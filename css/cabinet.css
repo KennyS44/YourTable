@@ -2,7 +2,19 @@
    Те же токены, что у стола: цвета, шаг 4px, шкала 14/16/20/24/32.   */
 
 .cab-body{overflow:auto}
-.cab{display:flex; flex-direction:column; min-height:100dvh}
+.cab{display:flex; flex-direction:column; min-height:100dvh; position:relative; z-index:1}
+
+/* Фон страницы под персонажа: картинка приглушена, иначе текст не читается */
+.page-bg{
+  position:fixed; inset:0; z-index:0; background-size:cover; background-position:center;
+  opacity:.22; filter:saturate(.85);
+}
+.has-page-bg .page-bg::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(23,22,19,.45), rgba(23,22,19,.8));
+}
+.has-page-bg .cab-side,.has-page-bg .sheet-wrap,.has-page-bg .blk{backdrop-filter:blur(2px)}
+.ribbon-acts{display:flex; gap:var(--s2); flex-wrap:wrap}
 .h-lg{font-size:20px; color:var(--gold)}
 .save-mark{font-size:14px; color:var(--muted); min-width:96px; text-align:right}
 .save-mark.is-bad{color:var(--danger)}
@@ -85,8 +97,9 @@
 }
 .sheet-head{display:grid; grid-template-columns:minmax(220px,1fr) 2fr; gap:var(--s3); align-items:end}
 .head-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2)}
-.sheet-cols{display:grid; grid-template-columns:250px 1fr 1fr; gap:var(--s3); margin-top:var(--s4)}
-.sheet-col{display:flex; flex-direction:column; gap:var(--s3); min-width:0}
+/* Карточки текут в три колонки и сами выравниваются по высоте */
+.sheet-flow{column-count:3; column-gap:var(--s3); margin-top:var(--s4)}
+.sheet-flow .blk{break-inside:avoid; margin-bottom:var(--s3)}
 .sheet-bottom{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); margin-top:var(--s3)}
 
 .blk{border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s3)}
@@ -110,15 +123,45 @@
 .fld input:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
 .fld-name input{min-height:52px; font-family:var(--f-head); font-size:24px; color:var(--gold)}
 .fld-num input{text-align:center}
-.row-3{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2)}
-.row-4{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2)}
+.row-3{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2); align-items:end}
+.row-4{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2); align-items:end}
 
-.insp{margin-bottom:var(--s1)}
-.prof-row{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
-.prof-row input{
-  width:64px; min-height:40px; text-align:center; border-radius:var(--r-sm);
-  border:1px solid var(--line); background:var(--panel); color:var(--text);
+/* Вдохновение только показываем: выдаёт его Мастер за столом */
+.insp-box{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
+.insp-n{
+  min-width:44px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:var(--r-sm); border:1px solid var(--gold-dim); background:var(--panel);
+  font-family:var(--f-head); font-size:20px; color:var(--gold);
 }
+
+/* Способности: свёрнутая вкладка — картинка и название, внутри текст */
+.feats{display:flex; flex-direction:column; gap:var(--s2); margin-bottom:var(--s2)}
+.feat{border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel); overflow:hidden}
+.feat.is-open{border-color:var(--gold-dim)}
+.feat-tab{
+  display:flex; align-items:center; gap:var(--s2); width:100%; min-height:52px;
+  padding:var(--s2); border:0; background:transparent; color:var(--text); cursor:pointer; text-align:left;
+}
+.feat-tab:hover{background:var(--panel-2)}
+.feat-pic{
+  width:40px; height:40px; flex-shrink:0; border-radius:var(--r-sm);
+  background:var(--bg-2) center/cover no-repeat; border:1px solid var(--line-soft);
+  display:inline-flex; align-items:center; justify-content:center; color:var(--gold-dim);
+}
+.feat-name{font-family:var(--f-head); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.feat-body{padding:0 var(--s2) var(--s2); display:flex; flex-direction:column; gap:var(--s2)}
+.feat-body textarea,.feat-name-input{
+  width:100%; padding:var(--s2); border-radius:var(--r-sm); border:1px solid var(--line);
+  background:var(--bg-2); color:var(--text); font-family:inherit; font-size:16px; line-height:1.5;
+}
+.feat-body textarea{resize:vertical}
+.feat-acts{display:flex; gap:var(--s2); justify-content:flex-end}
+
+.row-del{
+  width:32px; min-height:36px; border-radius:var(--r-sm); border:1px solid var(--line);
+  background:var(--panel); color:var(--muted); cursor:pointer;
+}
+.row-del:hover{color:var(--danger); border-color:var(--danger)}
 
 .abilities{display:grid; grid-template-columns:repeat(2,1fr); gap:var(--s2)}
 .abil{
@@ -132,24 +175,8 @@
   border-radius:var(--r-sm); border:1px solid var(--line-soft); background:var(--bg-2); color:var(--text);
 }
 
-.saves{display:flex; flex-direction:column; gap:2px}
-.save{display:flex; align-items:center; gap:var(--s2); min-height:32px; cursor:pointer; font-size:14px}
-.save input{width:16px; height:16px; accent-color:var(--gold)}
-.save-l{flex:1; color:var(--muted)}
-.save-v{font-family:var(--f-head); color:var(--gold); min-width:32px; text-align:right}
-
-.death{display:flex; flex-direction:column; gap:var(--s1); margin-top:var(--s2)}
-.death-row{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
-.dots{display:flex; gap:var(--s1)}
-.dot{
-  width:20px; height:20px; border-radius:50%; border:1px solid var(--line);
-  background:var(--panel); cursor:pointer; padding:0;
-}
-.dot.on.ok{background:var(--ok); border-color:var(--ok)}
-.dot.on.bad{background:var(--danger); border-color:var(--danger)}
-
 .attacks{display:flex; flex-direction:column; gap:var(--s1)}
-.atk-row{display:grid; grid-template-columns:1.2fr .5fr 1.3fr; gap:var(--s1)}
+.atk-row{display:grid; grid-template-columns:1.4fr .45fr 1.1fr 32px; gap:var(--s1)}
 .atk-row input{
   min-height:36px; padding:0 var(--s2); border-radius:var(--r-sm);
   border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:14px; width:100%;
@@ -177,11 +204,15 @@
 .adm-acts{display:flex; gap:var(--s2); flex-shrink:0}
 
 /* ── Телефон ── */
+@media (max-width: 1200px){
+  .sheet-flow{column-count:2}
+}
+
 @media (max-width: 900px){
   .cab-stage{grid-template-columns:1fr; padding:var(--s3)}
   .cab-side{position:static}
   .cab-main{order:-1}          /* на телефоне сперва персонажи, профиль ниже */
-  .sheet-cols{grid-template-columns:1fr}
+  .sheet-flow{column-count:1}
   .sheet-bottom{grid-template-columns:1fr}
   .sheet-head{grid-template-columns:1fr}
   .head-grid{grid-template-columns:repeat(2,1fr)}

@@ -6,7 +6,7 @@ import { createStore, defaultStats, emptyState, newLocation, newToken, normalize
 import { createBoard } from './board.js';
 import { DICE, roll, playAnimation } from './dice.js';
 import { packRoom } from './roomcode.js';
-import { noteRoom } from './registry.js';
+import { dbPut, noteRoom } from './registry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -644,7 +644,20 @@ function renderHeroes(s) {
       setTimeout(() => badge.classList.remove('is-changed'), 900);
     }
     gemShown = mine;
+    sendInspToCabinet(mine);
   }
+}
+
+/**
+ * Счётчик вдохновения виден и в личном кабинете, но правит его только Мастер.
+ * Поэтому стол сам кладёт число в кабинет игрока — если тот вошёл через него.
+ */
+let inspSent = null;
+function sendInspToCabinet(n) {
+  if (inspSent === n) return;
+  inspSent = n;
+  const cab = JSON.parse(sessionStorage.getItem('dnd.cab') || 'null');
+  if (cab && cab.path) dbPut(`cab-${cab.path}/profile/insp`, n);
 }
 /** Тот же гранёный камень, что и в верхней панели. */
 function gemNode(dim) {

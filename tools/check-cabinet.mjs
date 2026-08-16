@@ -74,7 +74,7 @@ const поле = async (label, value) => {
 await поле('Максимум хитов', 34);
 await поле('Хиты сейчас', 28);
 await поле('Обзор, фт', 60);
-await поле('Класс и уровень', 'Воин 4');
+await поле('Класс', 'Воин 4');
 await pl.evaluate(() => {
   const a = [...document.querySelectorAll('#sheet .abil')].find((x) => x.querySelector('.abil-l').textContent === 'Сила');
   const i = a.querySelector('.abil-score');
@@ -94,19 +94,42 @@ R.лист = await pl.evaluate(() => {
   return {
     модификаторСилы: [...document.querySelectorAll('#sheet .abil')]
       .find((a) => a.querySelector('.abil-l').textContent === 'Сила').querySelector('.abil-mod').textContent,
-    есть: { внешнийВид: blk('Внешний вид'), лор: blk('Лор персонажа'), заметки: blk('Заметки'), атаки: blk('Атаки и заклинания') },
-    убрано: { временныеХиты: fld('Временные хиты'), навыки: blk('Навыки'), пассивнаяМудрость: fld('Пассивная мудрость') },
+    есть: { внешнийВид: blk('Внешний вид'), лор: blk('Лор персонажа'), заметки: blk('Заметки'),
+      атаки: blk('Атаки и заклинания'), способности: blk('Умения и способности'), класс: fld('Класс') },
+    убрано: {
+      классИУровень: fld('Класс и уровень'), предыстория: fld('Предыстория'), опыт: fld('Опыт'),
+      инициатива: fld('Инициатива'), спасброски: blk('Спасброски'), бонусМастерства: fld('Бонус мастерства'),
+      успехи: [...document.querySelectorAll('#sheet .fld-l, #sheet .blk-h')].some((x) => x.textContent === 'Успехи'),
+    },
+    вдохновениеТолькоЧтение: !!document.querySelector('#sheet .insp-n')
+      && !document.querySelector('#sheet .insp-box input'),
   };
 });
 
-/* спасбросок считается сам: ставим галочку у Силы */
+/* способность: добавляем, называем — имя должно попасть в подсказки атак */
 await pl.evaluate(() => {
-  const row = [...document.querySelectorAll('#sheet .save')].find((s) => s.querySelector('.save-l').textContent === 'Сила');
-  const box = row.querySelector('input'); box.checked = true; box.dispatchEvent(new Event('change'));
+  [...document.querySelectorAll('#sheet .btn')].find((b) => b.textContent.includes('Способность')).click();
 });
 await pl.waitForTimeout(400);
-R.спасбросокСилы = await pl.evaluate(() => [...document.querySelectorAll('#sheet .save')]
-  .find((s) => s.querySelector('.save-l').textContent === 'Сила').querySelector('.save-v').textContent);
+await pl.evaluate(() => {
+  const i = document.querySelector('#sheet .feat-name-input');
+  i.value = 'Второе дыхание'; i.dispatchEvent(new Event('input', { bubbles: true }));
+  const t = document.querySelector('#sheet .feat-body textarea');
+  t.value = 'Бонусным действием лечит 1к10+уровень'; t.dispatchEvent(new Event('input', { bubbles: true }));
+});
+await pl.waitForTimeout(600);
+R.способности = await pl.evaluate(() => ({
+  вкладок: document.querySelectorAll('#sheet .feat').length,
+  название: document.querySelector('#sheet .feat-name').textContent,
+  подтянулосьВАтаки: [...document.querySelectorAll('#sheet datalist option')].map((o) => o.value),
+}));
+
+/* строки атак добавляются */
+const строкАтак = () => pl.$$eval('#sheet .atk-row:not(.atk-head)', (n) => n.length);
+const былоСтрок = await строкАтак();
+await pl.evaluate(() => { [...document.querySelectorAll('#sheet .btn')].find((b) => b.textContent.includes('Строка')).click(); });
+await pl.waitForTimeout(500);
+R.атаки = { было: былоСтрок, стало: await строкАтак() };
 
 /* ── Перезаход: всё сохранилось в облаке ── */
 const pl2 = await (await browser.newContext({ viewport: { width: 1400, height: 950 } })).newPage(); watch(pl2, 'PL2');
@@ -123,7 +146,8 @@ R.послеПерезахода = await pl2.evaluate(() => {
   };
   return {
     имя: document.querySelector('.char-card.is-active .char-name').value,
-    хиты: f('Максимум хитов'), обзор: f('Обзор, фт'), класс: f('Класс и уровень'),
+    хиты: f('Максимум хитов'), обзор: f('Обзор, фт'), класс: f('Класс'),
+    способность: document.querySelector('#sheet .feat-name')?.textContent,
   };
 });
 R.чужойПароль = await (async () => {
@@ -140,6 +164,9 @@ R.чужойПароль = await (async () => {
 
 /* ── Выбираем персонажа и уходим за стол по коду ── */
 await pl.click('#btn-pick');
+await pl.waitForTimeout(600);
+R.выборНеОткрываетВкладку = await pl.$eval('#wait', (e) => e.hidden);
+await pl.click('#btn-go');
 await pl.waitForSelector('#wait:not([hidden])', { timeout: 10000 });
 R.ожидание = { подпись: await pl.$eval('#wait-sub', (e) => e.textContent) };
 await pl.fill('#wait-form [name=code]', 'мусор');
@@ -160,6 +187,19 @@ R.заСтолом = await dm.evaluate(() => {
     фигурокНаПоле: Object.keys(s.tokens).length,     // никого не ставим сами
   };
 });
+
+/* вдохновение выдаёт Мастер — в кабинете оно только показывается */
+await dm.evaluate(() => window.__dispatch({ t: 'insp.set', key: 'торин', value: 3 }));
+await pl.waitForTimeout(3000);
+const плКаб = await (await browser.newContext()).newPage(); watch(плКаб, 'CAB2');
+await плКаб.goto(page('cabinet.html'));
+await плКаб.fill('#login-form [name=login]', LOGIN);
+await плКаб.fill('#login-form [name=pass]', PASS);
+await плКаб.click('#login-form button[type=submit]');
+await плКаб.waitForSelector('#cab:not([hidden])', { timeout: 20000 });
+await плКаб.waitForTimeout(1200);
+R.вдохновениеИзЗаСтола = await плКаб.$eval('#sheet .insp-n', (e) => e.textContent);
+await плКаб.close();
 
 /* тот же персонаж со стола не плодит вторую карточку, а обновляет прежнюю */
 await pl.evaluate(() => {

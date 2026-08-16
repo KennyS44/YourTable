@@ -88,11 +88,22 @@ function start(store, data) {
 }
 
 function fixChar(c) {
-  return { id: c.id, name: c.name || 'Безымянный', bg: c.bg || '', sheet: fixSheet(c.sheet), at: c.at || Date.now() };
+  return {
+    id: c.id, name: c.name || 'Безымянный', bg: c.bg || '', pageBg: c.pageBg || '',
+    sheet: fixSheet(c.sheet), at: c.at || Date.now(),
+  };
 }
 
 function newChar() {
-  return { id: uid('ch'), name: 'Новый персонаж', bg: '', sheet: emptySheet(), at: Date.now() };
+  return { id: uid('ch'), name: 'Новый персонаж', bg: '', pageBg: '', sheet: emptySheet(), at: Date.now() };
+}
+
+/** Фон всей страницы — у каждого персонажа свой; нет своего, берём фон карточки. */
+function applyPageBg() {
+  const ch = cab.chars[cab.currentId];
+  const src = ch && (ch.pageBg || ch.bg);
+  $('#page-bg').style.backgroundImage = src ? `url("${src}")` : '';
+  document.body.classList.toggle('has-page-bg', !!src);
 }
 
 /* Сохраняем не на каждую букву: копим правки и пишем раз в секунду. */
@@ -189,9 +200,14 @@ function renderCurrent() {
   const ch = cab.chars[cab.currentId];
   $('#sheet-wrap').hidden = !ch;
   $('#sheet-empty').hidden = !!ch;
+  $('#btn-page-bg').hidden = !ch;
+  applyPageBg();
+  $('#btn-pick').disabled = !ch;
   if (!ch) return;
-  renderSheet($('#sheet'), ch, () => { save(ch); syncRibbonName(ch); });
-  $('#btn-pick').disabled = false;
+  renderSheet($('#sheet'), ch, () => { save(ch); syncRibbonName(ch); }, {
+    insp: cab.profile.insp || 0,
+    pickImage: (file, side) => shrink(file, side),
+  });
 }
 
 /** Имя правится и в ленте, и в шапке листа — держим оба поля в согласии. */
@@ -210,6 +226,7 @@ function renderPick() {
   const ch = cab.chars[cab.pickedId];
   $('#pick-name').textContent = ch ? ch.name : 'Персонаж не выбран';
   $('#pick-bg').style.backgroundImage = ch && ch.bg ? `url("${ch.bg}")` : '';
+  $('#btn-go').disabled = !ch;
 }
 
 function wire() {
@@ -223,13 +240,29 @@ function wire() {
     sessionStorage.removeItem('dnd.cab');
     location.reload();
   });
+  // выбор только отмечает персонажа; за стол уводит отдельная кнопка
   $('#btn-pick').addEventListener('click', () => {
     const ch = cab.chars[cab.currentId];
     if (!ch) return;
     cab.pickedId = ch.id;
     renderPick();
-    openWaiting(ch);
+    mark(`Выбран: ${ch.name}`);
   });
+  $('#btn-go').addEventListener('click', () => {
+    const ch = cab.chars[cab.pickedId];
+    if (ch) openWaiting(ch);
+  });
+
+  $('#page-bg-file').addEventListener('change', async (e) => {
+    const ch = cab.chars[cab.currentId];
+    const f = e.target.files[0];
+    if (!ch || !f) return;
+    ch.pageBg = await shrink(f, 1600);
+    save(ch);
+    applyPageBg();
+    e.target.value = '';
+  });
+
   $('#btn-back').addEventListener('click', () => { $('#wait').hidden = true; });
   $('#wait-form').addEventListener('submit', enterRoom);
 }

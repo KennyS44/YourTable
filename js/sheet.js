@@ -1,9 +1,9 @@
 // Лист персонажа. Классический бланк D&D, но собранный из полей приложения:
 // та же тёмная бумага, золотые канты, шкала отступов и размеров.
 //
-// Чего здесь нет намеренно: временных хитов и списка навыков с пассивной
-// мудростью — вместо них окно внешнего вида. Спасброски считаются сами:
-// модификатор характеристики плюс бонус мастерства, если стоит галочка.
+// Чего здесь нет намеренно: временных хитов, навыков с пассивной мудростью,
+// спасбросков, бонуса мастерства, предыстории, опыта, инициативы и спасбросков
+// от смерти. Вдохновение не правится: его выдаёт Мастер за столом.
 
 export const ABILITIES = [
   { id: 'str', label: 'Сила' },
@@ -15,54 +15,51 @@ export const ABILITIES = [
 ];
 
 const HEAD = [
-  { id: 'cls', label: 'Класс и уровень' },
+  { id: 'cls', label: 'Класс' },
   { id: 'race', label: 'Раса' },
-  { id: 'background', label: 'Предыстория' },
   { id: 'alignment', label: 'Мировоззрение' },
-  { id: 'xp', label: 'Опыт' },
   { id: 'player', label: 'Имя игрока' },
 ];
 
-// Разложены по колонкам так, чтобы столбцы кончались примерно на одной высоте
-const TEXTS = {
-  left: [{ id: 'langs', label: 'Прочие владения и языки', rows: 3 }],
-  mid: [
-    { id: 'gear', label: 'Снаряжение', rows: 4 },
-    { id: 'features', label: 'Умения и особенности', rows: 4 },
-  ],
-  right: [
-    { id: 'appearance', label: 'Внешний вид', rows: 5 },
-    { id: 'traits', label: 'Черты характера', rows: 3 },
-    { id: 'ideals', label: 'Идеалы', rows: 2 },
-    { id: 'bonds', label: 'Привязанности', rows: 2 },
-    { id: 'flaws', label: 'Слабости', rows: 2 },
-  ],
-};
-const ALL_TEXTS = [...TEXTS.left, ...TEXTS.mid, ...TEXTS.right];
-
-export const ATTACK_ROWS = 5;
+// Порядок карточек в потоке; по колонкам их раскладывает сама вёрстка,
+// поэтому столбцы кончаются на одной высоте, сколько бы ни было способностей.
+const TEXTS = [
+  { id: 'appearance', label: 'Внешний вид', rows: 5 },
+  { id: 'traits', label: 'Черты характера', rows: 3 },
+  { id: 'ideals', label: 'Идеалы', rows: 2 },
+  { id: 'bonds', label: 'Привязанности', rows: 2 },
+  { id: 'flaws', label: 'Слабости', rows: 2 },
+  { id: 'gear', label: 'Снаряжение', rows: 4 },
+  { id: 'langs', label: 'Прочие владения и языки', rows: 3 },
+];
 
 export const mod = (score) => Math.floor(((Number(score) || 10) - 10) / 2);
 export const sign = (n) => (n >= 0 ? '+' : '−') + Math.abs(n);
+const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
 
 export function emptySheet() {
   const s = {
-    cls: '', race: '', background: '', alignment: '', xp: '', player: '',
-    prof: 2, inspiration: false,
-    ac: 10, initiative: 0, speed: 30, vision: 30,
-    hpMax: 10, hpCur: 10, hitDice: '', deathOk: 0, deathFail: 0,
-    attacks: Array.from({ length: ATTACK_ROWS }, () => ({ name: '', bonus: '', dmg: '' })),
+    cls: '', race: '', alignment: '', player: '',
+    ac: 10, speed: 30, vision: 30,
+    hpMax: 10, hpCur: 10, hitDice: '',
+    attacks: [{ name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }],
+    feats: [],                 // способности: {id, name, img, text}
     lore: '', notes: '',
   };
-  ABILITIES.forEach((a) => { s[a.id] = 10; s['save_' + a.id] = false; });
-  ALL_TEXTS.forEach((t) => { s[t.id] = ''; });
+  ABILITIES.forEach((a) => { s[a.id] = 10; });
+  TEXTS.forEach((t) => { s[t.id] = ''; });
   return s;
 }
 
 /** Дополняем сохранённый лист до полного: старые записи не должны падать. */
 export function fixSheet(raw) {
   const s = { ...emptySheet(), ...(raw || {}) };
-  s.attacks = Array.from({ length: ATTACK_ROWS }, (_, i) => ({ name: '', bonus: '', dmg: '', ...((raw && raw.attacks && raw.attacks[i]) || {}) }));
+  const rows = (raw && raw.attacks) || [];
+  s.attacks = rows.length ? rows.map((a) => ({ name: '', bonus: '', dmg: '', ...a })) : emptySheet().attacks;
+  s.feats = ((raw && raw.feats) || []).map((f) => ({ id: f.id || uid('ft'), name: f.name || '', img: f.img || '', text: f.text || '' }));
+  // старое текстовое поле «Умения и особенности» переносим в первую способность
+  if (!s.feats.length && raw && raw.features) s.feats = [{ id: uid('ft'), name: 'Особенности', img: '', text: raw.features }];
+  delete s.features;
   return s;
 }
 
@@ -74,10 +71,10 @@ const el = (tag, cls = '', text = '') => {
 };
 
 /**
- * Рисуем лист. onEdit(key, value) отдаёт правку наружу — кабинет её сохраняет.
- * Всё, что можно посчитать (модификаторы, спасброски), пересчитывается на месте.
+ * Рисуем лист. onEdit(key) отдаёт правку наружу — кабинет её сохраняет.
+ * ctx.insp — сколько вдохновений выдал Мастер, ctx.pickImage — выбор картинки.
  */
-export function renderSheet(root, ch, onEdit) {
+export function renderSheet(root, ch, onEdit, ctx = {}) {
   const s = ch.sheet;
   root.innerHTML = '';
 
@@ -89,8 +86,8 @@ export function renderSheet(root, ch, onEdit) {
     });
     return node;
   };
-  const textField = (label, key, wide) => {
-    const f = el('label', 'fld' + (wide ? ' fld-wide' : ''));
+  const textField = (label, key) => {
+    const f = el('label', 'fld');
     const i = el('input');
     i.value = s[key] ?? '';
     f.append(el('span', 'fld-l', label), bind(i, key));
@@ -133,21 +130,12 @@ export function renderSheet(root, ch, onEdit) {
   head.append(nameWrap, headGrid);
   root.append(head);
 
-  /* ── колонка 1: характеристики и спасброски ── */
-  const col1 = el('div', 'sheet-col');
+  /* ── карточки одним потоком ── */
+  const flow = el('div', 'sheet-flow');
 
-  const insp = el('label', 'check insp');
-  const inspBox = el('input');
-  inspBox.type = 'checkbox';
-  inspBox.checked = !!s.inspiration;
-  inspBox.addEventListener('change', () => { s.inspiration = inspBox.checked; onEdit('inspiration', s.inspiration); });
-  insp.append(inspBox, el('span', '', 'Вдохновение'));
-
-  const profRow = el('div', 'prof-row');
-  const profInput = el('input');
-  profInput.type = 'number';
-  profInput.value = s.prof;
-  profRow.append(el('span', 'fld-l', 'Бонус мастерства'), bind(profInput, 'prof', (v) => Number(v) || 0));
+  const insp = el('div', 'insp-box');
+  insp.append(el('span', 'fld-l', 'Вдохновение'), el('span', 'insp-n', String(ctx.insp || 0)));
+  const inspBlock = block('', insp, el('p', 'hint', 'Выдаёт и забирает Мастер за столом.'));
 
   const abil = el('div', 'abilities');
   const modNodes = {};
@@ -161,80 +149,140 @@ export function renderSheet(root, ch, onEdit) {
     abil.append(c);
   });
 
-  const saves = el('div', 'saves');
-  const saveNodes = {};
-  ABILITIES.forEach((a) => {
-    const r = el('label', 'save');
-    const box = el('input');
-    box.type = 'checkbox';
-    box.checked = !!s['save_' + a.id];
-    box.addEventListener('change', () => {
-      s['save_' + a.id] = box.checked;
-      onEdit('save_' + a.id, box.checked);
-      refreshDerived();
-    });
-    saveNodes[a.id] = el('span', 'save-v', '');
-    r.append(box, el('span', 'save-l', a.label), saveNodes[a.id]);
-    saves.append(r);
-  });
+  flow.append(inspBlock, block('Характеристики', abil));
 
-  col1.append(block('', insp, profRow), block('Характеристики', abil), block('Спасброски', saves));
-  TEXTS.left.forEach((t) => col1.append(area(t)));
-
-  /* ── колонка 2: бой ── */
-  const col2 = el('div', 'sheet-col');
-  const defense = el('div', 'row-4');
-  defense.append(numField('КД', 'ac'), numField('Инициатива', 'initiative'),
-    numField('Скорость', 'speed'), numField('Обзор, фт', 'vision'));
+  const defense = el('div', 'row-3');
+  defense.append(numField('КД', 'ac'), numField('Скорость', 'speed'), numField('Обзор, фт', 'vision'));
 
   const hp = el('div', 'row-3');
   hp.append(numField('Хиты сейчас', 'hpCur'), numField('Максимум хитов', 'hpMax'), textField('Кость хитов', 'hitDice'));
 
-  const death = el('div', 'death');
-  const dots = (key, label, tone) => {
-    const row = el('div', 'death-row');
-    row.append(el('span', 'fld-l', label));
-    const box = el('div', 'dots');
-    for (let i = 1; i <= 3; i++) {
-      const d = el('button', 'dot ' + tone + (s[key] >= i ? ' on' : ''));
-      d.type = 'button';
-      d.addEventListener('click', () => {
-        s[key] = s[key] === i ? i - 1 : i;      // повторный клик по горящей — снять
-        onEdit(key, s[key]);
-        [...box.children].forEach((c, j) => c.classList.toggle('on', s[key] >= j + 1));
-      });
-      box.append(d);
-    }
-    row.append(box);
-    return row;
-  };
-  death.append(dots('deathOk', 'Успехи', 'ok'), dots('deathFail', 'Провалы', 'bad'));
-
+  /* Атаки: строки добавляются, названия подсказываются из способностей */
+  const listId = 'feat-names';
+  const datalist = el('datalist');
+  datalist.id = listId;
   const atk = el('div', 'attacks');
-  const ah = el('div', 'atk-row atk-head');
-  ah.append(el('span', '', 'Название'), el('span', '', 'Бонус'), el('span', '', 'Урон и вид'));
-  atk.append(ah);
-  s.attacks.forEach((a, i) => {
-    const r = el('div', 'atk-row');
-    ['name', 'bonus', 'dmg'].forEach((k) => {
-      const inp = el('input');
-      inp.value = a[k] || '';
-      inp.addEventListener('input', () => { a[k] = inp.value; onEdit('attacks', s.attacks); });
-      r.append(inp);
-    });
-    atk.append(r);
+  const addAtkBtn = el('button', 'btn btn-soft btn-sm w-full', '+ Строка');
+  addAtkBtn.type = 'button';
+  addAtkBtn.addEventListener('click', () => {
+    s.attacks.push({ name: '', bonus: '', dmg: '' });
+    onEdit('attacks', s.attacks);
+    drawAttacks();
   });
 
-  col2.append(block('Защита и ход', defense), block('Хиты', hp, death), block('Атаки и заклинания', atk));
-  TEXTS.mid.forEach((t) => col2.append(area(t)));
+  function drawAttacks() {
+    atk.innerHTML = '';
+    const h = el('div', 'atk-row atk-head');
+    h.append(el('span', '', 'Название'), el('span', '', 'Бонус'), el('span', '', 'Урон и вид'), el('span', '', ''));
+    atk.append(h);
+    s.attacks.forEach((a, i) => {
+      const r = el('div', 'atk-row');
+      ['name', 'bonus', 'dmg'].forEach((k) => {
+        const inp = el('input');
+        inp.value = a[k] || '';
+        if (k === 'name') inp.setAttribute('list', listId);
+        inp.addEventListener('input', () => { a[k] = inp.value; onEdit('attacks', s.attacks); });
+        r.append(inp);
+      });
+      const del = el('button', 'row-del', '×');
+      del.type = 'button';
+      del.title = 'Убрать строку';
+      del.addEventListener('click', () => {
+        s.attacks.splice(i, 1);
+        if (!s.attacks.length) s.attacks.push({ name: '', bonus: '', dmg: '' });
+        onEdit('attacks', s.attacks);
+        drawAttacks();
+      });
+      r.append(del);
+      atk.append(r);
+    });
+  }
+  drawAttacks();
 
-  /* ── колонка 3: описание ── */
-  const col3 = el('div', 'sheet-col');
-  TEXTS.right.forEach((t) => col3.append(area(t)));
+  flow.append(block('Защита и ход', defense), block('Хиты', hp),
+    block('Атаки и заклинания', atk, addAtkBtn, datalist));
 
-  const cols = el('div', 'sheet-cols');
-  cols.append(col1, col2, col3);
-  root.append(cols);
+  const feats = el('div', 'feats');
+  const addFeat = el('button', 'btn btn-soft btn-sm w-full', '+ Способность');
+  addFeat.type = 'button';
+  addFeat.addEventListener('click', () => {
+    const f = { id: uid('ft'), name: 'Новая способность', img: '', text: '' };
+    s.feats.push(f);
+    onEdit('feats', s.feats);
+    openFeat = f.id;
+    drawFeats();
+  });
+
+  let openFeat = null;
+  function drawFeats() {
+    feats.innerHTML = '';
+    datalist.innerHTML = '';
+    s.feats.forEach((f) => {
+      if (f.name) datalist.append(new Option(f.name));
+
+      const card = el('div', 'feat' + (openFeat === f.id ? ' is-open' : ''));
+      const tab = el('button', 'feat-tab');
+      tab.type = 'button';
+      const pic = el('span', 'feat-pic');
+      if (f.img) pic.style.backgroundImage = `url("${f.img}")`;
+      else pic.textContent = '✦';
+      tab.append(pic, el('span', 'feat-name', f.name || 'Без названия'));
+      tab.addEventListener('click', () => { openFeat = openFeat === f.id ? null : f.id; drawFeats(); });
+      card.append(tab);
+
+      if (openFeat === f.id) {
+        const body = el('div', 'feat-body');
+        const nameI = el('input', 'feat-name-input');
+        nameI.value = f.name;
+        nameI.placeholder = 'Название способности';
+        nameI.addEventListener('input', () => {
+          f.name = nameI.value;
+          onEdit('feats', s.feats);
+          tab.querySelector('.feat-name').textContent = f.name || 'Без названия';
+          refreshNames();
+        });
+        const ta = el('textarea');
+        ta.rows = 5;
+        ta.value = f.text;
+        ta.placeholder = 'Что делает способность';
+        ta.addEventListener('input', () => { f.text = ta.value; onEdit('feats', s.feats); });
+
+        const row = el('div', 'feat-acts');
+        const up = el('label', 'btn btn-soft btn-sm file-btn', '🖼 Картинка');
+        const inp = el('input');
+        inp.type = 'file'; inp.accept = 'image/*'; inp.hidden = true;
+        inp.addEventListener('change', async () => {
+          if (!inp.files[0] || !ctx.pickImage) return;
+          f.img = await ctx.pickImage(inp.files[0], 220);
+          onEdit('feats', s.feats);
+          drawFeats();
+        });
+        up.append(inp);
+        const del = el('button', 'btn btn-danger btn-sm', 'Убрать');
+        del.type = 'button';
+        del.addEventListener('click', () => {
+          if (!confirm(`Убрать способность «${f.name || 'без названия'}»?`)) return;
+          s.feats = s.feats.filter((x) => x.id !== f.id);
+          onEdit('feats', s.feats);
+          drawFeats();
+        });
+        row.append(up, del);
+        body.append(nameI, ta, row);
+        card.append(body);
+      }
+      feats.append(card);
+    });
+    if (!s.feats.length) feats.append(el('p', 'hint', 'Способностей пока нет.'));
+  }
+  const refreshNames = () => {
+    datalist.innerHTML = '';
+    s.feats.forEach((f) => { if (f.name) datalist.append(new Option(f.name)); });
+  };
+  drawFeats();
+
+  flow.append(block('Умения и способности', feats, addFeat));
+  TEXTS.forEach((t) => flow.append(area(t)));
+  root.append(flow);
 
   /* ── лор и заметки ── */
   const bottom = el('div', 'sheet-bottom');
@@ -242,11 +290,7 @@ export function renderSheet(root, ch, onEdit) {
   root.append(bottom);
 
   function refreshDerived() {
-    ABILITIES.forEach((a) => {
-      const m = mod(s[a.id]);
-      modNodes[a.id].textContent = sign(m);
-      saveNodes[a.id].textContent = sign(m + (s['save_' + a.id] ? Number(s.prof) || 0 : 0));
-    });
+    ABILITIES.forEach((a) => { modNodes[a.id].textContent = sign(mod(s[a.id])); });
   }
   refreshDerived();
 }

@@ -8,26 +8,29 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=13">
-<link rel="stylesheet" href="css/cabinet.css?v=13">
+<link rel="stylesheet" href="css/app.css?v=14">
+<link rel="stylesheet" href="css/cabinet.css?v=14">
 
 <!-- Версия сборки — та же, что в index.html. Поднимайте её при каждом обновлении. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/cabinet.js":        "./js/cabinet.js?v=13",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=13",
-    "./js/sheet.js":          "./js/sheet.js?v=13",
-    "./js/roomcode.js":       "./js/roomcode.js?v=13",
-    "./js/registry.js":       "./js/registry.js?v=13",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=13",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=13",
-    "./js/idb.js":            "./js/idb.js?v=13"
+    "./js/cabinet.js":        "./js/cabinet.js?v=14",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=14",
+    "./js/sheet.js":          "./js/sheet.js?v=14",
+    "./js/roomcode.js":       "./js/roomcode.js?v=14",
+    "./js/registry.js":       "./js/registry.js?v=14",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=14",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=14",
+    "./js/idb.js":            "./js/idb.js?v=14"
   }
 }
 </script>
 </head>
 <body class="cab-body">
+
+<!-- Фон страницы: своя картинка у каждого персонажа -->
+<div class="page-bg" id="page-bg" aria-hidden="true"></div>
 
 <!-- ───────────────────────── Вход в кабинет ───────────────────────── -->
 <div id="gate" class="gate">
@@ -79,14 +82,20 @@
         <div class="pick-bg" id="pick-bg"></div>
         <span class="pick-name" id="pick-name">Персонаж не выбран</span>
       </div>
-      <button class="btn btn-primary w-full" id="btn-pick" disabled>Выбрать этого персонажа</button>
-      <p class="hint">Дальше вы попадёте в комнату ожидания и введёте код стола. Мастер увидит фигурку с этими хитами и обзором.</p>
+      <button class="btn btn-soft w-full" id="btn-pick" disabled>Выбрать этого персонажа</button>
+      <button class="btn btn-primary w-full" id="btn-go" disabled>Переместиться за стол</button>
+      <p class="hint">Сначала выберите персонажа, потом идите за стол и введите код от Мастера. Мастер получит карточку с этими хитами и обзором.</p>
     </aside>
 
     <section class="cab-main">
       <div class="ribbon-head">
         <h2 class="h-lg">Мои персонажи</h2>
-        <button class="btn btn-soft btn-sm" id="btn-new-char">+ Новый персонаж</button>
+        <div class="ribbon-acts">
+          <label class="btn btn-soft btn-sm file-btn" id="btn-page-bg">🖼 Фон страницы
+            <input type="file" id="page-bg-file" accept="image/*" hidden>
+          </label>
+          <button class="btn btn-soft btn-sm" id="btn-new-char">+ Новый персонаж</button>
+        </div>
       </div>
       <div class="ribbon" id="ribbon"></div>
 
@@ -119,6 +128,6 @@
   </div>
 </div>
 
-<script type="module" src="js/cabinet.js?v=13"></script>
+<script type="module" src="js/cabinet.js?v=14"></script>
 </body>
 </html>
