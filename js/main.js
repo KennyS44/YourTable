@@ -236,15 +236,37 @@ async function bringCharacter() {
     vision: ch.vision > 0 ? ch.vision : 30,
     cells: 1, hpPublic: true, namePublic: true,
   };
+  // персонаж принадлежит тому, кто его привёл: и карточка, и будущие фигурки
+  const owner = { id: app.me.id, name: app.me.name };
   const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
   const old = Object.values(s.library).find((it) => same(it.name, ch.name));
+  let libId;
   if (old) {
-    app.store.dispatch({ t: 'lib.update', id: old.id, patch: { kind: 'pc', assetId: assetId || old.assetId, stats } });
+    libId = old.id;
+    app.store.dispatch({ t: 'lib.update', id: old.id, patch: { kind: 'pc', assetId: assetId || old.assetId, stats, owner } });
     say(`Карточка «${ch.name}» обновлена из личного кабинета`, 'system');
   } else {
-    app.store.dispatch({ t: 'lib.add', item: { id: uid('lib'), name: ch.name, kind: 'pc', assetId, stats } });
+    libId = uid('lib');
+    app.store.dispatch({ t: 'lib.add', item: { id: libId, name: ch.name, kind: 'pc', assetId, stats, owner } });
     say(`«${ch.name}» добавлен в «Иконки» — Мастер, поставьте фигурку на поле`, 'system');
   }
+  claimFigures(libId, ch.name, owner);
+}
+
+/**
+ * Фигурки этого персонажа, уже стоящие на поле, тоже становятся нашими:
+ * Мастер мог поставить их до того, как игрок вошёл. Чужих не трогаем.
+ */
+function claimFigures(libId, charName, owner) {
+  const s = app.store.get();
+  const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  Object.values(s.tokens).forEach((t) => {
+    if (t.libId !== libId && !same(t.name, charName)) return;
+    const free = !t.ownerName && !t.ownerId;
+    if (!free && !same(t.ownerName, owner.name)) return;      // это чужая фигурка
+    if (t.ownerId === owner.id && same(t.ownerName, owner.name)) return;
+    upd(t.id, { ownerId: owner.id, ownerName: owner.name });
+  });
 }
 
 function onRemoteEvent(ev) {
@@ -787,7 +809,9 @@ function openLibCard(it, ev) {
     (on) => libUpd(it.id, { stats: { namePublic: on } })));
   card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
     (on) => libUpd(it.id, { stats: { hpPublic: on } })));
-  card.append(el('p', 'hint', 'Эти настройки получит каждая новая фигурка с этой иконкой.'));
+  card.append(el('p', 'hint', it.owner
+    ? `Персонаж игрока ${it.owner.name}: его фигурки сразу достаются ему.`
+    : 'Эти настройки получит каждая новая фигурка с этой иконкой.'));
 
   // Отсюда переход и нужен: в списке иконок не видно, где на поле стоит это существо
   const bGo = el('button', 'btn btn-soft btn-sm w-full', '⌖ Перейти к фигурке');
@@ -1165,8 +1189,12 @@ function dropToken(libId, worldPos) {
     locId: s.activeLoc, x: c.x, y: c.y, assetId: it.assetId, libId: it.id, name: it.name, kind: it.kind,
     cells: st.cells, vision: st.vision, hp: { ...st.hp },
     hpPublic: st.hpPublic, namePublic: st.namePublic,
+    // персонаж из кабинета принадлежит своему игроку — привязываем сразу
+    ownerId: it.owner ? it.owner.id : null,
+    ownerName: it.owner ? it.owner.name : null,
   });
   app.store.dispatch({ t: 'token.add', token });
+  if (it.owner) say(`${it.name} на поле — фигуркой управляет ${it.owner.name}`, 'system');
 }
 
 /* ───────────────────────── Чат и броски ───────────────────────── */

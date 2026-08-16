@@ -188,6 +188,42 @@ R.заСтолом = await dm.evaluate(() => {
   };
 });
 
+/* персонаж сразу принадлежит игроку: Мастер ставит фигурку — она уже его */
+R.привязка = { карточка: await dm.evaluate(() => {
+  const lib = Object.values(window.__state().library).find((x) => x.name === 'Торин Дубощит');
+  return lib && lib.owner ? lib.owner.name : null;
+}) };
+await dm.click('[data-ltab=library]');
+await dm.waitForTimeout(600);
+await dm.dblclick('.lib-item');          // Мастер ставит фигурку из иконки
+await dm.waitForTimeout(1200);
+R.привязка.фигурка = await dm.evaluate(() => {
+  const t = Object.values(window.__state().tokens).find((x) => x.name === 'Торин Дубощит');
+  return t ? { владелец: t.ownerName, есть_id: !!t.ownerId } : null;
+});
+await pl.waitForTimeout(2000);
+R.привязка.игрокМожетДвигать = await pl.evaluate(() => {
+  const s = window.__state();
+  const t = Object.values(s.tokens).find((x) => x.name === 'Торин Дубощит');
+  const me = window.__me();
+  const ключ = (n) => String(n || '').trim().toLowerCase();
+  return !!t && (t.ownerId === me.id || ключ(t.ownerName) === ключ(me.name));
+});
+
+/* фигурка стояла ничьей (Мастер поставил её раньше) — приход игрока её забирает */
+await dm.evaluate(() => {
+  const t = Object.values(window.__state().tokens).find((x) => x.name === 'Торин Дубощит');
+  window.__dispatch({ t: 'token.update', id: t.id, patch: { ownerId: null, ownerName: null } });
+});
+await dm.waitForTimeout(800);
+await pl.reload();
+await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });
+await pl.waitForTimeout(3000);
+R.привязка.ничьюПодобрал = await dm.evaluate(() => {
+  const t = Object.values(window.__state().tokens).find((x) => x.name === 'Торин Дубощит');
+  return t ? t.ownerName : null;
+});
+
 /* вдохновение выдаёт Мастер — в кабинете оно только показывается */
 await dm.evaluate(() => window.__dispatch({ t: 'insp.set', key: 'торин', value: 3 }));
 await pl.waitForTimeout(3000);
