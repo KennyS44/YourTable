@@ -448,6 +448,16 @@ function msgNode(m) {
   return d;
 }
 
+/** Показать фигурку: если она в другой локации, сначала переходим туда. */
+function goToToken(t) {
+  if (!t) return;
+  if (t.locId !== app.store.get().activeLoc) {
+    if (!app.isDM) return;                       // локацию для стола меняет только Мастер
+    app.store.dispatch({ t: 'loc.active', id: t.locId });
+  }
+  setTimeout(() => app.board.focusToken(t.id), 40);
+}
+
 /** Имя существа глазами читателя: скрытые имена НПС и врагов игрок не видит. */
 function tokenName(t) {
   return (app.isDM || t.namePublic !== false) ? t.name : 'Неизвестное существо';
@@ -468,10 +478,7 @@ function renderInit(s) {
     if (t.assetId) assetUrl(t.assetId).then((u) => { if (u) img.src = u; });
     const go = el('button', 'mini', '⌖');
     go.title = 'Перейти к фигурке';
-    go.addEventListener('click', () => {
-      if (t.locId !== s.activeLoc && app.isDM) app.store.dispatch({ t: 'loc.active', id: t.locId });
-      setTimeout(() => app.board.focusToken(t.id), 40);
-    });
+    go.addEventListener('click', () => goToToken(t));
     head.append(img, el('span', 'nm', tokenName(t)), go, el('span', 'iv', String(entry.v)));
     row.append(head);
 
@@ -683,7 +690,7 @@ const libUpd = (id, patch) => app.store.dispatch({ t: 'lib.update', id, patch })
  * Карточка существа в базе. Хиты, обзор и видимость имени живут здесь, а не
  * только на фигурке: удалили фигурку — настройки никуда не делись.
  */
-function openLibCard(it) {
+function openLibCard(it, ev) {
   const card = $('#token-card');
   card.innerHTML = '';
   card.hidden = false;
@@ -716,13 +723,44 @@ function openLibCard(it) {
   card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
     (on) => libUpd(it.id, { stats: { hpPublic: on } })));
   card.append(el('p', 'hint', 'Эти настройки получит каждая новая фигурка с этой иконкой.'));
-  centerCard(card);
+
+  // Отсюда переход и нужен: в списке иконок не видно, где на поле стоит это существо
+  const bGo = el('button', 'btn btn-soft btn-sm w-full', '⌖ Перейти к фигурке');
+  const note = el('p', 'hint', '');
+  let i = 0;
+  const refresh = () => {
+    const list = tokensOfLib(app.store.get(), it);
+    bGo.disabled = !list.length;
+    bGo.textContent = list.length > 1 ? `⌖ Перейти к фигурке (${(i % list.length) + 1} из ${list.length})` : '⌖ Перейти к фигурке';
+    note.textContent = list.length ? '' : 'На поле пока нет фигурок с этой иконкой.';
+  };
+  bGo.addEventListener('click', () => {
+    const list = tokensOfLib(app.store.get(), it);
+    if (!list.length) return;
+    const t = list[i % list.length];
+    i = (i + 1) % list.length;
+    goToToken(t);
+    refresh();
+  });
+  refresh();
+  card.append(bGo, note);
+  // держим карточку у края поля, ближе к списку иконок: середина нужна свободной,
+  // чтобы увидеть фигурку, к которой перешли
+  const board = $('#board').getBoundingClientRect();
+  placeCard(card, ev
+    ? { x: ev.clientX - board.left, y: ev.clientY - board.top }
+    : { x: 0, y: board.height / 2 });
 }
 
-/** Карточка без привязки к фигурке — по центру поля. */
-function centerCard(card) {
-  const board = $('#board').getBoundingClientRect();
-  placeCard(card, { x: board.width / 2 - card.offsetWidth / 2, y: board.height / 2 - card.offsetHeight / 2 });
+/**
+ * Фигурки этой карточки: у поставленных раньше libId ещё нет, поэтому
+ * подхватываем их по общей иконке.
+ */
+function tokensOfLib(s, it) {
+  // порядок не трогаем: он должен быть одинаковым от клика к клику, иначе перебор
+  // копий начнёт возвращаться к той же фигурке
+  return Object.values(s.tokens)
+    .filter((t) => (t.libId ? t.libId === it.id : it.assetId && t.assetId === it.assetId));
 }
 
 /* ───────────────────────── Карточка токена ───────────────────────── */
@@ -741,9 +779,6 @@ function openTokenCard(t, screenPos) {
     const info = el('div', 'hint',
       `${hpVisible ? `Хиты: ${t.hp.cur}/${t.hp.max}. ` : ''}${(t.statuses || []).join(', ') || 'Состояний нет'}`);
     card.append(info);
-    const go = el('button', 'btn btn-soft btn-sm w-full', '⌖ Перейти к фигурке');
-    go.addEventListener('click', () => { app.board.focusToken(t.id); card.hidden = true; });
-    card.append(go);
     placeCard(card, screenPos);
     return;
   }
@@ -800,12 +835,8 @@ function openTokenCard(t, screenPos) {
   card.append(el('div', 'divider'), row);
 
   const lib = s.library[t.libId];
-  const row2 = el('div', lib ? 'row-2' : '');
-  const bGo = el('button', 'btn btn-soft btn-sm' + (lib ? '' : ' w-full'), '⌖ Перейти к фигурке');
-  bGo.addEventListener('click', () => { app.board.focusToken(t.id); card.hidden = true; });
-  row2.append(bGo);
   if (lib) {
-    const bSave = el('button', 'btn btn-soft btn-sm', 'Сохранить в базу');
+    const bSave = el('button', 'btn btn-soft btn-sm w-full', 'Сохранить в базу');
     bSave.title = `Записать имя, хиты и обзор в карточку «${lib.name}»`;
     bSave.addEventListener('click', () => {
       const cur = app.store.get().tokens[t.id];
@@ -819,9 +850,8 @@ function openTokenCard(t, screenPos) {
       });
       bSave.textContent = 'Сохранено ✓';
     });
-    row2.append(bSave);
+    card.append(bSave);
   }
-  card.append(row2);
   placeCard(card, screenPos);
 }
 
