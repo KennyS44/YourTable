@@ -4,14 +4,15 @@
 .cab-body{overflow:auto}
 .cab{display:flex; flex-direction:column; min-height:100dvh; position:relative; z-index:1}
 
-/* Фон страницы под персонажа: картинка приглушена, иначе текст не читается */
+/* Фон страницы под персонажа: картинка видна почти в полную силу — текст от
+   неё не страдает, потому что лежит на плотных карточках. */
 .page-bg{
   position:fixed; inset:0; z-index:0; background-size:cover; background-position:center;
-  opacity:.22; filter:saturate(.85);
+  opacity:.85;
 }
 .has-page-bg .page-bg::after{
   content:''; position:absolute; inset:0;
-  background:linear-gradient(180deg, rgba(23,22,19,.45), rgba(23,22,19,.8));
+  background:linear-gradient(180deg, rgba(23,22,19,.1), rgba(23,22,19,.28));
 }
 .has-page-bg .cab-side,.has-page-bg .sheet-wrap,.has-page-bg .blk{backdrop-filter:blur(2px)}
 .ribbon-acts{display:flex; gap:var(--s2); flex-wrap:wrap}
