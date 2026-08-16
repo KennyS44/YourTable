@@ -4,6 +4,7 @@
 import { chromium } from 'playwright-chromium';
 import { FIREBASE } from '../js/firebase-config.js';
 import { roomFingerprint } from '../js/sync-firebase.js';
+import { userPath } from '../js/cabinet-store.js';
 
 const slug = (s) => s.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\wа-яё-]/gi, '').slice(0, 40);
 
@@ -35,14 +36,21 @@ await dm.waitForSelector('#app:not([hidden])', { timeout: 20000 });
 await dm.click('#btn-add-location');
 await dm.waitForTimeout(1500);
 
-/* ── Игрок заводит кабинет: аккаунт тоже должен попасть в реестр ── */
+/* Кабинет заводит только Мастер из админки — здесь делаем это напрямую в базе */
+const завестиКабинет = async (login, pass, name) => {
+  const path = userPath(login, pass);
+  await fetch(`${FIREBASE.databaseURL}/rooms/cab-${path}/profile.json`,
+    { method: 'PUT', body: JSON.stringify({ login, name, at: Date.now() }) });
+  return path;
+};
+
+/* ── Выданный кабинет: вход игрока отмечает аккаунт в реестре ── */
+await завестиКабинет(LOGIN, PASS, 'Торин');
 const pl = await (await browser.newContext({ viewport: { width: 1200, height: 900 } })).newPage(); watch(pl, 'PL');
 await pl.goto(page('cabinet.html'));
-await pl.click('[data-gate-tab=signup]');
-await pl.fill('#signup-form [name=name]', 'Торин');
-await pl.fill('#signup-form [name=login]', LOGIN);
-await pl.fill('#signup-form [name=pass]', PASS);
-await pl.click('#signup-form button[type=submit]');
+await pl.fill('#login-form [name=login]', LOGIN);
+await pl.fill('#login-form [name=pass]', PASS);
+await pl.click('#login-form button[type=submit]');
 await pl.waitForSelector('#cab:not([hidden])', { timeout: 20000 });
 await pl.waitForTimeout(1500);
 

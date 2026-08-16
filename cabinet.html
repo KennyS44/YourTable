@@ -8,21 +8,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=12">
-<link rel="stylesheet" href="css/cabinet.css?v=12">
+<link rel="stylesheet" href="css/app.css?v=13">
+<link rel="stylesheet" href="css/cabinet.css?v=13">
 
 <!-- Версия сборки — та же, что в index.html. Поднимайте её при каждом обновлении. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/cabinet.js":        "./js/cabinet.js?v=12",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=12",
-    "./js/sheet.js":          "./js/sheet.js?v=12",
-    "./js/roomcode.js":       "./js/roomcode.js?v=12",
-    "./js/registry.js":       "./js/registry.js?v=12",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=12",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=12",
-    "./js/idb.js":            "./js/idb.js?v=12"
+    "./js/cabinet.js":        "./js/cabinet.js?v=13",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=13",
+    "./js/sheet.js":          "./js/sheet.js?v=13",
+    "./js/roomcode.js":       "./js/roomcode.js?v=13",
+    "./js/registry.js":       "./js/registry.js?v=13",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=13",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=13",
+    "./js/idb.js":            "./js/idb.js?v=13"
   }
 }
 </script>
@@ -35,12 +35,7 @@
     <h1 class="gate-title">Личный кабинет</h1>
     <p class="gate-sub">Ваши персонажи живут здесь и приходят с вами за любой стол.</p>
 
-    <div class="tabs" role="tablist">
-      <button class="tab is-active" data-gate-tab="login">Войти</button>
-      <button class="tab" data-gate-tab="signup">Завести кабинет</button>
-    </div>
-
-    <form id="login-form" class="gate-form" data-gate-panel="login">
+    <form id="login-form" class="gate-form">
       <label class="field">
         <span>Логин</span>
         <input name="login" required maxlength="24" autocomplete="username" placeholder="torin">
@@ -53,24 +48,7 @@
       <p class="gate-err" id="login-err" hidden></p>
     </form>
 
-    <form id="signup-form" class="gate-form" data-gate-panel="signup" hidden>
-      <label class="field">
-        <span>Ваше имя</span>
-        <input name="name" required maxlength="24" autocomplete="off" placeholder="Торин">
-      </label>
-      <label class="field">
-        <span>Логин</span>
-        <input name="login" required maxlength="24" autocomplete="username" placeholder="torin">
-      </label>
-      <label class="field">
-        <span>Пароль</span>
-        <input name="pass" required type="password" minlength="3" autocomplete="new-password">
-      </label>
-      <button class="btn btn-primary" type="submit">Завести кабинет</button>
-      <p class="gate-err" id="signup-err" hidden></p>
-    </form>
-
-    <p class="gate-note">Пароль нигде не хранится: по нему считается адрес вашего кабинета. Запишите пару логин-пароль — восстановить их некому.</p>
+    <p class="gate-note">Кабинет заводит Мастер и присылает вам логин с паролем. Запишите их: пароль нигде не хранится — по нему считается адрес вашего кабинета, и восстановить его некому.</p>
   </div>
 </div>
 
@@ -141,6 +119,6 @@
   </div>
 </div>
 
-<script type="module" src="js/cabinet.js?v=12"></script>
+<script type="module" src="js/cabinet.js?v=13"></script>
 </body>
 </html>

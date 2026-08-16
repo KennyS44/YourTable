@@ -1,6 +1,8 @@
 // Проверка личного кабинета: заведение, персонажи, лист, сохранение между
 // заходами и выход за стол по коду комнаты с переносом характеристик.
 import { chromium } from 'playwright-chromium';
+import { FIREBASE } from '../js/firebase-config.js';
+import { userPath } from '../js/cabinet-store.js';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:20300/';
 const page = (n) => BASE.replace(/[^/]*$/, '') + n;
@@ -33,14 +35,22 @@ await dm.waitForTimeout(300);
 const код = await dm.$eval('#code-out, #link-out', (i) => i.value);
 R.кодКомнаты = { длина: код.length, естьПробелы: /\s/.test(код) };
 
-/* ── Игрок заводит кабинет ── */
+/* Кабинет заводит только Мастер из админки — здесь делаем это напрямую в базе */
+const завестиКабинет = async (login, pass, name) => {
+  const path = userPath(login, pass);
+  await fetch(`${FIREBASE.databaseURL}/rooms/cab-${path}/profile.json`,
+    { method: 'PUT', body: JSON.stringify({ login, name, at: Date.now() }) });
+  return path;
+};
+
+/* ── Игрок входит в выданный ему кабинет ── */
+await завестиКабинет(LOGIN, PASS, 'Торин');
 const pl = await (await browser.newContext({ viewport: { width: 1400, height: 950 } })).newPage(); watch(pl, 'PL');
 await pl.goto(page('cabinet.html'));
-await pl.click('[data-gate-tab=signup]');
-await pl.fill('#signup-form [name=name]', 'Торин');
-await pl.fill('#signup-form [name=login]', LOGIN);
-await pl.fill('#signup-form [name=pass]', PASS);
-await pl.click('#signup-form button[type=submit]');
+R.самомуЗавестиНельзя = await pl.$$eval('#signup-form, [data-gate-tab]', (n) => n.length === 0);
+await pl.fill('#login-form [name=login]', LOGIN);
+await pl.fill('#login-form [name=pass]', PASS);
+await pl.click('#login-form button[type=submit]');
 await pl.waitForSelector('#cab:not([hidden])', { timeout: 20000 });
 R.кабинетОткрылся = { профиль: await pl.$eval('#pf-name', (i) => i.value), лента: await pl.$$eval('.char-card', (n) => n.length) };
 

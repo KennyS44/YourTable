@@ -7,7 +7,6 @@ import { unpackRoom } from './roomcode.js';
 import { noteAccount } from './registry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const el = (tag, cls = '', text = '') => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -17,12 +16,9 @@ const el = (tag, cls = '', text = '') => {
 
 const cab = {};   // store, profile, chars, currentId, pickedId
 
-/* ───────────────────────── Вход ───────────────────────── */
-
-$$('[data-gate-tab]').forEach((b) => b.addEventListener('click', () => {
-  $$('[data-gate-tab]').forEach((x) => x.classList.toggle('is-active', x === b));
-  $$('[data-gate-panel]').forEach((p) => { p.hidden = p.dataset.gatePanel !== b.dataset.gateTab; });
-}));
+/* ───────────────────────── Вход ─────────────────────────
+   Завести кабинет самому нельзя: логин и пароль выдаёт Мастер
+   в административной комнате. */
 
 function fail(el2, msg) { el2.textContent = msg; el2.hidden = false; }
 function busy(form, on, label) {
@@ -44,32 +40,11 @@ $('#login-form').addEventListener('submit', async (e) => {
     const path = userPath(login, f.get('pass'));
     const store = await openStore(path);
     const data = await store.load();
-    if (!data || !data.profile) return fail(err, 'Кабинет не найден — проверьте логин и пароль');
+    if (!data || !data.profile) return fail(err, 'Кабинет не найден — проверьте логин и пароль, их выдаёт Мастер');
     remember(path, login, f.get('pass'), data.profile.name);
     start(store, data);
   } catch (ex) {
     fail(err, 'Не удалось войти: ' + ex.message);
-  } finally { busy(e.target, false); }
-});
-
-$('#signup-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const err = $('#signup-err');
-  err.hidden = true;
-  const login = f.get('login').trim();
-  if (!slug(login)) return fail(err, 'Такой логин не подходит');
-  busy(e.target, true);
-  try {
-    const path = userPath(login, f.get('pass'));
-    const store = await openStore(path);
-    if (await store.load()) return fail(err, 'Такой кабинет уже есть — войдите в него');
-    const profile = { login, name: f.get('name').trim(), at: Date.now() };
-    await store.saveProfile(profile);
-    remember(path, login, f.get('pass'), profile.name);
-    start(store, { profile, chars: {} });
-  } catch (ex) {
-    fail(err, 'Не удалось завести кабинет: ' + ex.message);
   } finally { busy(e.target, false); }
 });
 
