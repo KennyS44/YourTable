@@ -5,6 +5,7 @@ import { FIREBASE, useFirebase } from './firebase-config.js';
 import { createStore, defaultStats, emptyState, newLocation, newToken, normalize, uid, STATUSES, STATUS_FX } from './store.js';
 import { createBoard } from './board.js';
 import { DICE, roll, playAnimation } from './dice.js';
+import { packRoom } from './roomcode.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -48,6 +49,8 @@ if (invite) {
   $('.gate-sub').innerHTML = `Комната «${esc(invite.room)}»<br>вы входите как <b>${invite.dm ? 'Мастер' : 'игрок'}</b>`;
   const saved = localStorage.getItem('dnd.name');
   if (saved) jf.name.value = saved;   // имя подставлено, вход — по кнопке
+  // из кабинета приходят с готовым персонажем и именем — входим сразу
+  if (saved && sessionStorage.getItem('dnd.char')) setTimeout(() => jf.requestSubmit(), 0);
 }
 
 /* Стол удалили, пока мы за ним сидели — объясняем это на входе. */
@@ -193,6 +196,50 @@ function start(sync, state, me) {
   renderAll(app.store.get());
   app.board.fit();
   if (firstTime) say(`${me.name} за столом (${app.isDM ? 'Мастер' : 'игрок'})`, 'system');
+  bringCharacter();
+}
+
+/**
+ * Игрок пришёл из личного кабинета: приводим за стол его персонажа. Иконка
+ * попадает в базу существ Мастера, фигурка встаёт на точку входа. Чего в листе
+ * нет — берём по умолчанию (10 хитов, обзор 30 футов).
+ */
+async function bringCharacter() {
+  if (app.isDM) return;
+  const ch = JSON.parse(sessionStorage.getItem('dnd.char') || 'null');
+  if (!ch) return;
+  const s = app.store.get();
+  if (Object.values(s.tokens).some((t) => t.charId === ch.id)) return;   // уже за столом
+
+  let assetId = null;
+  if (ch.avatar) {
+    assetId = uid('a');
+    await app.sync.putAsset(assetId, ch.avatar);
+  }
+  const stats = {
+    hp: { cur: ch.hp && ch.hp.cur > 0 ? ch.hp.cur : 10, max: ch.hp && ch.hp.max > 0 ? ch.hp.max : 10 },
+    vision: ch.vision > 0 ? ch.vision : 30,
+    cells: 1, hpPublic: true, namePublic: true,
+  };
+  const libId = uid('lib');
+  app.store.dispatch({ t: 'lib.add', item: { id: libId, name: ch.name, kind: 'pc', assetId, stats } });
+
+  const loc = s.activeLoc && s.locations[s.activeLoc];
+  if (!loc) {
+    say(`${ch.name} ждёт на столе: Мастер, создайте локацию и поставьте фигурку из «Иконок»`, 'system');
+    return;
+  }
+  const mid = app.board.screenToWorld($('#board').clientWidth / 2, $('#board').clientHeight / 2);
+  const spot = spawnSpot(loc, null) || app.board.cellCenter(mid.x, mid.y);
+  app.store.dispatch({
+    t: 'token.add',
+    token: newToken({
+      locId: loc.id, x: spot.x, y: spot.y, assetId, libId, charId: ch.id,
+      name: ch.name, kind: 'pc', ownerId: app.me.id, ownerName: app.me.name,
+      ...stats,
+    }),
+  });
+  say(`${ch.name} вышел к столу`, 'system');
 }
 
 function onRemoteEvent(ev) {
@@ -1400,6 +1447,13 @@ function wireDM() {
   };
   $('#btn-link-player').addEventListener('click', () => showLink(inviteLink(false)));
   $('#btn-link-dm').addEventListener('click', () => showLink(inviteLink(true)));
+  $('#btn-room-code').addEventListener('click', () => {
+    const s = app.store.get();
+    showLink(packRoom(s.room.name, s.room.playerKey || ''));
+  });
+  $('#btn-cab-link').addEventListener('click', () => {
+    showLink(location.origin + location.pathname.replace(/[^/]*$/, '') + 'cabinet.html');
+  });
 
   $('#btn-delete-room').addEventListener('click', deleteRoom);
   $('#btn-export').addEventListener('click', exportCampaign);

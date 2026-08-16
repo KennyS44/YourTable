@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=10">
+<link rel="stylesheet" href="css/app.css?v=11">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -19,14 +19,15 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=10",
-    "./js/sync.js":           "./js/sync.js?v=10",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=10",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=10",
-    "./js/store.js":          "./js/store.js?v=10",
-    "./js/board.js":          "./js/board.js?v=10",
-    "./js/dice.js":           "./js/dice.js?v=10",
-    "./js/idb.js":            "./js/idb.js?v=10"
+    "./js/main.js":           "./js/main.js?v=11",
+    "./js/sync.js":           "./js/sync.js?v=11",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=11",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=11",
+    "./js/store.js":          "./js/store.js?v=11",
+    "./js/board.js":          "./js/board.js?v=11",
+    "./js/dice.js":           "./js/dice.js?v=11",
+    "./js/roomcode.js":       "./js/roomcode.js?v=11",
+    "./js/idb.js":            "./js/idb.js?v=11"
   }
 }
 </script>
@@ -109,6 +110,7 @@
     </form>
 
     <p class="gate-note">Пока работает локальная синхронизация (вкладки одного браузера). Подключим Firebase — заработает между устройствами.</p>
+    <a class="btn btn-ghost w-full" href="cabinet.html" id="gate-cabinet">Личный кабинет и мои персонажи</a>
   </div>
 </div>
 
@@ -232,7 +234,12 @@
           <button class="btn btn-soft" id="btn-link-dm">Для Мастера</button>
         </div>
         <input id="link-out" class="link-out" readonly hidden>
-        <p class="hint" id="link-hint" hidden>Ссылка скопирована.</p>
+        <p class="hint" id="link-hint" hidden>Скопировано.</p>
+        <div class="row-2">
+          <button class="btn btn-soft" id="btn-room-code">Код комнаты</button>
+          <button class="btn btn-soft" id="btn-cab-link">Ссылка в кабинет</button>
+        </div>
+        <p class="hint">Игроку пошлите ссылку в кабинет: там он соберёт персонажа и войдёт к вам по коду комнаты.</p>
         <div class="divider"></div>
         <h3 class="h-sm">Кампания</h3>
         <div class="row-2">
@@ -388,6 +395,6 @@
   <div class="token-card" id="token-card" hidden></div>
 </div>
 
-<script type="module" src="js/main.js?v=10"></script>
+<script type="module" src="js/main.js?v=11"></script>
 </body>
 </html>

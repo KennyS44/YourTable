@@ -1,0 +1,170 @@
+/* ── Личный кабинет и лист персонажа ────────────────────────────────
+   Те же токены, что у стола: цвета, шаг 4px, шкала 14/16/20/24/32.   */
+
+.cab-body{overflow:auto}
+.cab{display:flex; flex-direction:column; min-height:100dvh}
+.h-lg{font-size:20px; color:var(--gold)}
+.save-mark{font-size:14px; color:var(--muted); min-width:96px; text-align:right}
+.save-mark.is-bad{color:var(--danger)}
+
+.cab-stage{display:grid; grid-template-columns:288px 1fr; gap:var(--s4); padding:var(--s4); align-items:start}
+.cab-side{
+  position:sticky; top:var(--s4); background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--r); padding:var(--s4);
+}
+.cab-main{min-width:0}
+
+/* ── Лента персонажей ── */
+.ribbon-head{display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin-bottom:var(--s3)}
+.ribbon{
+  display:flex; gap:var(--s3); overflow-x:auto; padding-bottom:var(--s3);
+  scroll-snap-type:x proximity;
+}
+.char-card{
+  position:relative; flex:0 0 240px; height:150px; scroll-snap-align:start;
+  border:1px solid var(--line); border-radius:var(--r); overflow:hidden;
+  background:var(--panel); cursor:pointer; padding:0;
+  transition:border-color .18s var(--ease), transform .18s var(--ease);
+}
+.char-card:hover{border-color:var(--gold-dim); transform:translateY(-2px)}
+.char-card.is-active{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-dim) inset}
+.char-bg{
+  position:absolute; inset:0; background-size:cover; background-position:center;
+  background-color:var(--panel-2);
+}
+.char-card::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(20,19,16,.15) 40%, rgba(20,19,16,.88));
+  pointer-events:none;
+}
+.char-name{
+  position:absolute; left:var(--s2); right:var(--s2); bottom:var(--s2); z-index:2;
+  min-height:36px; padding:0 var(--s2); border-radius:var(--r-sm);
+  border:1px solid transparent; background:rgba(23,22,19,.6); color:var(--text);
+  font-family:var(--f-head); font-size:16px;
+}
+.char-name:hover,.char-name:focus{border-color:var(--gold-dim); outline:none; background:rgba(23,22,19,.9)}
+.char-bg-btn,.char-del{
+  position:absolute; top:var(--s2); z-index:2; min-height:28px; padding:0 var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:rgba(23,22,19,.78);
+  color:var(--muted); font-size:14px; cursor:pointer; display:inline-flex; align-items:center;
+}
+.char-bg-btn{left:var(--s2)}
+.char-del{right:var(--s2); width:28px; justify-content:center}
+.char-bg-btn:hover{color:var(--gold)}
+.char-del:hover{color:var(--danger)}
+.char-add{
+  display:flex; align-items:center; justify-content:center; color:var(--muted);
+  font-family:var(--f-head); font-size:16px; border-style:dashed; background:var(--bg-2);
+}
+.char-add::after{display:none}
+.char-add:hover{color:var(--gold)}
+
+.sheet-empty{margin-top:var(--s6)}
+
+/* ── Карточка выбранного ── */
+.pick-card,.wait-card{
+  position:relative; height:120px; border:1px solid var(--line); border-radius:var(--r);
+  overflow:hidden; background:var(--panel-2); margin-bottom:var(--s3);
+}
+.pick-bg{position:absolute; inset:0; background-size:cover; background-position:center}
+.pick-card::after,.wait-card::after{
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(20,19,16,.1) 40%, rgba(20,19,16,.9));
+}
+.pick-name{
+  position:absolute; left:var(--s3); bottom:var(--s2); z-index:2;
+  font-family:var(--f-head); font-size:16px; color:var(--text);
+}
+.wait-card{height:140px; margin-top:var(--s4)}
+
+/* ── Лист персонажа ── */
+.sheet-wrap{
+  margin-top:var(--s4); background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--r); padding:var(--s4);
+}
+.sheet-head{display:grid; grid-template-columns:minmax(220px,1fr) 2fr; gap:var(--s3); align-items:end}
+.head-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2)}
+.sheet-cols{display:grid; grid-template-columns:250px 1fr 1fr; gap:var(--s3); margin-top:var(--s4)}
+.sheet-col{display:flex; flex-direction:column; gap:var(--s3); min-width:0}
+.sheet-bottom{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); margin-top:var(--s3)}
+
+.blk{border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s3)}
+.blk-h{
+  font-size:14px; color:var(--gold); letter-spacing:.04em; text-transform:uppercase;
+  margin-bottom:var(--s2);
+}
+.blk textarea{
+  width:100%; resize:vertical; min-height:44px; padding:var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--panel);
+  color:var(--text); font-family:inherit; font-size:16px; line-height:1.5;
+}
+.blk textarea:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+
+.fld{display:flex; flex-direction:column; gap:2px; min-width:0}
+.fld-l{font-size:14px; color:var(--muted)}
+.fld input{
+  width:100%; min-height:40px; padding:0 var(--s2); border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:16px;
+}
+.fld input:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+.fld-name input{min-height:52px; font-family:var(--f-head); font-size:24px; color:var(--gold)}
+.fld-num input{text-align:center}
+.row-3{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2)}
+.row-4{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2)}
+
+.insp{margin-bottom:var(--s1)}
+.prof-row{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
+.prof-row input{
+  width:64px; min-height:40px; text-align:center; border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--panel); color:var(--text);
+}
+
+.abilities{display:grid; grid-template-columns:repeat(2,1fr); gap:var(--s2)}
+.abil{
+  border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel);
+  padding:var(--s2); text-align:center;
+}
+.abil-l{font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.abil-mod{font-family:var(--f-head); font-size:24px; color:var(--gold); line-height:1.2}
+.abil-score{
+  width:100%; min-height:32px; margin-top:2px; text-align:center; font-size:14px;
+  border-radius:var(--r-sm); border:1px solid var(--line-soft); background:var(--bg-2); color:var(--text);
+}
+
+.saves{display:flex; flex-direction:column; gap:2px}
+.save{display:flex; align-items:center; gap:var(--s2); min-height:32px; cursor:pointer; font-size:14px}
+.save input{width:16px; height:16px; accent-color:var(--gold)}
+.save-l{flex:1; color:var(--muted)}
+.save-v{font-family:var(--f-head); color:var(--gold); min-width:32px; text-align:right}
+
+.death{display:flex; flex-direction:column; gap:var(--s1); margin-top:var(--s2)}
+.death-row{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
+.dots{display:flex; gap:var(--s1)}
+.dot{
+  width:20px; height:20px; border-radius:50%; border:1px solid var(--line);
+  background:var(--panel); cursor:pointer; padding:0;
+}
+.dot.on.ok{background:var(--ok); border-color:var(--ok)}
+.dot.on.bad{background:var(--danger); border-color:var(--danger)}
+
+.attacks{display:flex; flex-direction:column; gap:var(--s1)}
+.atk-row{display:grid; grid-template-columns:1.2fr .5fr 1.3fr; gap:var(--s1)}
+.atk-row input{
+  min-height:36px; padding:0 var(--s2); border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:14px; width:100%;
+}
+.atk-head span{font-size:14px; color:var(--muted)}
+
+/* ── Телефон ── */
+@media (max-width: 900px){
+  .cab-stage{grid-template-columns:1fr; padding:var(--s3)}
+  .cab-side{position:static}
+  .cab-main{order:-1}          /* на телефоне сперва персонажи, профиль ниже */
+  .sheet-cols{grid-template-columns:1fr}
+  .sheet-bottom{grid-template-columns:1fr}
+  .sheet-head{grid-template-columns:1fr}
+  .head-grid{grid-template-columns:repeat(2,1fr)}
+  .char-card{flex-basis:212px}
+  .row-4{grid-template-columns:repeat(2,1fr)}
+}

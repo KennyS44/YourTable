@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YourTable — личный кабинет</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=11">
+<link rel="stylesheet" href="css/cabinet.css?v=11">
+
+<!-- Версия сборки — та же, что в index.html. Поднимайте её при каждом обновлении. -->
+<script type="importmap">
+{
+  "imports": {
+    "./js/cabinet.js":        "./js/cabinet.js?v=11",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=11",
+    "./js/sheet.js":          "./js/sheet.js?v=11",
+    "./js/roomcode.js":       "./js/roomcode.js?v=11",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=11",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=11",
+    "./js/idb.js":            "./js/idb.js?v=11"
+  }
+}
+</script>
+</head>
+<body class="cab-body">
+
+<!-- ───────────────────────── Вход в кабинет ───────────────────────── -->
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <h1 class="gate-title">Личный кабинет</h1>
+    <p class="gate-sub">Ваши персонажи живут здесь и приходят с вами за любой стол.</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" data-gate-tab="login">Войти</button>
+      <button class="tab" data-gate-tab="signup">Завести кабинет</button>
+    </div>
+
+    <form id="login-form" class="gate-form" data-gate-panel="login">
+      <label class="field">
+        <span>Логин</span>
+        <input name="login" required maxlength="24" autocomplete="username" placeholder="torin">
+      </label>
+      <label class="field">
+        <span>Пароль</span>
+        <input name="pass" required type="password" minlength="3" autocomplete="current-password">
+      </label>
+      <button class="btn btn-primary" type="submit">Войти</button>
+      <p class="gate-err" id="login-err" hidden></p>
+    </form>
+
+    <form id="signup-form" class="gate-form" data-gate-panel="signup" hidden>
+      <label class="field">
+        <span>Ваше имя</span>
+        <input name="name" required maxlength="24" autocomplete="off" placeholder="Торин">
+      </label>
+      <label class="field">
+        <span>Логин</span>
+        <input name="login" required maxlength="24" autocomplete="username" placeholder="torin">
+      </label>
+      <label class="field">
+        <span>Пароль</span>
+        <input name="pass" required type="password" minlength="3" autocomplete="new-password">
+      </label>
+      <button class="btn btn-primary" type="submit">Завести кабинет</button>
+      <p class="gate-err" id="signup-err" hidden></p>
+    </form>
+
+    <p class="gate-note">Пароль нигде не хранится: по нему считается адрес вашего кабинета. Запишите пару логин-пароль — восстановить их некому.</p>
+  </div>
+</div>
+
+<!-- ───────────────────────── Кабинет ───────────────────────── -->
+<div id="cab" class="cab" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="brand">YourTable</span>
+      <span class="room-name">Личный кабинет</span>
+    </div>
+    <div class="topbar-right">
+      <span class="save-mark" id="save-mark"></span>
+      <a class="btn btn-ghost btn-sm" href="index.html">За стол</a>
+      <button class="btn btn-ghost btn-sm" id="btn-logout">Выйти</button>
+    </div>
+  </header>
+
+  <main class="cab-stage">
+    <aside class="cab-side">
+      <h3 class="h-sm">Профиль</h3>
+      <label class="field"><span>Имя за столом</span><input id="pf-name" maxlength="24" autocomplete="off"></label>
+      <label class="field"><span>Логин</span><input id="pf-login" readonly></label>
+      <p class="hint">Имя увидят за столом остальные игроки.</p>
+
+      <div class="divider"></div>
+      <h3 class="h-sm">Выбранный персонаж</h3>
+      <div class="pick-card" id="pick-card">
+        <div class="pick-bg" id="pick-bg"></div>
+        <span class="pick-name" id="pick-name">Персонаж не выбран</span>
+      </div>
+      <button class="btn btn-primary w-full" id="btn-pick" disabled>Выбрать этого персонажа</button>
+      <p class="hint">Дальше вы попадёте в комнату ожидания и введёте код стола. Мастер увидит фигурку с этими хитами и обзором.</p>
+    </aside>
+
+    <section class="cab-main">
+      <div class="ribbon-head">
+        <h2 class="h-lg">Мои персонажи</h2>
+        <button class="btn btn-soft btn-sm" id="btn-new-char">+ Новый персонаж</button>
+      </div>
+      <div class="ribbon" id="ribbon"></div>
+
+      <div class="sheet-wrap" id="sheet-wrap" hidden>
+        <div class="sheet" id="sheet"></div>
+      </div>
+      <p class="hint sheet-empty" id="sheet-empty">Создайте персонажа — и здесь откроется его лист.</p>
+    </section>
+  </main>
+</div>
+
+<!-- ───────────────────────── Комната ожидания ───────────────────────── -->
+<div id="wait" class="gate" hidden>
+  <div class="gate-card">
+    <h1 class="gate-title">Комната ожидания</h1>
+    <p class="gate-sub" id="wait-sub"></p>
+    <div class="wait-card">
+      <div class="pick-bg" id="wait-bg"></div>
+      <span class="pick-name" id="wait-name"></span>
+    </div>
+    <form id="wait-form" class="gate-form">
+      <label class="field">
+        <span>Код комнаты от Мастера</span>
+        <input name="code" required autocomplete="off" placeholder="вставьте код">
+      </label>
+      <button class="btn btn-primary" type="submit">Войти в комнату</button>
+      <p class="gate-err" id="wait-err" hidden></p>
+    </form>
+    <button class="btn btn-ghost w-full" id="btn-back">Назад в кабинет</button>
+  </div>
+</div>
+
+<script type="module" src="js/cabinet.js?v=11"></script>
+</body>
+</html>
