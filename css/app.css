@@ -224,8 +224,14 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .lib-item{position:relative; border:1px solid var(--line-soft); border-radius:var(--r-sm); overflow:hidden; background:var(--bg-2); cursor:grab}
 .lib-item img{width:100%; aspect-ratio:1; object-fit:cover; display:block}
 .lib-item .cap{font-size:14px; padding:2px var(--s1); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.lib-item .del{position:absolute; top:2px; right:2px; background:rgba(20,19,16,.8); border:0; color:var(--muted); border-radius:4px; cursor:pointer; width:22px; height:22px}
+.lib-item .del,.lib-item .edit{
+  position:absolute; top:2px; background:rgba(20,19,16,.8); border:0; color:var(--muted);
+  border-radius:4px; cursor:pointer; width:22px; height:22px; font-size:14px; line-height:1;
+}
+.lib-item .del{right:2px}
+.lib-item .edit{right:26px}
 .lib-item .del:hover{color:var(--danger)}
+.lib-item .edit:hover{color:var(--gold)}
 .lib-item.is-shown{border-color:var(--gold)}
 
 /* ── Чат и броски ────────────────────────────────────────────────── */
@@ -521,6 +527,7 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .token-card h4{font-family:var(--f-head); font-size:16px; margin:0 0 var(--s2); color:var(--gold)}
 .token-card .field{margin-bottom:var(--s2)}
 .token-card .close{position:absolute; top:var(--s1); right:var(--s1)}
+.token-card .row-2,.token-card > .btn{margin-top:var(--s2)}
 
 .only-mobile{display:none}
 

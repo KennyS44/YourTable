@@ -133,6 +133,16 @@
         <div class="list list-scroll" id="locations-list"></div>
 
         <div class="settings-stack">
+          <details class="fold" data-fold="move">
+            <summary>Перевести существ в локацию</summary>
+            <div class="fold-body">
+              <select id="move-all-to" class="sel"></select>
+              <label class="check"><input type="checkbox" id="move-all-kinds"><span>Не только героев, но и НПС с врагами</span></label>
+              <button class="btn btn-soft w-full" id="btn-move-all">Перевести всех разом</button>
+              <p class="hint">Берём существ из текущей локации и ставим на те же клетки в выбранной.</p>
+            </div>
+          </details>
+
           <details class="fold" data-fold="grid">
             <summary>Настройки поля</summary>
             <div class="fold-body">
@@ -158,6 +168,7 @@
                 <button class="btn btn-soft" id="fog-hide-all">Закрыть всё</button>
               </div>
               <p class="hint">1 — ровно одна клетка. Alt или правая кнопка временно меняет режим на обратный.</p>
+              <p class="hint">Дальность зрения каждого существа задаётся в его карточке: клик по фигурке на поле → «Дальность зрения». Для новых — во вкладке «Иконки» (кнопка ✎).</p>
             </div>
           </details>
         </div>
@@ -179,7 +190,7 @@
           <button class="tab" data-libfilter="enemy">Враги</button>
         </div>
         <div class="lib-grid" id="lib-grid"></div>
-        <p class="hint">Перетащите иконку на поле или кликните дважды.</p>
+        <p class="hint">Перетащите иконку на поле или кликните дважды. ✎ — имя, хиты и дальность зрения: они сохранятся в базе и вернутся с новой фигуркой.</p>
       </section>
 
       <section class="panel-body" data-lpanel="room" hidden>
@@ -237,8 +248,12 @@
         <div class="shapes">
           <button class="shape is-active" data-wallkind="wall">Стена</button>
           <button class="shape" data-wallkind="door">Дверь</button>
+          <button class="shape" data-wallkind="torch">Факел</button>
+          <button class="shape" data-wallkind="lantern">Фонарь</button>
+          <button class="shape" data-wallkind="erase">Ластик</button>
         </div>
-        <span class="hint">Ведите линию — стена. Клик по двери открывает её, правая кнопка убирает. Alt — без привязки к сетке.</span>
+        <label class="check"><input type="checkbox" id="wall-snap" checked><span>Магнит к концам</span></label>
+        <span class="hint" id="wall-hint">Ведите линию — стена. Клик по двери открывает её. Alt — без привязки к сетке.</span>
         <button class="btn btn-soft btn-sm" id="walls-clear">Убрать все</button>
       </div>
 
@@ -294,9 +309,10 @@
           <button class="btn btn-soft btn-sm dm-only" id="init-roll-all">Бросить всем</button>
           <button class="btn btn-soft btn-sm dm-only" id="init-next">Следующий ход →</button>
         </div>
+        <button class="btn btn-soft btn-sm w-full dm-only" id="init-end" hidden>Завершить бой у всех</button>
         <div class="round-line" id="round-line"></div>
         <div class="init-list" id="init-list"></div>
-        <p class="hint">Здоровье и состояния — под именем существа.</p>
+        <p class="hint">Здоровье и состояния — под именем существа. ⌖ — перейти к фигурке.</p>
       </section>
 
       <section class="panel-body" data-rpanel="heroes" hidden>

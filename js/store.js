@@ -37,6 +37,7 @@ export function fixLoc(l) {
     grid: { size: 70, ox: 0, oy: 0, feet: 5, show: true, ...(l.grid || {}) },
     fog: l.fog || {},
     walls: (l.walls || []).map((w) => ({ ...w })),
+    lights: (l.lights || []).map((x) => ({ ...x })),
     drawings: (l.drawings || []).map((d) => ({ ...d, pts: d.pts || [] })),
   };
 }
@@ -60,11 +61,15 @@ export function normalize(raw) {
   Object.keys(s.locations).forEach((id) => { s.locations[id] = fixLoc(s.locations[id]); });
   Object.values(s.tokens).forEach((t) => {
     t.hp = { cur: 0, max: 0, ...(t.hp || {}) };
-    t.hpPublic = t.hpPublic !== false;
+    // не указано — решает вид существа: имя и хиты героя открыты, НПС и врага нет
+    t.hpPublic = t.hpPublic === undefined || t.hpPublic === null ? t.kind === 'pc' : t.hpPublic !== false;
+    t.namePublic = t.namePublic === undefined || t.namePublic === null ? t.kind === 'pc' : t.namePublic !== false;
     t.statuses = t.statuses || [];
     t.vision = t.vision || 0;
     t.cells = t.cells || 1;
   });
+  // Карточки существ: имя, хиты и обзор живут в базе, а не только на фигурке
+  Object.values(s.library).forEach((it) => { it.stats = { ...defaultStats(it.kind), ...(it.stats || {}) }; });
   s.order = s.order.filter((id) => s.locations[id]);
   if (!s.locations[s.activeLoc]) s.activeLoc = s.order[0] || null;
   return s;
@@ -78,15 +83,31 @@ export function newLocation(name) {
     fogOn: false,
     fog: {},                    // "cx,cy" -> 1 (открыто Мастером)
     drawings: [],
+    walls: [],
+    lights: [],                 // источники света: {id, x, y, feet, kind}
     view: null,                 // {x, y, scale} — камера по умолчанию
+  };
+}
+
+/**
+ * Настройки существа по умолчанию. Герои открыты столу, НПС и враги — нет:
+ * игрок не должен читать имя и хиты того, кого ещё не разглядел.
+ */
+export function defaultStats(kind) {
+  return {
+    hp: { cur: 10, max: 10 },
+    vision: kind === 'pc' ? 30 : 0,
+    cells: 1,
+    hpPublic: kind === 'pc',
+    namePublic: kind === 'pc',
   };
 }
 
 export function newToken(patch) {
   return {
     id: uid('tok'), locId: null, x: 0, y: 0, cells: 1,
-    assetId: null, name: 'Существо', kind: 'npc',
-    ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, hpPublic: true, statuses: [],
+    assetId: null, libId: null, name: 'Существо', kind: 'npc',
+    ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, hpPublic: true, namePublic: true, statuses: [],
     vision: 0, ...patch,
   };
 }
@@ -136,6 +157,11 @@ export function reduce(s, a) {
 
     case 'lib.add':
       s.library = { ...s.library, [a.item.id]: a.item }; break;
+    case 'lib.update': {
+      const cur = s.library[a.id]; if (!cur) break;
+      s.library = { ...s.library, [a.id]: deepMerge(cur, a.patch) };
+      break;
+    }
     case 'lib.remove': {
       const next = { ...s.library }; delete next[a.id]; s.library = next; break;
     }
@@ -192,6 +218,18 @@ export function reduce(s, a) {
       const loc = s.locations[a.locId]; if (!loc) break;
       const walls = (loc.walls || []).filter((w) => a.id ? w.id !== a.id : false);
       s.locations = { ...s.locations, [a.locId]: { ...loc, walls } };
+      break;
+    }
+
+    case 'light.add': {
+      const loc = s.locations[a.locId]; if (!loc) break;
+      s.locations = { ...s.locations, [a.locId]: { ...loc, lights: [...(loc.lights || []), a.light] } };
+      break;
+    }
+    case 'light.remove': {
+      const loc = s.locations[a.locId]; if (!loc) break;
+      const lights = (loc.lights || []).filter((x) => x.id !== a.id);
+      s.locations = { ...s.locations, [a.locId]: { ...loc, lights } };
       break;
     }
 

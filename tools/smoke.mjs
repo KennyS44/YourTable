@@ -84,6 +84,7 @@ await dm.waitForTimeout(300);
 
 // туман + кисть
 await dm.click('[data-ltab="locations"]');
+await dm.click('[data-fold="fog"] > summary');       // блок настроек закрыт по умолчанию
 await dm.check('#fog-on');
 await dm.click('[data-tool="fog"]');
 await dm.mouse.move(box.x + 400, box.y + 300);

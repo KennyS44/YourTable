@@ -2,7 +2,7 @@
 
 import { createSync } from './sync.js';
 import { FIREBASE, useFirebase } from './firebase-config.js';
-import { createStore, emptyState, newLocation, newToken, normalize, uid, STATUSES, STATUS_FX } from './store.js';
+import { createStore, defaultStats, emptyState, newLocation, newToken, normalize, uid, STATUSES, STATUS_FX } from './store.js';
 import { createBoard } from './board.js';
 import { DICE, roll, playAnimation } from './dice.js';
 
@@ -319,6 +319,17 @@ function renderLocations(s) {
     row.append(up, ren, del);
     list.append(row);
   });
+
+  // куда переводить существ разом — все локации, кроме текущей
+  const sel = $('#move-all-to');
+  if (sel) {
+    const keep = sel.value;
+    sel.innerHTML = '';
+    s.order.filter((id) => id !== s.activeLoc)
+      .forEach((id) => sel.append(new Option(s.locations[id].name, id)));
+    if (keep && s.locations[keep] && keep !== s.activeLoc) sel.value = keep;
+    $('#btn-move-all').disabled = !sel.options.length;
+  }
 }
 
 let libFilter = 'all';
@@ -333,9 +344,14 @@ function renderLibrary(s) {
       const img = el('img'); img.alt = it.name;
       assetUrl(it.assetId).then((u) => { if (u) img.src = u; });
       const cap = el('div', 'cap', it.name);
+      const edit = el('button', 'edit', '✎');
+      edit.title = 'Имя, хиты, дальность зрения';
+      edit.addEventListener('click', (e) => { e.stopPropagation(); openLibCard(it, e); });
       const del = el('button', 'del', '×');
-      del.addEventListener('click', () => app.store.dispatch({ t: 'lib.remove', id: it.id }));
-      card.append(img, cap, del);
+      del.addEventListener('click', () => {
+        if (confirm(`Убрать «${it.name}» из базы? Фигурки на поле останутся.`)) app.store.dispatch({ t: 'lib.remove', id: it.id });
+      });
+      card.append(img, cap, edit, del);
       card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/lib', it.id));
       card.addEventListener('dblclick', () => dropToken(it.id, null));
       grid.append(card);
@@ -369,10 +385,17 @@ function msgNode(m) {
   return d;
 }
 
+/** Имя существа глазами читателя: скрытые имена НПС и врагов игрок не видит. */
+function tokenName(t) {
+  return (app.isDM || t.namePublic !== false) ? t.name : 'Неизвестное существо';
+}
+
 function renderInit(s) {
   const list = $('#init-list');
   list.innerHTML = '';
   $('#round-line').textContent = s.init.order.length ? `Раунд ${s.init.round}` : 'Порядок не выставлен';
+  const endBtn = $('#init-end');
+  if (endBtn) endBtn.hidden = !s.init.order.length;
   s.init.order.forEach((entry, i) => {
     const t = s.tokens[entry.id];
     if (!t) return;
@@ -380,7 +403,13 @@ function renderInit(s) {
     const head = el('div', 'init-head');
     const img = el('img'); img.alt = '';
     if (t.assetId) assetUrl(t.assetId).then((u) => { if (u) img.src = u; });
-    head.append(img, el('span', 'nm', t.name), el('span', 'iv', String(entry.v)));
+    const go = el('button', 'mini', '⌖');
+    go.title = 'Перейти к фигурке';
+    go.addEventListener('click', () => {
+      if (t.locId !== s.activeLoc && app.isDM) app.store.dispatch({ t: 'loc.active', id: t.locId });
+      setTimeout(() => app.board.focusToken(t.id), 40);
+    });
+    head.append(img, el('span', 'nm', tokenName(t)), go, el('span', 'iv', String(entry.v)));
     row.append(head);
 
     if (t.hp && t.hp.max > 0 && (app.isDM || t.hpPublic !== false)) {
@@ -583,6 +612,56 @@ function renderMembers() {
   }
 }
 
+/* ─────────────────── База существ: карточка из «Иконок» ─────────────────── */
+
+const libUpd = (id, patch) => app.store.dispatch({ t: 'lib.update', id, patch });
+
+/**
+ * Карточка существа в базе. Хиты, обзор и видимость имени живут здесь, а не
+ * только на фигурке: удалили фигурку — настройки никуда не делись.
+ */
+function openLibCard(it) {
+  const card = $('#token-card');
+  card.innerHTML = '';
+  card.hidden = false;
+
+  const close = el('button', 'icon-btn close', '×');
+  close.addEventListener('click', () => { card.hidden = true; });
+  card.append(close, el('h4', '', 'Карточка в базе'));
+
+  card.append(field('Имя', textInput(it.name, (v) => libUpd(it.id, { name: v }))));
+
+  const kindSel = el('select', 'sel');
+  [['pc', 'Персонаж'], ['npc', 'НПС'], ['enemy', 'Враг']].forEach(([v, label]) => {
+    const o = new Option(label, v);
+    if (it.kind === v) o.selected = true;
+    kindSel.append(o);
+  });
+  kindSel.addEventListener('change', () => libUpd(it.id, { kind: kindSel.value }));
+  card.append(field('Вид', kindSel));
+
+  const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
+  card.append(field('Хиты (тек./макс.)', pair(
+    numInput(st.hp.cur, (v) => libUpd(it.id, { stats: { hp: { cur: v } } })),
+    numInput(st.hp.max, (v) => libUpd(it.id, { stats: { hp: { max: v } } })))));
+  card.append(field('Дальность зрения, футов (0 — без обзора)',
+    numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
+  card.append(field('Размер, клеток',
+    numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
+  card.append(checkRow('Имя видно игрокам', st.namePublic !== false,
+    (on) => libUpd(it.id, { stats: { namePublic: on } })));
+  card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
+    (on) => libUpd(it.id, { stats: { hpPublic: on } })));
+  card.append(el('p', 'hint', 'Эти настройки получит каждая новая фигурка с этой иконкой.'));
+  centerCard(card);
+}
+
+/** Карточка без привязки к фигурке — по центру поля. */
+function centerCard(card) {
+  const board = $('#board').getBoundingClientRect();
+  placeCard(card, { x: board.width / 2 - card.offsetWidth / 2, y: board.height / 2 - card.offsetHeight / 2 });
+}
+
 /* ───────────────────────── Карточка токена ───────────────────────── */
 
 function openTokenCard(t, screenPos) {
@@ -592,13 +671,16 @@ function openTokenCard(t, screenPos) {
 
   const close = el('button', 'icon-btn close', '×');
   close.addEventListener('click', () => { card.hidden = true; });
-  card.append(close, el('h4', '', t.name));
+  card.append(close, el('h4', '', tokenName(t)));
 
   if (!app.isDM) {
     const hpVisible = t.hp && t.hp.max > 0 && t.hpPublic !== false;
     const info = el('div', 'hint',
       `${hpVisible ? `Хиты: ${t.hp.cur}/${t.hp.max}. ` : ''}${(t.statuses || []).join(', ') || 'Состояний нет'}`);
     card.append(info);
+    const go = el('button', 'btn btn-soft btn-sm w-full', '⌖ Перейти к фигурке');
+    go.addEventListener('click', () => { app.board.focusToken(t.id); card.hidden = true; });
+    card.append(go);
     placeCard(card, screenPos);
     return;
   }
@@ -608,7 +690,10 @@ function openTokenCard(t, screenPos) {
   card.append(field('Хиты (тек./макс.)', pair(
     numInput(t.hp.cur, (v) => upd(t.id, { hp: { cur: v } })),
     numInput(t.hp.max, (v) => upd(t.id, { hp: { max: v } })))));
-  card.append(field('Обзор, футов (0 — нет)', numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
+  card.append(field('Дальность зрения, футов (0 — без обзора)',
+    numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
+  card.append(checkRow('Имя видно игрокам', t.namePublic !== false,
+    (on) => upd(t.id, { namePublic: on })));
   card.append(checkRow('Полоска хитов видна игрокам', t.hpPublic !== false,
     (on) => upd(t.id, { hpPublic: on })));
 
@@ -650,6 +735,30 @@ function openTokenCard(t, screenPos) {
   bDel.addEventListener('click', () => { app.store.dispatch({ t: 'token.remove', id: t.id }); card.hidden = true; });
   row.append(bInit, bDel);
   card.append(el('div', 'divider'), row);
+
+  const lib = s.library[t.libId];
+  const row2 = el('div', lib ? 'row-2' : '');
+  const bGo = el('button', 'btn btn-soft btn-sm' + (lib ? '' : ' w-full'), '⌖ Перейти к фигурке');
+  bGo.addEventListener('click', () => { app.board.focusToken(t.id); card.hidden = true; });
+  row2.append(bGo);
+  if (lib) {
+    const bSave = el('button', 'btn btn-soft btn-sm', 'Сохранить в базу');
+    bSave.title = `Записать имя, хиты и обзор в карточку «${lib.name}»`;
+    bSave.addEventListener('click', () => {
+      const cur = app.store.get().tokens[t.id];
+      if (!cur) return;
+      libUpd(lib.id, {
+        name: cur.name,
+        stats: {
+          hp: { ...cur.hp }, vision: cur.vision, cells: cur.cells,
+          hpPublic: cur.hpPublic !== false, namePublic: cur.namePublic !== false,
+        },
+      });
+      bSave.textContent = 'Сохранено ✓';
+    });
+    row2.append(bSave);
+  }
+  card.append(row2);
   placeCard(card, screenPos);
 }
 
@@ -681,7 +790,7 @@ function placeCard(card, at) {
 const upd = (id, patch) => app.store.dispatch({ t: 'token.update', id, patch });
 
 /** Телепорт фигурки в другую локацию: та же клетка, пересчитанная под её сетку. */
-function moveTokenToLocation(t, toId) {
+function moveTokenToLocation(t, toId, quiet) {
   const s = app.store.get();
   const from = s.locations[t.locId], to = s.locations[toId];
   if (!from || !to || from.id === to.id) return;
@@ -692,6 +801,7 @@ function moveTokenToLocation(t, toId) {
     x: to.grid.ox + (cx + 0.5) * to.grid.size,
     y: to.grid.oy + (cy + 0.5) * to.grid.size,
   });
+  if (quiet) return;
   say(`${t.name} перемещён в «${to.name}»`, 'system');
   $('#token-card').hidden = true;
 }
@@ -730,10 +840,12 @@ function dropToken(libId, worldPos) {
   if (!it || !s.activeLoc) return;
   const p = worldPos || app.board.screenToWorld($('#board').clientWidth / 2, $('#board').clientHeight / 2);
   const c = app.board.cellCenter(p.x, p.y);
+  // настройки берём из базы существ: удалили фигурку — заново ничего вбивать не нужно
+  const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
   const token = newToken({
-    locId: s.activeLoc, x: c.x, y: c.y, assetId: it.assetId, name: it.name, kind: it.kind,
-    vision: it.kind === 'pc' ? 30 : 0,
-    hpPublic: it.kind !== 'enemy',      // хиты врага игрокам по умолчанию не видны
+    locId: s.activeLoc, x: c.x, y: c.y, assetId: it.assetId, libId: it.id, name: it.name, kind: it.kind,
+    cells: st.cells, vision: st.vision, hp: { ...st.hp },
+    hpPublic: st.hpPublic, namePublic: st.namePublic,
   });
   app.store.dispatch({ t: 'token.add', token });
 }
@@ -910,16 +1022,28 @@ function wireDM() {
     if (id) app.store.dispatch({ t: 'fog.all', locId: id, open: false });
   });
 
+  const WALL_HINT = {
+    wall: 'Ведите линию — стена. Клик по двери открывает её. Alt — без привязки к сетке.',
+    door: 'Ведите линию поперёк прохода — получится дверь. Клик по ней открывает и закрывает.',
+    torch: 'Клик по полю — факел: светит на 20 футов, свет обрывается о стены.',
+    lantern: 'Клик по полю — фонарь: светит на 40 футов, свет обрывается о стены.',
+    erase: 'Ведите по стенам, дверям и огонькам — они пропадут.',
+  };
   $$('[data-wallkind]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-wallkind]').forEach((x) => x.classList.toggle('is-active', x === b));
     app.board.setWallKind(b.dataset.wallkind);
+    $('#wall-hint').textContent = WALL_HINT[b.dataset.wallkind] || '';
   }));
+  $('#wall-snap').addEventListener('change', (e) => app.board.setWallSnap(e.target.checked));
   $('#walls-clear').addEventListener('click', () => {
     const s = app.store.get();
     const loc = s.locations[s.activeLoc];
-    if (!loc || !(loc.walls || []).length) return;
-    if (!confirm(`Убрать все стены и двери в локации «${loc.name}»?`)) return;
-    loc.walls.forEach((w) => app.store.dispatch({ t: 'wall.remove', locId: loc.id, id: w.id }));
+    if (!loc) return;
+    const walls = loc.walls || [], lights = loc.lights || [];
+    if (!walls.length && !lights.length) return;
+    if (!confirm(`Убрать все стены, двери и огни в локации «${loc.name}»?`)) return;
+    walls.forEach((w) => app.store.dispatch({ t: 'wall.remove', locId: loc.id, id: w.id }));
+    lights.forEach((x) => app.store.dispatch({ t: 'light.remove', locId: loc.id, id: x.id }));
   });
 
   $('#lib-upload').addEventListener('change', async (e) => {
@@ -966,6 +1090,28 @@ function wireDM() {
     say('Инициатива брошена', 'system');
   });
   $('#init-next').addEventListener('click', () => app.store.dispatch({ t: 'init.next' }));
+  // выход из боя разом: выводить каждого по одному больше не нужно
+  $('#init-end').addEventListener('click', () => {
+    if (!app.store.get().init.order.length) return;
+    if (!confirm('Завершить бой у всех за столом? Порядок ходов очистится.')) return;
+    app.store.dispatch({ t: 'init.clear' });
+    say('Бой окончен', 'system');
+  });
+
+  $('#btn-move-all').addEventListener('click', () => {
+    const s = app.store.get();
+    const toId = $('#move-all-to').value;
+    const to = s.locations[toId];
+    if (!to || toId === s.activeLoc) return;
+    const all = $('#move-all-kinds').checked;
+    const list = Object.values(s.tokens).filter((t) => t.locId === s.activeLoc
+      && (all || t.kind === 'pc' || t.ownerName));
+    if (!list.length) return alert('В этой локации некого переводить.');
+    if (!confirm(`Перевести существ (${list.length}) в «${to.name}»?`)) return;
+    list.forEach((t) => moveTokenToLocation(t, toId, true));
+    app.store.dispatch({ t: 'loc.active', id: toId });
+    say(`Мастер перевёл существ (${list.length}) в «${to.name}»`, 'system');
+  });
 
   const s0 = app.store.get();
   $('#key-player').value = s0.room.playerKey || '';

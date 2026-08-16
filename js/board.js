@@ -3,6 +3,9 @@
 
 const IMG_CACHE = new Map();
 
+/** Насколько далеко светят источники, футов. */
+const LIGHT_FEET = { torch: 20, lantern: 40 };
+
 export function createBoard(opts) {
   const { canvas, store, sync, me, isDM, onTokenOpen, onViewChange } = opts;
   const ctx = canvas.getContext('2d');
@@ -12,7 +15,8 @@ export function createBoard(opts) {
   let draw = { shape: 'pen', color: '#c9a45a', width: 4 };
   let fogBrush = 1;
   let fogMode = 'reveal';       // 'reveal' — открывает местность, 'hide' — возвращает туман
-  let wallKind = 'wall';        // что чертим: 'wall' — стена, 'door' — дверь
+  let wallKind = 'wall';        // 'wall' | 'door' | 'torch' | 'lantern' | 'erase'
+  let wallSnap = true;          // концы стен липнут друг к другу — без щелей в углах
   let eraseSize = 40;           // радиус ластика в пикселях карты — заметно крупнее кисти
   let eraseWork = null;         // что останется от рисунков, пока ластик ведут
   let hoverAt = null;           // где курсор: для круга ластика
@@ -61,6 +65,9 @@ export function createBoard(opts) {
     });
     return null;
   }
+
+  /** Под курсором ластик: и в рисовании, и в стенах — кружок один и тот же. */
+  const isErasing = () => (tool === 'draw' && draw.shape === 'eraser') || (tool === 'wall' && wallKind === 'erase');
 
   const nameKey = (n) => String(n || '').trim().toLowerCase();
   function canMove(t) {
@@ -117,10 +124,11 @@ export function createBoard(opts) {
     drawTokens();
     if (l.fogOn) drawFog(W, H, bounds);
     drawWalls();
+    drawLights();
     if (ruler) drawRuler();
     if (drag && drag.type === 'fog') drawBrushCursor();
-    if (tool === 'draw' && draw.shape === 'eraser' && hoverAt) {
-      const r = eraseSize * view.scale;
+    if (isErasing() && hoverAt) {
+      const r = (tool === 'wall' ? 16 : eraseSize * view.scale);
       ctx.save();
       const g = ctx.createRadialGradient(hoverAt.x, hoverAt.y, r * .35, hoverAt.x, hoverAt.y, r);
       g.addColorStop(0, 'rgba(236,230,217,0)');
@@ -197,13 +205,16 @@ export function createBoard(opts) {
       // подпись и здоровье
       if (size > 34) {
         ctx.font = '12px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        const label = t.name || '';
+        // имя НПС и врага игрокам не показываем, пока Мастер не откроет его
+        const label = (isDM || t.namePublic !== false) ? (t.name || '') : '';
         const ty = p.y + size / 2 + 4;
-        const tw = ctx.measureText(label).width;
-        ctx.fillStyle = 'rgba(23,22,19,.7)';
-        ctx.fillRect(p.x - tw / 2 - 4, ty - 2, tw + 8, 16);
-        ctx.fillStyle = '#ece6d9';
-        ctx.fillText(label, p.x, ty);
+        if (label) {
+          const tw = ctx.measureText(label).width;
+          ctx.fillStyle = 'rgba(23,22,19,.7)';
+          ctx.fillRect(p.x - tw / 2 - 4, ty - 2, tw + 8, 16);
+          ctx.fillStyle = t.namePublic === false ? '#b9b0a0' : '#ece6d9';
+          ctx.fillText(label, p.x, ty);
+        }
 
         if (t.hp && t.hp.max > 0 && (isDM || t.hpPublic !== false)) {
           const bw = size * .8, bh = 5;
@@ -305,7 +316,8 @@ export function createBoard(opts) {
       if (d.shape === 'line' || d.shape === 'arrow') {
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         if (d.shape === 'arrow') {
-          const ang = Math.atan2(b.y - a.y, b.x - a.x), h = 12 + ctx.lineWidth;
+          // наконечник растёт вместе с толщиной кисти, иначе у жирной линии он теряется
+          const ang = Math.atan2(b.y - a.y, b.x - a.x), h = Math.max(8, ctx.lineWidth * 3.6);
           ctx.beginPath();
           ctx.moveTo(b.x, b.y);
           ctx.lineTo(b.x - h * Math.cos(ang - .4), b.y - h * Math.sin(ang - .4));
@@ -410,6 +422,7 @@ export function createBoard(opts) {
   /* ── Стены и двери: обзор обрывается о них ──────────────────── */
 
   const wallsOf = () => { const l = loc(); return (l && l.walls) || []; };
+  const lightsOf = () => { const l = loc(); return (l && l.lights) || []; };
   /** Что перекрывает обзор: стены всегда, двери — пока закрыты. */
   const blockers = () => wallsOf().filter((w) => w.type !== 'door' || !w.open);
 
@@ -515,6 +528,33 @@ export function createBoard(opts) {
     ctx.restore();
   }
 
+  /** Огоньки видит только Мастер: игрокам виден лишь освещённый ими круг. */
+  function drawLights() {
+    if (!isDM) return;
+    const g = gridOf();
+    lightsOf().forEach((x) => {
+      const p = w2s(x.x, x.y);
+      const rad = ((x.feet || LIGHT_FEET[x.kind] || 20) / g.feet) * g.size * view.scale;
+      ctx.save();
+      ctx.setLineDash([5, 6]); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(224,160,90,.5)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      const r = Math.max(7, 11 * view.scale);
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 2);
+      glow.addColorStop(0, 'rgba(240,190,110,.55)');
+      glow.addColorStop(1, 'rgba(240,190,110,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r * 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = '#171613'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#e0a05a'; ctx.stroke();
+      ctx.fillStyle = '#f0c070'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `${Math.round(r * 1.1)}px Inter, sans-serif`;
+      ctx.fillText(x.kind === 'lantern' ? '☀' : '✦', p.x, p.y + 1);
+      ctx.restore();
+    });
+  }
+
   /** Ближайшая стена под курсором: сначала концы, потом сам отрезок. */
   function wallAt(w) {
     const near = 12 / view.scale;
@@ -527,6 +567,18 @@ export function createBoard(opts) {
     }
     return null;
   }
+  /** Ластик стен: убирает всё, чего коснулся, — и стены с дверьми, и огоньки. */
+  function eraseWalls(w) {
+    const l = loc(); if (!l) return;
+    const near = 16 / view.scale;
+    wallsOf().forEach((s) => {
+      if (distToSeg(w, s) < near) store.dispatch({ t: 'wall.remove', locId: l.id, id: s.id });
+    });
+    lightsOf().forEach((x) => {
+      if (Math.hypot(w.x - x.x, w.y - x.y) < near) store.dispatch({ t: 'light.remove', locId: l.id, id: x.id });
+    });
+  }
+
   function distToSeg(p, s) {
     const vx = s.x2 - s.x1, vy = s.y2 - s.y1;
     const len2 = vx * vx + vy * vy || 1;
@@ -534,10 +586,25 @@ export function createBoard(opts) {
     u = Math.max(0, Math.min(1, u));
     return Math.hypot(p.x - (s.x1 + u * vx), p.y - (s.y1 + u * vy));
   }
-  /** Стены липнут к узлам сетки — так их удобно вести по стенам карты. */
-  function snapNode(w, free) {
-    if (free) return { x: w.x, y: w.y };
+  /**
+   * Куда встанет конец стены: сначала магнит к концам соседних стен (иначе в
+   * углах остаются щели и через них видно), потом узел сетки.
+   */
+  function snapNode(w, free, exceptId) {
     const g = gridOf();
+    if (wallSnap) {
+      const near = Math.min(g.size * .45, 22 / view.scale);
+      let best = null, bestD = near;
+      wallsOf().forEach((s) => {
+        if (s.id === exceptId) return;
+        [{ x: s.x1, y: s.y1 }, { x: s.x2, y: s.y2 }].forEach((q) => {
+          const d = Math.hypot(w.x - q.x, w.y - q.y);
+          if (d < bestD) { bestD = d; best = q; }
+        });
+      });
+      if (best) return { x: best.x, y: best.y };
+    }
+    if (free) return { x: w.x, y: w.y };
     return {
       x: g.ox + Math.round((w.x - g.ox) / g.size) * g.size,
       y: g.oy + Math.round((w.y - g.oy) / g.size) * g.size,
@@ -551,7 +618,8 @@ export function createBoard(opts) {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     f.setTransform(dpr, 0, 0, dpr, 0, 0);
     f.clearRect(0, 0, W, H);
-    f.fillStyle = isDM ? 'rgba(12,11,9,.55)' : 'rgba(9,9,8,.98)';
+    // для игрока туман глухой: сквозь полупрозрачный была видна вся карта
+    f.fillStyle = isDM ? 'rgba(12,11,9,.55)' : 'rgba(9,9,8,1)';
     f.fillRect(0, 0, W, H);
 
     f.globalCompositeOperation = 'destination-out';
@@ -567,26 +635,38 @@ export function createBoard(opts) {
     } else {
       f.fillRect(0, 0, W, H);
     }
-    // постоянный обзор вокруг персонажей — обрывается о стены и закрытые двери
-    toksHere().forEach((t) => {
+    // Обзор: Мастер видит все круги, игрок — только своих фигурок. Иначе он
+    // подглядывает через глаза соседа по команде.
+    const mine = toksHere().filter((t) => canMove(t));
+    const seers = isDM ? toksHere() : (mine.length ? mine : toksHere().filter((t) => t.kind === 'pc'));
+    seers.forEach((t) => {
       if (!t.vision) return;
-      const p = w2s(t.x, t.y);
-      const radWorld = (t.vision / g.feet) * g.size;
-      const rad = radWorld * view.scale;
-      const grd = f.createRadialGradient(p.x, p.y, Math.max(0, rad * .72), p.x, p.y, rad);
-      grd.addColorStop(0, 'rgba(0,0,0,1)');
-      grd.addColorStop(1, 'rgba(0,0,0,0)');
-      f.fillStyle = grd;
-      f.beginPath();
-      const shape = visionShape(t, radWorld);
-      shape.forEach((q, i) => {
-        const sp = w2s(q.x, q.y);
-        if (i === 0) f.moveTo(sp.x, sp.y); else f.lineTo(sp.x, sp.y);
-      });
-      f.closePath(); f.fill();
+      cutVision(f, t, (t.vision / g.feet) * g.size, .72);
+    });
+    // факелы и фонари светят всем: свет на карте, а не в чьих-то глазах
+    lightsOf().forEach((x) => {
+      const feet = x.feet || LIGHT_FEET[x.kind] || 20;
+      cutVision(f, { id: 'L' + x.id, x: x.x, y: x.y }, (feet / g.feet) * g.size, .6);
     });
     f.globalCompositeOperation = 'source-over';
     ctx.drawImage(fogLayer, 0, 0, W, H);
+  }
+
+  /** Вырезаем в тумане многоугольник видимости вокруг точки. */
+  function cutVision(f, src, radWorld, soft) {
+    const p = w2s(src.x, src.y);
+    const rad = radWorld * view.scale;
+    if (rad < 1) return;
+    const grd = f.createRadialGradient(p.x, p.y, Math.max(0, rad * soft), p.x, p.y, rad);
+    grd.addColorStop(0, 'rgba(0,0,0,1)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    f.fillStyle = grd;
+    f.beginPath();
+    visionShape(src, radWorld).forEach((q, i) => {
+      const sp = w2s(q.x, q.y);
+      if (i === 0) f.moveTo(sp.x, sp.y); else f.lineTo(sp.x, sp.y);
+    });
+    f.closePath(); f.fill();
   }
 
   /* ── попадание в токен ─────────────────────────────────────── */
@@ -641,11 +721,18 @@ export function createBoard(opts) {
       drag = { type: 'draw' }; render(); return;
     }
     if (tool === 'wall' && isDM && !mid) {
-      const hitW = wallAt(w);
-      if (e.button === 2 && hitW) {                       // правая кнопка — убрать
-        store.dispatch({ t: 'wall.remove', locId: loc().id, id: hitW.wall.id });
+      if (wallKind === 'erase' || e.button === 2) {        // ластик и правая кнопка — убрать
+        drag = { type: 'wall-erase' };
+        eraseWalls(w); render(); return;
+      }
+      if (wallKind === 'torch' || wallKind === 'lantern') {
+        store.dispatch({
+          t: 'light.add', locId: loc().id,
+          light: { id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), kind: wallKind, feet: LIGHT_FEET[wallKind], x: w.x, y: w.y },
+        });
         return;
       }
+      const hitW = wallAt(w);
       if (hitW) {                                          // тянем конец или всю стену
         drag = { type: 'wall-move', id: hitW.wall.id, part: hitW.part, from: w, start: { ...hitW.wall } };
         return;
@@ -673,7 +760,7 @@ export function createBoard(opts) {
     const w = s2w(p.x, p.y);
 
     if (!drag) {
-      if (tool === 'draw' && draw.shape === 'eraser') { hoverAt = p; render(); return; }
+      if (isErasing()) { hoverAt = p; render(); return; }
       const t = (tool === 'select' || tool === 'token') ? tokenAt(w.x, w.y) : null;
       const id = t ? t.id : null;
       // подсказка курсором: под мышкой дверь, её можно открыть
@@ -719,10 +806,13 @@ export function createBoard(opts) {
     } else if (drag.type === 'wall-new') {
       drag.b = snapNode(w, drag.free || e.altKey);
       render();
+    } else if (drag.type === 'wall-erase') {
+      hoverAt = p;
+      eraseWalls(w); render();
     } else if (drag.type === 'wall-move') {
       const s = drag.start;
       const dx = w.x - drag.from.x, dy = w.y - drag.from.y;
-      const snap = (x, y) => snapNode({ x, y }, e.altKey);
+      const snap = (x, y) => snapNode({ x, y }, e.altKey, drag.id);
       let patch;
       if (drag.part === 'a') { const q = snap(s.x1 + dx, s.y1 + dy); patch = { x1: q.x, y1: q.y }; }
       else if (drag.part === 'b') { const q = snap(s.x2 + dx, s.y2 + dy); patch = { x2: q.x, y2: q.y }; }
@@ -870,7 +960,19 @@ export function createBoard(opts) {
     eraseSize: () => eraseSize,
     setFogBrush(n) { fogBrush = Math.max(1, n); },
     setFogMode(m) { fogMode = m; },
-    setWallKind(k) { wallKind = k; },
+    setWallKind(k) { wallKind = k; hoverAt = null; render(); },
+    setWallSnap(on) { wallSnap = !!on; },
+    /** Перемещение к персонажу: ставим камеру на фигурку, не меняя масштаб. */
+    focusToken(id) {
+      const t = S().tokens[id]; if (!t) return false;
+      const r = canvas.getBoundingClientRect();
+      touched = true;
+      view.x = r.width / 2 - t.x * view.scale;
+      view.y = r.height / 2 - t.y * view.scale;
+      onViewChange && onViewChange(view);
+      render();
+      return true;
+    },
     /** Для проверок: куда достаёт обзор существа и рисуются ли стены. */
     visionPoints(t) {
       const g = gridOf();
