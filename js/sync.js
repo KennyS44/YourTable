@@ -88,6 +88,12 @@ export async function createSync(roomId, me) {
       }, 400);
     },
 
+    /** Стол удаляют насовсем: снимок комнаты стирается из хранилища. */
+    deleteRoom() {
+      clearTimeout(saveTimer);
+      return idb.delRoom(roomId);
+    },
+
     async putAsset(id, dataUrl) {
       await idb.putAsset(id, dataUrl);
       post('event', { type: 'asset', id });

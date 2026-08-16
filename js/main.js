@@ -50,6 +50,17 @@ if (invite) {
   if (saved) jf.name.value = saved;   // имя подставлено, вход — по кнопке
 }
 
+/* Стол удалили, пока мы за ним сидели — объясняем это на входе. */
+const killed = sessionStorage.getItem('dnd.killed');
+if (killed !== null) {
+  const self = sessionStorage.getItem('dnd.killedSelf') === '1';
+  sessionStorage.removeItem('dnd.killed');
+  sessionStorage.removeItem('dnd.killedSelf');
+  const err = $('#join-err');
+  err.textContent = `Стол ${killed ? `«${killed}» ` : ''}удалён${self ? '' : ' Мастером'}.`;
+  err.hidden = false;
+}
+
 $('.gate-note').textContent = useFirebase
   ? 'Комната живёт в облаке: заходите с любого устройства, всё сохраняется между встречами.'
   : 'Пока работает локальная синхронизация (вкладки одного браузера). Подключим Firebase — заработает между устройствами.';
@@ -185,6 +196,7 @@ function start(sync, state, me) {
 }
 
 function onRemoteEvent(ev) {
+  if (ev.type === 'room-deleted') { roomIsGone(ev.room); return; }
   if (ev.type === 'asset') {
     ASSETS.delete(ev.id);
     app.board.invalidateAsset(ev.id);
@@ -200,8 +212,55 @@ function assetUrl(id) {
   return ASSETS.get(id);
 }
 
+/* ─────────────────────── Удаление стола ─────────────────────── */
+
+/**
+ * Стол удалили — свой уход со страницы делаем сразу: любая запись отсюда
+ * (снимок, отметка присутствия) воскресила бы комнату в базе.
+ */
+function roomIsGone(name, self) {
+  if (app.gone) return;
+  app.gone = true;
+  app.dead = true;
+  sessionStorage.setItem('dnd.killed', name || app.store.get().room.name || '');
+  sessionStorage.setItem('dnd.killedSelf', self ? '1' : '');
+  location.href = location.origin + location.pathname;   // без ссылки-приглашения
+}
+
+/** Мастер удаляет стол: подтверждение названием, потом чистим базу у всех. */
+async function deleteRoom() {
+  const name = app.store.get().room.name || '';
+  const typed = prompt(
+    `Удалить стол «${name}» насовсем?\n\n`
+    + 'Пропадут локации, фигурки, иконки, картинки и журнал — у всех, кто за столом. Вернуть нельзя.\n'
+    + 'Если кампания нужна, сначала закройте это окно и нажмите «Экспорт».\n\n'
+    + 'Для подтверждения введите название стола:');
+  if (typed === null) return;
+  if (typed.trim().toLowerCase() !== name.trim().toLowerCase()) {
+    alert('Название не совпало — стол на месте.');
+    return;
+  }
+  const btn = $('#btn-delete-room');
+  btn.disabled = true;
+  btn.textContent = 'Удаляем…';
+  app.dead = true;                                  // снимок больше не пишем
+  app.sync.emit({ type: 'room-deleted', room: name, by: app.me.name });
+  await new Promise((res) => setTimeout(res, 700)); // пусть весть дойдёт до остальных
+  try {
+    await app.sync.deleteRoom();
+  } catch (ex) {
+    app.dead = false;
+    btn.disabled = false;
+    btn.textContent = 'Удалить стол насовсем';
+    alert('Не удалось удалить стол: ' + ex.message);
+    return;
+  }
+  roomIsGone(name, true);
+}
+
 /** Снимок комнаты в базу пишет Мастер; если его нет — самый «старший» из игроков. */
 function canPersist() {
+  if (app.dead) return false;
   if (app.isDM) return true;
   const peers = app.peers || [];
   if (peers.some((p) => p.role === 'dm')) return false;
@@ -1241,6 +1300,7 @@ function wireDM() {
   $('#btn-link-player').addEventListener('click', () => showLink(inviteLink(false)));
   $('#btn-link-dm').addEventListener('click', () => showLink(inviteLink(true)));
 
+  $('#btn-delete-room').addEventListener('click', deleteRoom);
   $('#btn-export').addEventListener('click', exportCampaign);
   $('#btn-import').addEventListener('change', importCampaign);
 }

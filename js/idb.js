@@ -35,6 +35,7 @@ async function tx(store, mode, fn) {
 export const idb = {
   getRoom: (id) => tx('rooms', 'readonly', (s) => s.get(id)),
   putRoom: (id, value) => tx('rooms', 'readwrite', (s) => s.put(value, id)),
+  delRoom: (id) => tx('rooms', 'readwrite', (s) => s.delete(id)),
   listRooms: () => tx('rooms', 'readonly', (s) => s.getAll()),
   getAsset: (id) => tx('assets', 'readonly', (s) => s.get(id)),
   putAsset: (id, dataUrl) => tx('assets', 'readwrite', (s) => s.put(dataUrl, id)),

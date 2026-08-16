@@ -65,7 +65,7 @@ export async function createFirebaseSync(roomPath, me, cfg) {
   const mine = R('presence/' + me.id);
   db.onDisconnect(mine).remove();
   db.set(mine, { ...who, at: Date.now() });
-  setInterval(() => db.set(mine, { ...who, at: Date.now() }), 20000);
+  const beat = setInterval(() => db.set(mine, { ...who, at: Date.now() }), 20000);
   db.onValue(R('presence'), (snap) => {
     peers = Object.values(snap.val() || {});
     emitLocal('presence', peers);
@@ -121,6 +121,19 @@ export async function createFirebaseSync(roomPath, me, cfg) {
         stats.bytesSent += JSON.stringify(payload).length;
         db.set(R('state'), payload);
       }, overdue ? 0 : 900);
+    },
+
+    /**
+     * Удаление стола: сносим всю ветку комнаты — снимок, поток действий,
+     * присутствие и картинки. Отложенную запись снимка гасим, иначе она
+     * воскресит комнату сразу после удаления.
+     */
+    deleteRoom() {
+      clearTimeout(saveTimer);
+      dirtySince = 0;
+      clearInterval(beat);                 // отметка присутствия тоже воскрешает ветку
+      db.onDisconnect(mine).cancel();
+      return db.remove(db.ref(database, base));
     },
 
     async putAsset(id, dataUrl) {
