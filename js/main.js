@@ -6,6 +6,7 @@ import { createStore, defaultStats, emptyState, newLocation, newToken, normalize
 import { createBoard } from './board.js';
 import { DICE, roll, playAnimation } from './dice.js';
 import { packRoom } from './roomcode.js';
+import { noteRoom } from './registry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -81,10 +82,13 @@ async function roomPath(name, key) {
   return id + '-' + roomFingerprint(id, key);
 }
 
+/* Скрытый вход из административной комнаты: ?ghost=1 — стол о госте не узнает. */
+const ghostMode = P.get('ghost') === '1';
+
 async function makeSync(path, me) {
-  if (!useFirebase) return createSync(path, me);
+  if (!useFirebase) return createSync(path, me, { ghost: ghostMode });
   const { createFirebaseSync } = await import('./sync-firebase.js');
-  return createFirebaseSync(path, me, FIREBASE);
+  return createFirebaseSync(path, me, FIREBASE, { ghost: ghostMode });
 }
 
 $('#create-form').addEventListener('submit', async (e) => {
@@ -97,7 +101,8 @@ $('#create-form').addEventListener('submit', async (e) => {
   try {
     const me = { id: myId(), name: f.get('name').trim(), role: 'dm' };
     localStorage.setItem('dnd.name', me.name);
-    const sync = await makeSync(await roomPath(name, f.get('key')), me);
+    app.roomPath = await roomPath(name, f.get('key'));
+    const sync = await makeSync(app.roomPath, me);
     if (await sync.loadState()) return fail(err, 'Комната с таким названием и ключом уже есть — войдите в неё');
     const st = emptyState({ name, playerKey: f.get('key'), dmKey: f.get('dmkey') });
     sync.saveState(st, { name });
@@ -117,7 +122,8 @@ $('#join-form').addEventListener('submit', async (e) => {
   try {
     const me = { id: myId(), name: f.get('name').trim(), role: 'player' };
     localStorage.setItem('dnd.name', me.name);
-    const sync = await makeSync(await roomPath(f.get('room'), key), me);
+    app.roomPath = await roomPath(f.get('room'), key);
+    const sync = await makeSync(app.roomPath, me);
     const st = await sync.loadState();
     if (!st) {
       // по ссылке Мастера комната создаётся сама при первом входе
@@ -151,6 +157,7 @@ function busy(form, on) {
 function start(sync, state, me) {
   app.me = me;
   app.isDM = me.role === 'dm';
+  app.ghost = ghostMode;              // скрытый вход: за столом нас как бы нет
   app.sync = sync;
   app.peers = [];
   app.store = createStore(normalize(state), sync, onRemoteAction, canPersist);
@@ -161,7 +168,7 @@ function start(sync, state, me) {
   if (!app.isDM) $$('.dm-only').forEach((el) => el.remove());
 
   $('#room-name').textContent = app.store.get().room.name;
-  $('#role-badge').textContent = app.isDM ? 'Мастер' : 'Игрок';
+  $('#role-badge').textContent = app.ghost ? 'Скрытый вход' : app.isDM ? 'Мастер' : 'Игрок';
 
   app.board = createBoard({
     canvas: $('#board'), store: app.store, sync: app.sync,
@@ -175,11 +182,14 @@ function start(sync, state, me) {
   // роль выяснилась только сейчас — поправим запись о себе в списке присутствия
   if (app.sync.updateMe) app.sync.updateMe({ role: me.role, name: me.name });
 
-  const firstTime = !app.store.get().roster[nameKey(me.name)];
-  app.store.dispatch({
-    t: 'roster.seen',
-    member: { key: nameKey(me.name), id: me.id, name: me.name, role: me.role },
-  });
+  // Скрытый гость не попадает ни в список за столом, ни в чат: ни следа.
+  const firstTime = !app.ghost && !app.store.get().roster[nameKey(me.name)];
+  if (!app.ghost) {
+    app.store.dispatch({
+      t: 'roster.seen',
+      member: { key: nameKey(me.name), id: me.id, name: me.name, role: me.role },
+    });
+  }
   app.store.subscribe(renderAll);
   app.sync.on('event', onRemoteEvent);
   app.sync.on('presence', (list) => { app.peers = list; renderMembers(); });
@@ -195,21 +205,26 @@ function start(sync, state, me) {
   wireUI();
   renderAll(app.store.get());
   app.board.fit();
+  // отмечаем стол в реестре: перечислить комнаты в базе иначе нельзя
+  if (!app.ghost && app.roomPath) {
+    const r = app.store.get().room;
+    noteRoom(app.roomPath, r.name, r.playerKey || '', r.dmKey || '');
+  }
   if (firstTime) say(`${me.name} за столом (${app.isDM ? 'Мастер' : 'игрок'})`, 'system');
   bringCharacter();
 }
 
 /**
- * Игрок пришёл из личного кабинета: приводим за стол его персонажа. Иконка
- * попадает в базу существ Мастера, фигурка встаёт на точку входа. Чего в листе
- * нет — берём по умолчанию (10 хитов, обзор 30 футов).
+ * Игрок пришёл из личного кабинета: кладём его персонажа в базу иконок Мастера.
+ * Сам на поле никто не встаёт — фигурку ставит Мастер. Карточка с тем же именем
+ * не плодится, а обновляется. Чего в листе нет — берём по умолчанию (10 хитов,
+ * обзор 30 футов).
  */
 async function bringCharacter() {
-  if (app.isDM) return;
+  if (app.isDM || app.ghost) return;
   const ch = JSON.parse(sessionStorage.getItem('dnd.char') || 'null');
   if (!ch) return;
   const s = app.store.get();
-  if (Object.values(s.tokens).some((t) => t.charId === ch.id)) return;   // уже за столом
 
   let assetId = null;
   if (ch.avatar) {
@@ -221,25 +236,15 @@ async function bringCharacter() {
     vision: ch.vision > 0 ? ch.vision : 30,
     cells: 1, hpPublic: true, namePublic: true,
   };
-  const libId = uid('lib');
-  app.store.dispatch({ t: 'lib.add', item: { id: libId, name: ch.name, kind: 'pc', assetId, stats } });
-
-  const loc = s.activeLoc && s.locations[s.activeLoc];
-  if (!loc) {
-    say(`${ch.name} ждёт на столе: Мастер, создайте локацию и поставьте фигурку из «Иконок»`, 'system');
-    return;
+  const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  const old = Object.values(s.library).find((it) => same(it.name, ch.name));
+  if (old) {
+    app.store.dispatch({ t: 'lib.update', id: old.id, patch: { kind: 'pc', assetId: assetId || old.assetId, stats } });
+    say(`Карточка «${ch.name}» обновлена из личного кабинета`, 'system');
+  } else {
+    app.store.dispatch({ t: 'lib.add', item: { id: uid('lib'), name: ch.name, kind: 'pc', assetId, stats } });
+    say(`«${ch.name}» добавлен в «Иконки» — Мастер, поставьте фигурку на поле`, 'system');
   }
-  const mid = app.board.screenToWorld($('#board').clientWidth / 2, $('#board').clientHeight / 2);
-  const spot = spawnSpot(loc, null) || app.board.cellCenter(mid.x, mid.y);
-  app.store.dispatch({
-    t: 'token.add',
-    token: newToken({
-      locId: loc.id, x: spot.x, y: spot.y, assetId, libId, charId: ch.id,
-      name: ch.name, kind: 'pc', ownerId: app.me.id, ownerName: app.me.name,
-      ...stats,
-    }),
-  });
-  say(`${ch.name} вышел к столу`, 'system');
 }
 
 function onRemoteEvent(ev) {
@@ -307,7 +312,7 @@ async function deleteRoom() {
 
 /** Снимок комнаты в базу пишет Мастер; если его нет — самый «старший» из игроков. */
 function canPersist() {
-  if (app.dead) return false;
+  if (app.dead || app.ghost) return false;   // скрытый гость не трогает снимок комнаты
   if (app.isDM) return true;
   const peers = app.peers || [];
   if (peers.some((p) => p.role === 'dm')) return false;

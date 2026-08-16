@@ -8,7 +8,7 @@ import { idb } from './idb.js';
 const HEARTBEAT = 4000;
 const AWAY_AFTER = 12000;
 
-export async function createSync(roomId, me) {
+export async function createSync(roomId, me, opts = {}) {
   // Префикс канала — от прежнего названия проекта; менять нельзя, иначе вкладки
   // со старой и новой версией перестанут видеть друг друга.
   const chan = new BroadcastChannel('dndonlain:' + roomId);
@@ -27,8 +27,8 @@ export async function createSync(roomId, me) {
     else if (m.kind === 'hello') {
       peers.set(m.payload.id, { ...m.payload, at: Date.now() });
       pushPresence();
-      // отвечаем новичку, чтобы он тоже нас увидел
-      if (m.payload.reply !== false) post('hello', { ...who, reply: false });
+      // отвечаем новичку, чтобы он тоже нас увидел (скрытый вход молчит)
+      if (m.payload.reply !== false && !opts.ghost) post('hello', { ...who, reply: false });
     } else if (m.kind === 'bye') {
       peers.delete(m.payload.id);
       pushPresence();
@@ -47,13 +47,18 @@ export async function createSync(roomId, me) {
     emitLocal('presence', live);
   }
 
-  post('hello', { ...who });
-  setInterval(() => {
-    peers.set(me.id, { ...who, at: Date.now() });
-    post('hello', { ...who, reply: false });
-    pushPresence();
-  }, HEARTBEAT);
-  window.addEventListener('pagehide', () => post('bye', { id: me.id }));
+  // скрытый вход из админки: о себе не объявляем, соседним вкладкам нас не видно
+  const ghost = !!opts.ghost;
+  if (ghost) peers.delete(me.id);
+  if (!ghost) {
+    post('hello', { ...who });
+    setInterval(() => {
+      peers.set(me.id, { ...who, at: Date.now() });
+      post('hello', { ...who, reply: false });
+      pushPresence();
+    }, HEARTBEAT);
+    window.addEventListener('pagehide', () => post('bye', { id: me.id }));
+  }
 
   return {
     mode: 'local',
@@ -62,6 +67,7 @@ export async function createSync(roomId, me) {
     /** Уточнить, кто мы за столом (роль выясняется после входа). */
     updateMe(patch) {
       who = { ...who, ...patch };
+      if (ghost) return;
       peers.set(me.id, { ...who, at: Date.now() });
       post('hello', { ...who, reply: false });
       pushPresence();

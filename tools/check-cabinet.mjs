@@ -143,20 +143,44 @@ await pl.waitForTimeout(3000);
 
 R.заСтолом = await dm.evaluate(() => {
   const s = window.__state();
-  const t = Object.values(s.tokens).find((x) => x.name === 'Торин Дубощит');
   const lib = Object.values(s.library).find((x) => x.name === 'Торин Дубощит');
   return {
-    фигуркаЕсть: !!t,
-    хиты: t && t.hp, обзор: t && t.vision, владелец: t && t.ownerName, вид: t && t.kind,
     вБазеМастера: !!lib, видВБазе: lib && lib.kind,
+    хиты: lib && lib.stats.hp, обзор: lib && lib.stats.vision,
+    фигурокНаПоле: Object.keys(s.tokens).length,     // никого не ставим сами
   };
 });
 
-/* повторный вход тем же персонажем не плодит фигурки */
+/* тот же персонаж со стола не плодит вторую карточку, а обновляет прежнюю */
+await pl.evaluate(() => {
+  const ch = JSON.parse(sessionStorage.getItem('dnd.char'));
+  ch.hp = { cur: 12, max: 40 };
+  ch.vision = 90;
+  sessionStorage.setItem('dnd.char', JSON.stringify(ch));
+});
 await pl.reload();
 await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });
-await pl.waitForTimeout(3000);
-R.безДублей = await dm.evaluate(() => Object.values(window.__state().tokens).filter((t) => t.name === 'Торин Дубощит').length);
+await pl.waitForTimeout(3500);
+R.повторныйПриход = await dm.evaluate(() => {
+  const s = window.__state();
+  const same = Object.values(s.library).filter((x) => x.name === 'Торин Дубощит');
+  return { карточек: same.length, хиты: same[0] && same[0].stats.hp, обзор: same[0] && same[0].stats.vision };
+});
+
+/* пустой лист даёт базовые значения */
+R.базовыеЗначения = await pl.evaluate(async () => {
+  const s = window.__state();
+  const ch = { id: 'пусто', name: 'Безымянный', hp: { cur: 0, max: 0 }, vision: 0, avatar: null };
+  sessionStorage.setItem('dnd.char', JSON.stringify(ch));
+  return true;
+});
+await pl.reload();
+await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });
+await pl.waitForTimeout(3500);
+R.базовыеЗначения = await dm.evaluate(() => {
+  const lib = Object.values(window.__state().library).find((x) => x.name === 'Безымянный');
+  return lib ? { хиты: lib.stats.hp, обзор: lib.stats.vision } : null;
+});
 
 R.ошибки = errors;
 console.log(JSON.stringify(R, null, 2));

@@ -17,7 +17,7 @@ import { idb } from './idb.js';
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.5/';
 const KEEP_ACTIONS = 100;
 
-export async function createFirebaseSync(roomPath, me, cfg) {
+export async function createFirebaseSync(roomPath, me, cfg, opts = {}) {
   const [{ initializeApp }, db] = await Promise.all([
     import(SDK + 'firebase-app.js'),
     import(SDK + 'firebase-database.js'),
@@ -63,9 +63,14 @@ export async function createFirebaseSync(roomPath, me, cfg) {
   // по загруженному состоянию), поэтому запись о себе умеет обновляться.
   let who = { ...me };
   const mine = R('presence/' + me.id);
-  db.onDisconnect(mine).remove();
-  db.set(mine, { ...who, at: Date.now() });
-  const beat = setInterval(() => db.set(mine, { ...who, at: Date.now() }), 20000);
+  // скрытый вход из админки: не отмечаемся нигде, за столом нас не видно
+  const ghost = !!opts.ghost;
+  let beat = null;
+  if (!ghost) {
+    db.onDisconnect(mine).remove();
+    db.set(mine, { ...who, at: Date.now() });
+    beat = setInterval(() => db.set(mine, { ...who, at: Date.now() }), 20000);
+  }
   db.onValue(R('presence'), (snap) => {
     peers = Object.values(snap.val() || {});
     emitLocal('presence', peers);
@@ -90,7 +95,7 @@ export async function createFirebaseSync(roomPath, me, cfg) {
     /** Уточнить, кто мы за столом (роль выясняется после входа). */
     updateMe(patch) {
       who = { ...who, ...patch };
-      db.set(mine, { ...who, at: Date.now() });
+      if (!ghost) db.set(mine, { ...who, at: Date.now() });
     },
 
     send(a) {
@@ -132,7 +137,7 @@ export async function createFirebaseSync(roomPath, me, cfg) {
       clearTimeout(saveTimer);
       dirtySince = 0;
       clearInterval(beat);                 // отметка присутствия тоже воскрешает ветку
-      db.onDisconnect(mine).cancel();
+      if (!ghost) db.onDisconnect(mine).cancel();
       return db.remove(db.ref(database, base));
     },
 

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YourTable — административная комната</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=12">
+<link rel="stylesheet" href="css/cabinet.css?v=12">
+
+<!-- Версия сборки — общая для всех страниц. Поднимайте при каждом обновлении. -->
+<script type="importmap">
+{
+  "imports": {
+    "./js/admin.js":          "./js/admin.js?v=12",
+    "./js/registry.js":       "./js/registry.js?v=12",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=12",
+    "./js/roomcode.js":       "./js/roomcode.js?v=12",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=12",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=12",
+    "./js/idb.js":            "./js/idb.js?v=12"
+  }
+}
+</script>
+</head>
+<body class="cab-body">
+
+<div id="gate" class="gate">
+  <div class="gate-card">
+    <h1 class="gate-title">Административная комната</h1>
+    <p class="gate-sub">Аккаунты игроков и столы этого сайта.</p>
+    <form id="admin-form" class="gate-form">
+      <label class="field"><span>Логин</span><input name="login" required autocomplete="username"></label>
+      <label class="field"><span>Пароль</span><input name="pass" required type="password" autocomplete="current-password"></label>
+      <button class="btn btn-primary" type="submit">Войти</button>
+      <p class="gate-err" id="admin-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div id="adm" class="cab" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="brand">YourTable</span>
+      <span class="room-name">Административная комната</span>
+    </div>
+    <div class="topbar-right">
+      <span class="save-mark" id="adm-mark"></span>
+      <a class="btn btn-ghost btn-sm" href="index.html">За стол</a>
+      <button class="btn btn-ghost btn-sm" id="adm-logout">Выйти</button>
+    </div>
+  </header>
+
+  <main class="adm-stage">
+    <div class="tabs tabs-sm adm-tabs">
+      <button class="tab is-active" data-atab="accounts">Аккаунты</button>
+      <button class="tab" data-atab="rooms">Столы</button>
+    </div>
+
+    <section data-apanel="accounts">
+      <div class="adm-head">
+        <h2 class="h-lg">Аккаунты игроков</h2>
+        <span class="hint" id="acc-count"></span>
+      </div>
+
+      <form class="adm-new" id="acc-new">
+        <label class="field"><span>Имя</span><input name="name" required maxlength="24" placeholder="Торин"></label>
+        <label class="field"><span>Логин</span><input name="login" required maxlength="24" placeholder="torin"></label>
+        <label class="field"><span>Пароль</span><input name="pass" required minlength="3" placeholder="не короче 3 знаков"></label>
+        <button class="btn btn-primary" type="submit">Создать аккаунт</button>
+      </form>
+      <p class="gate-err" id="acc-err" hidden></p>
+
+      <div class="adm-list" id="acc-list"></div>
+    </section>
+
+    <section data-apanel="rooms" hidden>
+      <div class="adm-head">
+        <h2 class="h-lg">Столы</h2>
+        <span class="hint" id="room-count"></span>
+      </div>
+      <p class="hint">Стол попадает в список, когда за него кто-то входит. Вход отсюда — скрытый: за столом не появится ни отметки, ни строки в чате.</p>
+      <div class="adm-list" id="room-list"></div>
+    </section>
+  </main>
+</div>
+
+<script type="module" src="js/admin.js?v=12"></script>
+</body>
+</html>

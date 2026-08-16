@@ -4,6 +4,7 @@
 import { openStore, slug, uid, userPath } from './cabinet-store.js';
 import { emptySheet, fixSheet, renderSheet } from './sheet.js';
 import { unpackRoom } from './roomcode.js';
+import { noteAccount } from './registry.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -44,7 +45,7 @@ $('#login-form').addEventListener('submit', async (e) => {
     const store = await openStore(path);
     const data = await store.load();
     if (!data || !data.profile) return fail(err, 'Кабинет не найден — проверьте логин и пароль');
-    remember(path, login, f.get('pass'));
+    remember(path, login, f.get('pass'), data.profile.name);
     start(store, data);
   } catch (ex) {
     fail(err, 'Не удалось войти: ' + ex.message);
@@ -65,16 +66,20 @@ $('#signup-form').addEventListener('submit', async (e) => {
     if (await store.load()) return fail(err, 'Такой кабинет уже есть — войдите в него');
     const profile = { login, name: f.get('name').trim(), at: Date.now() };
     await store.saveProfile(profile);
-    remember(path, login, f.get('pass'));
+    remember(path, login, f.get('pass'), profile.name);
     start(store, { profile, chars: {} });
   } catch (ex) {
     fail(err, 'Не удалось завести кабинет: ' + ex.message);
   } finally { busy(e.target, false); }
 });
 
-/** Вход помним в этой вкладке: возврат из комнаты не должен требовать пароля. */
-function remember(path, login, pass) {
+/**
+ * Вход помним в этой вкладке: возврат из комнаты не должен требовать пароля.
+ * Заодно отмечаем аккаунт в реестре — иначе админка о нём не узнает.
+ */
+function remember(path, login, pass, name) {
   sessionStorage.setItem('dnd.cab', JSON.stringify({ path, login, pass }));
+  noteAccount(path, login, name || '');
 }
 
 (async function autoLogin() {

@@ -156,6 +156,26 @@
 }
 .atk-head span{font-size:14px; color:var(--muted)}
 
+/* ── Административная комната ── */
+.adm-stage{max-width:960px; width:100%; margin:0 auto; padding:var(--s4)}
+.adm-tabs{max-width:360px; margin-bottom:var(--s4)}
+.adm-head{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3); margin-bottom:var(--s3)}
+.adm-head .hint{margin:0}
+.adm-new{
+  display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:var(--s2); align-items:end;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:var(--s3);
+}
+.adm-new .field{margin-bottom:0}
+.adm-list{display:flex; flex-direction:column; gap:var(--s2); margin-top:var(--s3)}
+.adm-row{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--s3);
+  background:var(--bg-2); border:1px solid var(--line-soft); border-radius:var(--r-sm); padding:var(--s3);
+}
+.adm-info{display:flex; flex-direction:column; min-width:0}
+.adm-name{font-family:var(--f-head); font-size:16px; color:var(--text)}
+.adm-sub{font-size:14px; color:var(--muted)}
+.adm-acts{display:flex; gap:var(--s2); flex-shrink:0}
+
 /* ── Телефон ── */
 @media (max-width: 900px){
   .cab-stage{grid-template-columns:1fr; padding:var(--s3)}
@@ -167,4 +187,7 @@
   .head-grid{grid-template-columns:repeat(2,1fr)}
   .char-card{flex-basis:212px}
   .row-4{grid-template-columns:repeat(2,1fr)}
+  .adm-new{grid-template-columns:1fr}
+  .adm-row{flex-direction:column; align-items:stretch}
+  .adm-acts{justify-content:flex-end}
 }
