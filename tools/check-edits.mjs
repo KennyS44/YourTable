@@ -193,6 +193,101 @@ R.базаСуществ = await dm.evaluate(() => {
     фигурка: t && { имя: t.name, зрение: t.vision, имяВидно: t.namePublic, хитыВидны: t.hpPublic } };
 });
 
+/* 10. ПЕРЕХОДЫ И ТОЧКИ ВХОДА */
+const локации = await dm.evaluate(() => {
+  const s = window.__state();
+  return s.order.map((id) => ({ id, name: s.locations[id].name }));
+});
+const подвал = локации.find((l) => l.name === 'Подвал').id;
+const двор = локации.find((l) => l.name === 'Двор').id;
+
+// точки входа во «Дворе»: основная и отдельная для пришедших из «Подвала»
+await dm.evaluate((id) => window.__dispatch({ t: 'loc.active', id }), двор);
+await dm.waitForTimeout(500);
+await dm.click('#toolbar [data-tool=wall]');
+await dm.click('[data-wallkind=spawn]');
+await dm.mouse.click(box.x + 250, box.y + 250);
+await dm.waitForTimeout(400);
+await dm.evaluate((from) => {
+  const sel = document.querySelector('#token-card select');
+  sel.value = from; sel.dispatchEvent(new Event('change'));
+}, подвал);
+await dm.mouse.click(box.x + 600, box.y + 250);          // вторая — основная
+await dm.waitForTimeout(400);
+R.зоны = { входов: await dm.evaluate((id) => window.__state().locations[id].spawns.length, двор) };
+const входИзПодвала = await dm.evaluate((id) => {
+  const z = window.__state().locations[id].spawns.find((x) => x.fromLocId);
+  return { x: z.x, y: z.y, main: !!z.main };
+}, двор);
+
+// зелёная стрелка в «Подвале», ведёт во «Двор»
+await dm.evaluate((id) => window.__dispatch({ t: 'loc.active', id }), подвал);
+await dm.waitForTimeout(600);
+await dm.evaluate((id) => window.__dispatch({ t: 'loc.update', id, patch: { fogOn: false } }), подвал);
+await dm.click('[data-wallkind=portal]');
+await dm.mouse.click(box.x + 400, box.y + 350);
+await dm.waitForTimeout(400);
+R.зоны.карточкаПерехода = await dm.$eval('#token-card h4', (h) => h.textContent);
+await dm.evaluate((to) => {
+  const sel = document.querySelector('#token-card select');
+  sel.value = to; sel.dispatchEvent(new Event('change'));
+}, двор);
+await dm.waitForTimeout(300);
+const стрелка = await dm.evaluate((id) => {
+  const z = window.__state().locations[id].portals[0];
+  return { x: z.x, y: z.y, toLocId: z.toLocId };
+}, подвал);
+R.зоны.стрелкаВедёт = стрелка.toLocId === двор;
+await dm.click('#toolbar [data-tool=select]');
+await dm.waitForTimeout(300);
+
+// зоны видит только Мастер: у игрока в этой клетке пусто
+const пиксель = (page, wx, wy) => page.evaluate(([x, y]) => {
+  const p = window.__board().worldToScreen(x, y);
+  const c = document.querySelector('#board');
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  return [...c.getContext('2d').getImageData(Math.round(p.x * d), Math.round(p.y * d), 1, 1).data];
+}, [wx, wy]);
+await pl.waitForTimeout(1500);
+R.зоны.уМастераВидна = (await пиксель(dm, стрелка.x, стрелка.y))[3] > 0;
+R.зоны.уИгрокаНевидима = (await пиксель(pl, стрелка.x, стрелка.y))[3] === 0;
+
+// фигурку тащат на стрелку — она уходит во «Двор», на точку входа из «Подвала»
+await dm.evaluate(([x, y]) => window.__dispatch({ t: 'token.update', id: 'враг', patch: { x, y } }), [стрелка.x - 140, стрелка.y]);
+await dm.waitForTimeout(400);
+const откуда = await dm.evaluate(([x, y]) => { const p = window.__board().worldToScreen(x, y); return p; }, [стрелка.x - 140, стрелка.y]);
+const куда = await dm.evaluate(([x, y]) => window.__board().worldToScreen(x, y), [стрелка.x, стрелка.y]);
+await dm.mouse.move(box.x + откуда.x, box.y + откуда.y);
+await dm.mouse.down();
+await dm.mouse.move(box.x + куда.x, box.y + куда.y, { steps: 8 });
+await dm.mouse.up();
+await dm.waitForTimeout(700);
+R.переходФигурки = await dm.evaluate(([id, вход]) => {
+  const s = window.__state();
+  const t = s.tokens.враг;
+  const g = s.locations[t.locId].grid;
+  const кл = (x, y) => Math.floor((x - g.ox) / g.size) + ',' + Math.floor((y - g.oy) / g.size);
+  return { локация: s.locations[t.locId].name, наТочкеВхода: кл(t.x, t.y) === кл(вход.x, вход.y) };
+}, [двор, входИзПодвала]);
+
+// второй пришелец: клетка занята — встаёт рядом, а не поверх
+await dm.evaluate(([подвал, x, y]) => {
+  window.__dispatch({ t: 'token.update', id: 'чужой', patch: { locId: подвал, x, y } });
+}, [подвал, стрелка.x - 140, стрелка.y]);
+await dm.waitForTimeout(400);
+await dm.mouse.move(box.x + откуда.x, box.y + откуда.y);
+await dm.mouse.down();
+await dm.mouse.move(box.x + куда.x, box.y + куда.y, { steps: 8 });
+await dm.mouse.up();
+await dm.waitForTimeout(700);
+R.втораяФигурка = await dm.evaluate(() => {
+  const s = window.__state();
+  const a = s.tokens.враг, b = s.tokens.чужой;
+  const g = s.locations[a.locId].grid;
+  const кл = (t) => Math.floor((t.x - g.ox) / g.size) + ',' + Math.floor((t.y - g.oy) / g.size);
+  return { локация: s.locations[b.locId].name, вРазныхКлетках: кл(a) !== кл(b), рядом: кл(a) + ' и ' + кл(b) };
+});
+
 R.ошибки = errors;
 console.log(JSON.stringify(R, null, 2));
 await browser.close();

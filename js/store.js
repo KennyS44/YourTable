@@ -38,6 +38,8 @@ export function fixLoc(l) {
     fog: l.fog || {},
     walls: (l.walls || []).map((w) => ({ ...w })),
     lights: (l.lights || []).map((x) => ({ ...x })),
+    portals: (l.portals || []).map((x) => ({ ...x })),
+    spawns: (l.spawns || []).map((x) => ({ ...x })),
     drawings: (l.drawings || []).map((d) => ({ ...d, pts: d.pts || [] })),
   };
 }
@@ -85,6 +87,8 @@ export function newLocation(name) {
     drawings: [],
     walls: [],
     lights: [],                 // источники света: {id, x, y, feet, kind}
+    portals: [],                // переходы: {id, x, y, toLocId} — клетка уводит в другую локацию
+    spawns: [],                 // точки входа: {id, x, y, fromLocId, main}
     view: null,                 // {x, y, scale} — камера по умолчанию
   };
 }
@@ -230,6 +234,26 @@ export function reduce(s, a) {
       const loc = s.locations[a.locId]; if (!loc) break;
       const lights = (loc.lights || []).filter((x) => x.id !== a.id);
       s.locations = { ...s.locations, [a.locId]: { ...loc, lights } };
+      break;
+    }
+
+    // Переходы и точки входа устроены одинаково, поэтому и действия общие:
+    // a.kind — 'portals' или 'spawns'.
+    case 'zone.add': {
+      const loc = s.locations[a.locId]; if (!loc) break;
+      s.locations = { ...s.locations, [a.locId]: { ...loc, [a.kind]: [...(loc[a.kind] || []), a.zone] } };
+      break;
+    }
+    case 'zone.update': {
+      const loc = s.locations[a.locId]; if (!loc) break;
+      const list = (loc[a.kind] || []).map((z) => (z.id === a.id ? { ...z, ...a.patch } : z));
+      s.locations = { ...s.locations, [a.locId]: { ...loc, [a.kind]: list } };
+      break;
+    }
+    case 'zone.remove': {
+      const loc = s.locations[a.locId]; if (!loc) break;
+      const list = (loc[a.kind] || []).filter((z) => z.id !== a.id);
+      s.locations = { ...s.locations, [a.locId]: { ...loc, [a.kind]: list } };
       break;
     }
 

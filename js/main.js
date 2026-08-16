@@ -153,6 +153,8 @@ function start(sync, state, me) {
     canvas: $('#board'), store: app.store, sync: app.sync,
     me, isDM: app.isDM,
     onTokenOpen: openTokenCard,
+    onZoneOpen: openZoneCard,
+    onPortalEnter: enterPortal,
     onViewChange: (v) => { $('#zoom-val').textContent = Math.round(v.scale * 100) + '%'; },
   });
 
@@ -789,21 +791,117 @@ function placeCard(card, at) {
 
 const upd = (id, patch) => app.store.dispatch({ t: 'token.update', id, patch });
 
-/** Телепорт фигурки в другую локацию: та же клетка, пересчитанная под её сетку. */
+/* ─────────── Переходы между локациями и точки входа ─────────── */
+
+const cellKeyOf = (g, x, y) => Math.floor((x - g.ox) / g.size) + ',' + Math.floor((y - g.oy) / g.size);
+const cellCenterOf = (g, cx, cy) => ({ x: g.ox + (cx + 0.5) * g.size, y: g.oy + (cy + 0.5) * g.size });
+
+/**
+ * Куда встанет пришедший: точка входа, назначенная для этой прежней локации,
+ * иначе основная, иначе любая. Занятую клетку не занимаем второй раз —
+ * ищем ближайшую свободную рядом.
+ */
+function spawnSpot(to, fromLocId) {
+  const g = to.grid;
+  const spawns = to.spawns || [];
+  const byFrom = spawns.filter((z) => z.fromLocId === fromLocId);
+  const main = spawns.filter((z) => z.main);
+  const cands = byFrom.length ? byFrom : (main.length ? main : spawns);
+  if (!cands.length) return null;
+
+  const taken = new Set(Object.values(app.store.get().tokens)
+    .filter((t) => t.locId === to.id)
+    .map((t) => cellKeyOf(g, t.x, t.y)));
+  for (const z of cands) if (!taken.has(cellKeyOf(g, z.x, z.y))) return { x: z.x, y: z.y };
+
+  // все точки заняты — становимся в ближайшую свободную клетку, сбоку раньше, чем наискось
+  const [cx, cy] = cellKeyOf(g, cands[0].x, cands[0].y).split(',').map(Number);
+  for (let r = 1; r <= 8; r++) {
+    const ring = [];
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (!taken.has((cx + dx) + ',' + (cy + dy))) ring.push([dx, dy]);
+      }
+    }
+    ring.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+    if (ring.length) return cellCenterOf(g, cx + ring[0][0], cy + ring[0][1]);
+  }
+  return { x: cands[0].x, y: cands[0].y };
+}
+
+/** Телепорт фигурки: на точку входа новой локации, а если её нет — на ту же клетку. */
 function moveTokenToLocation(t, toId, quiet) {
   const s = app.store.get();
   const from = s.locations[t.locId], to = s.locations[toId];
   if (!from || !to || from.id === to.id) return;
-  const cx = Math.floor((t.x - from.grid.ox) / from.grid.size);
-  const cy = Math.floor((t.y - from.grid.oy) / from.grid.size);
-  upd(t.id, {
-    locId: toId,
-    x: to.grid.ox + (cx + 0.5) * to.grid.size,
-    y: to.grid.oy + (cy + 0.5) * to.grid.size,
-  });
+  const spot = spawnSpot(to, from.id) || (() => {
+    const cx = Math.floor((t.x - from.grid.ox) / from.grid.size);
+    const cy = Math.floor((t.y - from.grid.oy) / from.grid.size);
+    return cellCenterOf(to.grid, cx, cy);
+  })();
+  upd(t.id, { locId: toId, x: spot.x, y: spot.y });
   if (quiet) return;
   say(`${t.name} перемещён в «${to.name}»`, 'system');
   $('#token-card').hidden = true;
+}
+
+/** Фигурка встала на зелёную стрелку — уводим её в назначенную локацию. */
+function enterPortal(t, portal) {
+  const s = app.store.get();
+  const to = s.locations[portal.toLocId];
+  if (!t || !to || to.id === t.locId) return;
+  moveTokenToLocation(t, to.id, true);
+  say(`${t.name} перешёл в локацию «${to.name}»`, 'system');
+}
+
+/** Настройки перехода и точки входа: обе зоны видит и правит только Мастер. */
+function openZoneCard(kind, zone, pos) {
+  if (!app.isDM) return;
+  const card = $('#token-card');
+  card.innerHTML = '';
+  card.hidden = false;
+  const s = app.store.get();
+  const locId = s.activeLoc;
+  const zUpd = (patch) => app.store.dispatch({ t: 'zone.update', locId, kind, id: zone.id, patch });
+
+  const close = el('button', 'icon-btn close', '×');
+  close.addEventListener('click', () => { card.hidden = true; });
+  card.append(close, el('h4', '', kind === 'portals' ? 'Переход в другую локацию' : 'Точка входа'));
+
+  const sel = el('select', 'sel');
+  const others = s.order.filter((id) => id !== locId);
+  if (kind === 'portals') {
+    sel.append(new Option('— локация не выбрана —', ''));
+    others.forEach((id) => {
+      const o = new Option(s.locations[id].name, id);
+      if (zone.toLocId === id) o.selected = true;
+      sel.append(o);
+    });
+    sel.addEventListener('change', () => zUpd({ toLocId: sel.value || null }));
+    card.append(field('Куда ведёт', sel));
+    card.append(el('p', 'hint', 'Фигурка, вставшая на эту клетку, окажется в выбранной локации — на её точке входа.'));
+  } else {
+    sel.append(new Option('— из любой локации —', ''));
+    others.forEach((id) => {
+      const o = new Option('из «' + s.locations[id].name + '»', id);
+      if (zone.fromLocId === id) o.selected = true;
+      sel.append(o);
+    });
+    sel.addEventListener('change', () => zUpd({ fromLocId: sel.value || null }));
+    card.append(field('Откуда приходят', sel));
+    card.append(checkRow('Основная точка входа', !!zone.main, (on) => zUpd({ main: on })));
+    card.append(el('p', 'hint', 'Сюда встают пришедшие из выбранной локации. Основная принимает всех остальных. Занятая клетка не занимается дважды — сосед встанет рядом.'));
+  }
+  if (!others.length) card.append(el('p', 'hint', 'Пока есть только одна локация — создайте вторую в панели слева.'));
+
+  const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать зону');
+  bDel.addEventListener('click', () => {
+    app.store.dispatch({ t: 'zone.remove', locId, kind, id: zone.id });
+    card.hidden = true;
+  });
+  card.append(bDel);
+  placeCard(card, pos);
 }
 function field(label, input) {
   const f = el('label', 'field');
@@ -1027,7 +1125,9 @@ function wireDM() {
     door: 'Ведите линию поперёк прохода — получится дверь. Клик по ней открывает и закрывает.',
     torch: 'Клик по полю — факел: светит на 20 футов, свет обрывается о стены.',
     lantern: 'Клик по полю — фонарь: светит на 40 футов, свет обрывается о стены.',
-    erase: 'Ведите по стенам, дверям и огонькам — они пропадут.',
+    portal: 'Клик по клетке — зелёная стрелка перехода. Кто на неё встанет, уйдёт в назначенную локацию. Игрокам стрелка не видна.',
+    spawn: 'Клик по клетке — точка входа: сюда встают пришедшие из другой локации. Игрокам не видна.',
+    erase: 'Ведите по стенам, дверям, огонькам и зонам — они пропадут.',
   };
   $$('[data-wallkind]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-wallkind]').forEach((x) => x.classList.toggle('is-active', x === b));
