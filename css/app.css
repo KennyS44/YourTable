@@ -150,6 +150,7 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 #board{display:block; width:100%; height:100%; cursor:grab}
 #board.is-drag{cursor:grabbing}
 #board.is-ruler,#board.is-draw,#board.is-fog{cursor:crosshair}
+#board.is-edit{cursor:move}
 #board.is-token{cursor:pointer}
 #board.on-door{cursor:pointer}
 
@@ -176,8 +177,11 @@ em{color:var(--muted); font-style:normal; font-size:14px}
   display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; justify-content:center;
   background:rgba(30,28,24,.94); border:1px solid var(--line); border-radius:var(--r);
   padding:var(--s2) var(--s3); box-shadow:var(--shadow); max-width:calc(100% - 24px);
-  animation:rise .25s var(--ease) both;
+  animation:rise-x .25s var(--ease) both;
 }
+/* У этих панелей центрирование живёт в transform, поэтому и в анимации оно должно
+   сохраниться: обычный rise гасил его и панель уезжала вправо. */
+@keyframes rise-x{from{opacity:0; transform:translate(-50%,12px)} to{opacity:1; transform:translateX(-50%)}}
 .swatches,.shapes{display:flex; gap:var(--s1); flex-wrap:wrap}
 .swatch{width:28px; height:28px; border-radius:50%; border:2px solid transparent; cursor:pointer}
 .swatch.is-active{border-color:var(--text)}
@@ -187,6 +191,10 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 }
 .shape.is-active{color:var(--gold); border-color:var(--gold-dim)}
 .draw-bar .field-row span{white-space:nowrap}
+/* Панель тянется вширь, а не вниз: иначе она закрывает пол-поля */
+.draw-bar{width:max-content}
+.draw-bar .hint{flex:1 1 240px; max-width:420px; margin:0}
+.edit-counts{font-size:14px; color:var(--gold); white-space:nowrap}
 .draw-bar input[type=range]{width:90px; accent-color:var(--gold)}
 
 /* ── Списки, библиотека ──────────────────────────────────────────── */

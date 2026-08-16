@@ -106,7 +106,8 @@
       <button class="tool" data-tool="ruler" title="Линейка">📏</button>
       <button class="tool" data-tool="draw" title="Рисование">✎</button>
       <button class="tool dm-only" data-tool="fog" title="Кисть тумана">☁</button>
-      <button class="tool dm-only" data-tool="wall" title="Невидимые стены и двери">▦</button>
+      <button class="tool dm-only" data-tool="wall" title="Ставить стены, двери, фонари, переходы и входы">▦</button>
+      <button class="tool dm-only" data-tool="edit" title="Правка: двигать и настраивать всё уже поставленное">⚙</button>
     </div>
 
     <div class="topbar-right">
@@ -252,7 +253,6 @@
         <div class="shapes">
           <button class="shape is-active" data-wallkind="wall">Стена</button>
           <button class="shape" data-wallkind="door">Дверь</button>
-          <button class="shape" data-wallkind="torch">Факел</button>
           <button class="shape" data-wallkind="lantern">Фонарь</button>
           <button class="shape" data-wallkind="portal">Переход</button>
           <button class="shape" data-wallkind="spawn">Вход</button>
@@ -261,6 +261,12 @@
         <label class="check"><input type="checkbox" id="wall-snap" checked><span>Магнит к концам</span></label>
         <span class="hint" id="wall-hint">Ведите линию — стена. Клик по двери открывает её. Alt — без привязки к сетке.</span>
         <button class="btn btn-soft btn-sm" id="walls-clear">Убрать все</button>
+      </div>
+
+      <!-- Правка уже поставленного (только Мастер) -->
+      <div class="draw-bar dm-only" id="edit-bar" hidden>
+        <span class="edit-counts" id="edit-counts"></span>
+        <span class="hint">Тяните объект — он переедет, уголок ◢ — растянется. Клик открывает настройки, правая кнопка убирает.</span>
       </div>
 
       <!-- Что видит игрок под действием состояния -->

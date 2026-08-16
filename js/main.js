@@ -320,6 +320,7 @@ function renderAll(s, action) {
   renderMembers();
   renderHeroes(s);
   renderStatusFx(s);
+  renderEditCounts(s);
   const loc = s.activeLoc ? s.locations[s.activeLoc] : null;
   $('#loc-title').textContent = loc ? loc.name : '';
   $('#empty-hint').hidden = !!loc;
@@ -334,7 +335,8 @@ function renderAll(s, action) {
 }
 function setVal(sel, v) { const el = $(sel); if (el && document.activeElement !== el) el.value = v; }
 
-const BOARD_ONLY = new Set(['token.update', 'fog.paint', 'draw.add', 'draw.clear', 'draw.erase', 'wall.add', 'wall.update', 'wall.remove']);
+// zone.update — это перетаскивание зоны или фонаря: панели от него не меняются
+const BOARD_ONLY = new Set(['token.update', 'fog.paint', 'draw.add', 'draw.clear', 'draw.erase', 'wall.add', 'wall.update', 'wall.remove', 'zone.update']);
 /** Правки, которые видны и в панелях (хиты, имя, владелец) — там нужна полная перерисовка. */
 function touchesPanels(a) {
   if (a.t !== 'token.update') return false;
@@ -832,7 +834,12 @@ function placeCard(card, at) {
   const board = $('#board').getBoundingClientRect();      // куда нельзя вылезать
   const host = (card.offsetParent || document.body).getBoundingClientRect();
 
-  card.style.maxHeight = (board.height - pad * 2) + 'px';
+  // нижняя панель инструментов должна остаться нажимаемой — карточку выше неё
+  const bar = ['#draw-bar', '#wall-bar', '#edit-bar']
+    .map((sel) => $(sel)).find((b) => b && !b.hidden);
+  const bottom = Math.min(board.bottom - pad, bar ? bar.getBoundingClientRect().top - 8 : Infinity);
+
+  card.style.maxHeight = (bottom - board.top - pad) + 'px';
   const w = card.offsetWidth, h = card.offsetHeight;
   const px = board.left + at.x, py = board.top + at.y;    // фигурка в координатах окна
 
@@ -841,8 +848,8 @@ function placeCard(card, at) {
   left = Math.max(board.left + pad, Math.min(left, board.right - w - pad));
 
   let top = py + gap;
-  if (top + h > board.bottom - pad) top = py - gap - h;   // не влезло снизу — станем выше
-  top = Math.max(board.top + pad, Math.min(top, board.bottom - h - pad));
+  if (top + h > bottom) top = py - gap - h;               // не влезло снизу — станем выше
+  top = Math.max(board.top + pad, Math.min(top, bottom - h));
 
   card.style.left = Math.round(left - host.left) + 'px';
   card.style.top = Math.round(top - host.top) + 'px';
@@ -871,7 +878,15 @@ function spawnSpot(to, fromLocId) {
   const taken = new Set(Object.values(app.store.get().tokens)
     .filter((t) => t.locId === to.id)
     .map((t) => cellKeyOf(g, t.x, t.y)));
-  for (const z of cands) if (!taken.has(cellKeyOf(g, z.x, z.y))) return { x: z.x, y: z.y };
+  // зона занимает прямоугольник клеток — идём по ним, поэтому пришедшие не слипаются
+  for (const z of cands) {
+    const [zx, zy] = cellKeyOf(g, z.x, z.y).split(',').map(Number);
+    for (let dy = 0; dy < Math.max(1, z.ch || 1); dy++) {
+      for (let dx = 0; dx < Math.max(1, z.cw || 1); dx++) {
+        if (!taken.has((zx + dx) + ',' + (zy + dy))) return cellCenterOf(g, zx + dx, zy + dy);
+      }
+    }
+  }
 
   // все точки заняты — становимся в ближайшую свободную клетку, сбоку раньше, чем наискось
   const [cx, cy] = cellKeyOf(g, cands[0].x, cands[0].y).split(',').map(Number);
@@ -914,7 +929,25 @@ function enterPortal(t, portal) {
   say(`${t.name} перешёл в локацию «${to.name}»`, 'system');
 }
 
-/** Настройки перехода и точки входа: обе зоны видит и правит только Мастер. */
+const ZONE_TITLE = { portals: 'Переход в другую локацию', spawns: 'Точка входа', lights: 'Фонарь', walls: 'Стена или дверь' };
+
+/** Что вообще стоит в этой локации — чтобы в правке было видно, чего искать. */
+function renderEditCounts(s) {
+  const box = $('#edit-counts');
+  if (!box || $('#edit-bar').hidden) return;
+  const l = s.locations[s.activeLoc];
+  if (!l) { box.textContent = 'Локация не выбрана'; return; }
+  const walls = (l.walls || []).filter((w) => w.type !== 'door').length;
+  const doors = (l.walls || []).length - walls;
+  const parts = [
+    ['стен', walls], ['дверей', doors], ['фонарей', (l.lights || []).length],
+    ['переходов', (l.portals || []).length], ['входов', (l.spawns || []).length],
+  ];
+  const some = parts.filter(([, n]) => n);
+  box.textContent = some.length ? some.map(([n, v]) => `${n}: ${v}`).join(' · ') : 'В локации пока ничего не поставлено';
+}
+
+/** Настройки поставленного объекта: зоны, фонари и стены правит только Мастер. */
 function openZoneCard(kind, zone, pos) {
   if (!app.isDM) return;
   const card = $('#token-card');
@@ -923,10 +956,40 @@ function openZoneCard(kind, zone, pos) {
   const s = app.store.get();
   const locId = s.activeLoc;
   const zUpd = (patch) => app.store.dispatch({ t: 'zone.update', locId, kind, id: zone.id, patch });
+  const drop = (t, extra) => app.store.dispatch({ t, locId, id: zone.id, ...extra });
 
   const close = el('button', 'icon-btn close', '×');
   close.addEventListener('click', () => { card.hidden = true; });
-  card.append(close, el('h4', '', kind === 'portals' ? 'Переход в другую локацию' : 'Точка входа'));
+  card.append(close, el('h4', '', ZONE_TITLE[kind] || 'Объект'));
+
+  if (kind === 'lights') {
+    card.append(field('Дальность света, футов',
+      numInput(zone.feet || 20, (v) => zUpd({ feet: Math.max(1, Math.min(500, v)) }))));
+    card.append(el('p', 'hint', 'Свет обрывается о стены и закрытые двери и виден всем за столом. Сам фонарь видит только Мастер — его можно двигать по полю.'));
+    const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать фонарь');
+    bDel.addEventListener('click', () => { drop('light.remove'); card.hidden = true; });
+    card.append(bDel);
+    placeCard(card, pos);
+    return;
+  }
+
+  if (kind === 'walls') {
+    const kindSel = el('select', 'sel');
+    [['wall', 'Стена'], ['door', 'Дверь']].forEach(([v, label]) => {
+      const o = new Option(label, v);
+      if ((zone.type || 'wall') === v) o.selected = true;
+      kindSel.append(o);
+    });
+    kindSel.addEventListener('change', () => zUpd({ type: kindSel.value }));
+    card.append(field('Что это', kindSel));
+    card.append(checkRow('Открыта (для двери)', !!zone.open, (on) => zUpd({ open: on })));
+    card.append(el('p', 'hint', 'Стена и закрытая дверь обрывают обзор. Тяните за концы, чтобы поправить длину.'));
+    const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать');
+    bDel.addEventListener('click', () => { drop('wall.remove'); card.hidden = true; });
+    card.append(bDel);
+    placeCard(card, pos);
+    return;
+  }
 
   const sel = el('select', 'sel');
   const others = s.order.filter((id) => id !== locId);
@@ -950,8 +1013,12 @@ function openZoneCard(kind, zone, pos) {
     sel.addEventListener('change', () => zUpd({ fromLocId: sel.value || null }));
     card.append(field('Откуда приходят', sel));
     card.append(checkRow('Основная точка входа', !!zone.main, (on) => zUpd({ main: on })));
-    card.append(el('p', 'hint', 'Сюда встают пришедшие из выбранной локации. Основная принимает всех остальных. Занятая клетка не занимается дважды — сосед встанет рядом.'));
+    card.append(el('p', 'hint', 'Сюда встают пришедшие из выбранной локации. Основная принимает всех остальных. Занятые клетки не занимаются дважды — следующий встанет на свободную.'));
   }
+  card.append(field('Размер, клеток (ширина × высота)', pair(
+    numInput(zone.cw || 1, (v) => zUpd({ cw: Math.max(1, Math.min(20, v)) })),
+    numInput(zone.ch || 1, (v) => zUpd({ ch: Math.max(1, Math.min(20, v)) })))));
+  card.append(el('p', 'hint', 'Растянуть можно и мышью — за уголок ◢ в правом нижнем углу зоны.'));
   if (!others.length) card.append(el('p', 'hint', 'Пока есть только одна локация — создайте вторую в панели слева.'));
 
   const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать зону');
@@ -1037,6 +1104,11 @@ function wireUI() {
     $('#draw-bar').hidden = b.dataset.tool !== 'draw';
     const wb = $('#wall-bar');
     if (wb) wb.hidden = b.dataset.tool !== 'wall';
+    const eb = $('#edit-bar');
+    if (eb) {
+      eb.hidden = b.dataset.tool !== 'edit';
+      if (!eb.hidden) renderEditCounts(app.store.get());
+    }
     $('#token-card').hidden = true;
   }));
 
@@ -1182,10 +1254,9 @@ function wireDM() {
   const WALL_HINT = {
     wall: 'Ведите линию — стена. Клик по двери открывает её. Alt — без привязки к сетке.',
     door: 'Ведите линию поперёк прохода — получится дверь. Клик по ней открывает и закрывает.',
-    torch: 'Клик по полю — факел: светит на 20 футов, свет обрывается о стены.',
-    lantern: 'Клик по полю — фонарь: светит на 40 футов, свет обрывается о стены.',
+    lantern: 'Клик по полю — фонарь. Дальность света задаётся в его карточке, свет обрывается о стены.',
     portal: 'Клик по клетке — зелёная стрелка перехода. Кто на неё встанет, уйдёт в назначенную локацию. Игрокам стрелка не видна.',
-    spawn: 'Клик по клетке — точка входа: сюда встают пришедшие из другой локации. Игрокам не видна.',
+    spawn: 'Клик по клетке — точка входа: сюда встают пришедшие из другой локации. Тяните уголок, чтобы растянуть её на несколько клеток.',
     erase: 'Ведите по стенам, дверям, огонькам и зонам — они пропадут.',
   };
   $$('[data-wallkind]').forEach((b) => b.addEventListener('click', () => {

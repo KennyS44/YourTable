@@ -3,8 +3,8 @@
 
 const IMG_CACHE = new Map();
 
-/** Насколько далеко светят источники, футов. */
-const LIGHT_FEET = { torch: 20, lantern: 40 };
+/** Дальность нового фонаря, футов: дальше её правят в его карточке. */
+const LIGHT_FEET = 20;
 
 export function createBoard(opts) {
   const { canvas, store, sync, me, isDM, onTokenOpen, onViewChange, onZoneOpen, onPortalEnter } = opts;
@@ -15,7 +15,7 @@ export function createBoard(opts) {
   let draw = { shape: 'pen', color: '#c9a45a', width: 4 };
   let fogBrush = 1;
   let fogMode = 'reveal';       // 'reveal' — открывает местность, 'hide' — возвращает туман
-  let wallKind = 'wall';        // 'wall' | 'door' | 'torch' | 'lantern' | 'portal' | 'spawn' | 'erase'
+  let wallKind = 'wall';        // 'wall' | 'door' | 'lantern' | 'portal' | 'spawn' | 'erase'
   let wallSnap = true;          // концы стен липнут друг к другу — без щелей в углах
   let eraseSize = 40;           // радиус ластика в пикселях карты — заметно крупнее кисти
   let eraseWork = null;         // что останется от рисунков, пока ластик ведут
@@ -519,7 +519,7 @@ export function createBoard(opts) {
       const a = w2s(w.x1, w.y1), b = w2s(w.x2, w.y2);
       if (w.type === 'door') drawDoor(a, b, w.open);
       else drawStoneWall(a, b);
-      if (tool === 'wall') {                       // ручки для перетаскивания
+      if (tool === 'wall' || tool === 'edit') {     // ручки для перетаскивания
         [a, b].forEach((p) => {
           ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
           ctx.fillStyle = '#171613'; ctx.fill();
@@ -530,13 +530,13 @@ export function createBoard(opts) {
     ctx.restore();
   }
 
-  /** Огоньки видит только Мастер: игрокам виден лишь освещённый ими круг. */
+  /** Фонари видит только Мастер: игрокам виден лишь освещённый ими круг. */
   function drawLights() {
     if (!isDM) return;
     const g = gridOf();
     lightsOf().forEach((x) => {
       const p = w2s(x.x, x.y);
-      const rad = ((x.feet || LIGHT_FEET[x.kind] || 20) / g.feet) * g.size * view.scale;
+      const rad = ((x.feet || LIGHT_FEET) / g.feet) * g.size * view.scale;
       ctx.save();
       ctx.setLineDash([5, 6]); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(224,160,90,.5)';
       ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, Math.PI * 2); ctx.stroke();
@@ -552,7 +552,8 @@ export function createBoard(opts) {
       ctx.lineWidth = 2; ctx.strokeStyle = '#e0a05a'; ctx.stroke();
       ctx.fillStyle = '#f0c070'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `${Math.round(r * 1.1)}px Inter, sans-serif`;
-      ctx.fillText(x.kind === 'lantern' ? '☀' : '✦', p.x, p.y + 1);
+      ctx.fillText('☀', p.x, p.y + 1);
+      if (tool === 'wall' || tool === 'edit') zoneCaption(`фонарь · ${x.feet || LIGHT_FEET} фт`, p.x, p.y + r + 4, 40);
       ctx.restore();
     });
   }
@@ -568,34 +569,53 @@ export function createBoard(opts) {
     if (side < 8) return;
 
     zonesOf('spawns').forEach((z) => {
-      const p = w2s(z.x - g.size / 2, z.y - g.size / 2);
+      const b = zoneBox(z), p = w2s(b.x, b.y);
+      const w = b.w * view.scale, h = b.h * view.scale;
       const from = z.fromLocId && s.locations[z.fromLocId];
       ctx.save();
       ctx.fillStyle = 'rgba(127,168,201,.14)';
-      ctx.fillRect(p.x, p.y, side, side);
+      ctx.fillRect(p.x, p.y, w, h);
       ctx.setLineDash([6, 5]); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(127,168,201,.9)';
-      ctx.strokeRect(p.x + 1, p.y + 1, side - 2, side - 2);
+      ctx.strokeRect(p.x + 1, p.y + 1, w - 2, h - 2);
       ctx.setLineDash([]);
       ctx.fillStyle = '#cfe0ef'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = `${Math.max(11, side * .42)}px Inter, sans-serif`;
-      ctx.fillText('⚑', p.x + side / 2, p.y + side / 2);
-      zoneCaption(z.main ? 'вход · основной' : from ? 'вход из «' + from.name + '»' : 'вход', p.x + side / 2, p.y + side + 4, side);
+      ctx.fillText('⚑', p.x + w / 2, p.y + h / 2);
+      const size = (z.cw || 1) > 1 || (z.ch || 1) > 1 ? ` ${z.cw || 1}×${z.ch || 1}` : '';
+      zoneCaption((z.main ? 'вход · основной' : from ? 'вход из «' + from.name + '»' : 'вход') + size,
+        p.x + w / 2, p.y + h + 4, side);
+      sizeHandle(p.x + w, p.y + h, '#7fa8c9');
       ctx.restore();
     });
 
     zonesOf('portals').forEach((z) => {
-      const p = w2s(z.x - g.size / 2, z.y - g.size / 2);
+      const b = zoneBox(z), p = w2s(b.x, b.y);
+      const w = b.w * view.scale, h = b.h * view.scale;
       const to = z.toLocId && s.locations[z.toLocId];
       const tone = to ? '131,160,95' : '184,96,74';         // без цели — красная, её видно сразу
       ctx.save();
       ctx.fillStyle = `rgba(${tone},.18)`;
-      ctx.fillRect(p.x, p.y, side, side);
+      ctx.fillRect(p.x, p.y, w, h);
       ctx.lineWidth = 2; ctx.strokeStyle = `rgba(${tone},.95)`;
-      ctx.strokeRect(p.x + 1, p.y + 1, side - 2, side - 2);
-      arrowGlyph(p.x + side / 2, p.y + side / 2, side * .52, `rgb(${tone})`);
-      zoneCaption(to ? '→ ' + to.name : 'переход без локации', p.x + side / 2, p.y + side + 4, side);
+      ctx.strokeRect(p.x + 1, p.y + 1, w - 2, h - 2);
+      arrowGlyph(p.x + w / 2, p.y + h / 2, Math.min(w, h) * .52, `rgb(${tone})`);
+      zoneCaption(to ? '→ ' + to.name : 'переход без локации', p.x + w / 2, p.y + h + 4, side);
+      sizeHandle(p.x + w, p.y + h, `rgb(${tone})`);
       ctx.restore();
     });
+  }
+
+  /** Уголок «потяни и растяни» — показываем, когда объекты можно править. */
+  function sizeHandle(x, y, color) {
+    if (tool !== 'wall' && tool !== 'edit') return;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#171613'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = color; ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 2.5, y + 2.5); ctx.lineTo(x + 2.5, y - 2.5);
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** Та самая зелёная стрелка: остриём вверх, во всю клетку. */
@@ -629,12 +649,52 @@ export function createBoard(opts) {
     ctx.restore();
   }
 
-  /** Зона под точкой: они ровно в клетку, поэтому сравниваем клетки. */
-  function zoneAt(w) {
-    const key = cellKey(w.x, w.y);
-    for (const kind of ['portals', 'spawns']) {
-      const hit = zonesOf(kind).find((z) => cellKey(z.x, z.y) === key);
-      if (hit) return { kind, zone: hit };
+  /** Зона занимает прямоугольник клеток: x,y — центр её первой клетки. */
+  function zoneCells(z) {
+    const g = gridOf();
+    const [cx, cy] = cellKey(z.x, z.y).split(',').map(Number);
+    return { cx, cy, cw: Math.max(1, z.cw || 1), ch: Math.max(1, z.ch || 1), g };
+  }
+  /** Прямоугольник зоны в мировых координатах. */
+  function zoneBox(z) {
+    const { cx, cy, cw, ch, g } = zoneCells(z);
+    return {
+      x: g.ox + cx * g.size, y: g.oy + cy * g.size,
+      w: cw * g.size, h: ch * g.size,
+    };
+  }
+
+  /** Зона под точкой — сравниваем с её прямоугольником. only сужает поиск до одного вида. */
+  function zoneAt(w, only) {
+    for (const kind of (only ? [only] : ['portals', 'spawns'])) {
+      const list = zonesOf(kind);
+      for (let i = list.length - 1; i >= 0; i--) {
+        const b = zoneBox(list[i]);
+        if (w.x >= b.x && w.x <= b.x + b.w && w.y >= b.y && w.y <= b.y + b.h) return { kind, zone: list[i] };
+      }
+    }
+    return null;
+  }
+
+  /** Уголок изменения размера — правый нижний угол зоны, ловим по экрану. */
+  function zoneHandleAt(p, only) {
+    for (const kind of (only ? [only] : ['portals', 'spawns'])) {
+      const list = zonesOf(kind);
+      for (let i = list.length - 1; i >= 0; i--) {
+        const b = zoneBox(list[i]);
+        const c = w2s(b.x + b.w, b.y + b.h);
+        if (Math.hypot(p.x - c.x, p.y - c.y) <= 11) return { kind, zone: list[i] };
+      }
+    }
+    return null;
+  }
+
+  /** Фонарь под точкой. */
+  function lightAt(w) {
+    const near = Math.max(14 / view.scale, gridOf().size * .3);
+    const list = lightsOf();
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (Math.hypot(w.x - list[i].x, w.y - list[i].y) <= near) return list[i];
     }
     return null;
   }
@@ -731,10 +791,9 @@ export function createBoard(opts) {
       if (!t.vision) return;
       cutVision(f, t, (t.vision / g.feet) * g.size, .72);
     });
-    // факелы и фонари светят всем: свет на карте, а не в чьих-то глазах
+    // фонари светят всем: свет лежит на карте, а не в чьих-то глазах
     lightsOf().forEach((x) => {
-      const feet = x.feet || LIGHT_FEET[x.kind] || 20;
-      cutVision(f, { id: 'L' + x.id, x: x.x, y: x.y }, (feet / g.feet) * g.size, .6);
+      cutVision(f, { id: 'L' + x.id, x: x.x, y: x.y }, ((x.feet || LIGHT_FEET) / g.feet) * g.size, .6);
     });
     f.globalCompositeOperation = 'source-over';
     ctx.drawImage(fogLayer, 0, 0, W, H);
@@ -810,33 +869,66 @@ export function createBoard(opts) {
       preview = { id: 'tmp', by: me.id, shape: draw.shape, color: draw.color, width: draw.width, pts: [w] };
       drag = { type: 'draw' }; render(); return;
     }
-    if (tool === 'wall' && isDM && !mid) {
-      if (wallKind === 'erase' || e.button === 2) {        // ластик и правая кнопка — убрать
+    // Стены и правка объектов устроены одинаково: сначала пробуем взять уже
+    // поставленное, и только режим стен ставит новое на пустом месте.
+    if ((tool === 'wall' || tool === 'edit') && isDM && !mid) {
+      if ((tool === 'wall' && wallKind === 'erase') || e.button === 2) {
         drag = { type: 'wall-erase' };
         eraseWalls(w); render(); return;
       }
+      // В правке хватаем что угодно; в режиме стен — только то, что сейчас ставим,
+      // иначе новый переход не поставить поверх стены.
+      const all = tool === 'edit';
+      const zoneKind = wallKind === 'portal' ? 'portals' : wallKind === 'spawn' ? 'spawns' : null;
+      const grabZone = all || !!zoneKind;
+      const only = all ? null : zoneKind;
+      const handle = grabZone ? zoneHandleAt(p, only) : null;         // уголок — растянуть зону
+      if (handle) {
+        const { cx, cy } = zoneCells(handle.zone);
+        drag = {
+          type: 'zone-size', kind: handle.kind, zone: handle.zone,
+          cx, cy, cw: handle.zone.cw || 1, ch: handle.zone.ch || 1,
+        };
+        return;
+      }
+      const hitZ = grabZone ? zoneAt(w, only) : null;      // тело зоны — подвинуть или открыть
+      if (hitZ) {
+        const start = { x: hitZ.zone.x, y: hitZ.zone.y };
+        drag = { type: 'zone-move', kind: hitZ.kind, zone: hitZ.zone, from: w, start, last: start, at: p };
+        return;
+      }
+      const hitL = (all || wallKind === 'lantern') && lightAt(w);
+      if (hitL) {
+        drag = { type: 'light-move', id: hitL.id, dx: hitL.x - w.x, dy: hitL.y - w.y, at: p };
+        return;
+      }
+      const hitW = (all || wallKind === 'wall' || wallKind === 'door') && wallAt(w);
+      if (hitW) {                                          // тянем конец или всю стену
+        drag = { type: 'wall-move', id: hitW.wall.id, part: hitW.part, from: w, start: { ...hitW.wall }, at: p };
+        return;
+      }
+      if (tool === 'edit') {                               // в правке пустое место двигает карту
+        drag = { type: 'pan', from: p, view: { ...view } };
+        canvas.classList.add('is-drag');
+        return;
+      }
       if (wallKind === 'portal' || wallKind === 'spawn') {
-        const hitZ = zoneAt(w);
-        if (hitZ) { drag = { type: 'zone-tap', kind: hitZ.kind, zone: hitZ.zone, from: p }; return; }
-        const c = cellCenter(w.x, w.y);                    // зона ровно в клетку
+        const c = cellCenter(w.x, w.y);                    // новая зона — с одной клетки
         const kind = wallKind === 'portal' ? 'portals' : 'spawns';
         const zone = kind === 'portals'
-          ? { id: zoneId(), x: c.x, y: c.y, toLocId: null }
-          : { id: zoneId(), x: c.x, y: c.y, fromLocId: null, main: !zonesOf('spawns').length };
+          ? { id: zoneId(), x: c.x, y: c.y, cw: 1, ch: 1, toLocId: null }
+          : { id: zoneId(), x: c.x, y: c.y, cw: 1, ch: 1, fromLocId: null, main: !zonesOf('spawns').length };
         store.dispatch({ t: 'zone.add', locId: loc().id, kind, zone });
         onZoneOpen && onZoneOpen(kind, zone, p);           // сразу спрашиваем, куда ведёт
         return;
       }
-      if (wallKind === 'torch' || wallKind === 'lantern') {
+      if (wallKind === 'lantern') {
+        // ставим молча: карточка с дальностью открывается по щелчку на фонаре,
+        // иначе она лезет поверх панели при каждом новом огне
         store.dispatch({
           t: 'light.add', locId: loc().id,
-          light: { id: 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), kind: wallKind, feet: LIGHT_FEET[wallKind], x: w.x, y: w.y },
+          light: { id: zoneId(), kind: 'lantern', feet: LIGHT_FEET, x: w.x, y: w.y },
         });
-        return;
-      }
-      const hitW = wallAt(w);
-      if (hitW) {                                          // тянем конец или всю стену
-        drag = { type: 'wall-move', id: hitW.wall.id, part: hitW.part, from: w, start: { ...hitW.wall } };
         return;
       }
       const a = snapNode(w, e.altKey);
@@ -911,6 +1003,28 @@ export function createBoard(opts) {
     } else if (drag.type === 'wall-erase') {
       hoverAt = p;
       eraseWalls(w); render();
+    } else if (drag.type === 'zone-move') {
+      // тянем за тело: зона встаёт по клеткам, поэтому шлём правку только при смене клетки
+      const c = cellCenter(drag.start.x + (w.x - drag.from.x), drag.start.y + (w.y - drag.from.y));
+      if (c.x !== drag.last.x || c.y !== drag.last.y) {
+        drag.moved = true; drag.last = c;
+        store.dispatch({ t: 'zone.update', locId: loc().id, kind: drag.kind, id: drag.zone.id, patch: { x: c.x, y: c.y } });
+      }
+    } else if (drag.type === 'zone-size') {
+      const [mx, my] = cellKey(w.x, w.y).split(',').map(Number);
+      const cw = Math.max(1, Math.min(20, mx - drag.cx + 1));
+      const ch = Math.max(1, Math.min(20, my - drag.cy + 1));
+      if (cw !== drag.cw || ch !== drag.ch) {
+        drag.moved = true; drag.cw = cw; drag.ch = ch;
+        store.dispatch({ t: 'zone.update', locId: loc().id, kind: drag.kind, id: drag.zone.id, patch: { cw, ch } });
+      }
+    } else if (drag.type === 'light-move') {
+      drag.moved = true;
+      // фонари и зоны правятся одним действием: zone.* работает с любым списком локации
+      store.dispatch({
+        t: 'zone.update', locId: loc().id, kind: 'lights', id: drag.id,
+        patch: { x: w.x + drag.dx, y: w.y + drag.dy },
+      });
     } else if (drag.type === 'wall-move') {
       const s = drag.start;
       const dx = w.x - drag.from.x, dy = w.y - drag.from.y;
@@ -940,13 +1054,23 @@ export function createBoard(opts) {
         store.dispatch({ t: 'token.update', id: drag.id, patch: { x: c.x, y: c.y } });
         if (!drag.moved) onTokenOpen && onTokenOpen(t, evPos(e));
         // встали на клетку перехода — уходим в другую локацию
-        const key = cellKey(c.x, c.y);
-        const portal = drag.moved && zonesOf('portals').find((z) => cellKey(z.x, z.y) === key);
-        if (portal && onPortalEnter) onPortalEnter(S().tokens[drag.id], portal);
+        const hitZ = drag.moved && zoneAt(c);
+        if (hitZ && hitZ.kind === 'portals' && onPortalEnter) onPortalEnter(S().tokens[drag.id], hitZ.zone);
       }
     } else if (drag.type === 'zone-tap') {
       const p = evPos(e);
       if (Math.hypot(p.x - drag.from.x, p.y - drag.from.y) < 6) onZoneOpen && onZoneOpen(drag.kind, drag.zone, p);
+    } else if (drag.type === 'zone-move' || drag.type === 'zone-size') {
+      // не двигали, а просто щёлкнули — открываем настройки зоны
+      if (!drag.moved) {
+        const z = zonesOf(drag.kind).find((x) => x.id === drag.zone.id);
+        if (z) onZoneOpen && onZoneOpen(drag.kind, z, evPos(e));
+      }
+    } else if (drag.type === 'light-move') {
+      if (!drag.moved) {
+        const x = lightsOf().find((l) => l.id === drag.id);
+        if (x) onZoneOpen && onZoneOpen('lights', x, evPos(e));
+      }
     } else if (drag.type === 'wall-new') {
       const { a, b } = drag;
       if (Math.hypot(b.x - a.x, b.y - a.y) > 4) {
@@ -956,9 +1080,13 @@ export function createBoard(opts) {
         });
       }
     } else if (drag.type === 'wall-move') {
-      // короткий клик по двери без перетаскивания — открыть или закрыть её
-      if (!drag.moved && drag.start.type === 'door') {
-        store.dispatch({ t: 'wall.update', locId: loc().id, id: drag.id, patch: { open: !drag.start.open } });
+      if (!drag.moved) {
+        // в правке щелчок открывает карточку стены, в остальных режимах — саму дверь
+        const wl = wallsOf().find((x) => x.id === drag.id);
+        if (tool === 'edit' && wl) onZoneOpen && onZoneOpen('walls', wl, evPos(e));
+        else if (drag.start.type === 'door') {
+          store.dispatch({ t: 'wall.update', locId: loc().id, id: drag.id, patch: { open: !drag.start.open } });
+        }
       }
     } else if (drag.type === 'door-tap') {
       const p = evPos(e);

@@ -37,9 +37,11 @@ export function fixLoc(l) {
     grid: { size: 70, ox: 0, oy: 0, feet: 5, show: true, ...(l.grid || {}) },
     fog: l.fog || {},
     walls: (l.walls || []).map((w) => ({ ...w })),
-    lights: (l.lights || []).map((x) => ({ ...x })),
-    portals: (l.portals || []).map((x) => ({ ...x })),
-    spawns: (l.spawns || []).map((x) => ({ ...x })),
+    // Фонарь теперь один на все случаи: у прежних факелов дальность просто остаётся своей
+    lights: (l.lights || []).map((x) => ({ ...x, kind: 'lantern', feet: x.feet || 20 })),
+    // Зоны занимают прямоугольник клеток; у старых, поставленных до этого, — одна клетка
+    portals: (l.portals || []).map((x) => ({ ...x, cw: x.cw || 1, ch: x.ch || 1 })),
+    spawns: (l.spawns || []).map((x) => ({ ...x, cw: x.cw || 1, ch: x.ch || 1 })),
     drawings: (l.drawings || []).map((d) => ({ ...d, pts: d.pts || [] })),
   };
 }
@@ -86,9 +88,9 @@ export function newLocation(name) {
     fog: {},                    // "cx,cy" -> 1 (открыто Мастером)
     drawings: [],
     walls: [],
-    lights: [],                 // источники света: {id, x, y, feet, kind}
-    portals: [],                // переходы: {id, x, y, toLocId} — клетка уводит в другую локацию
-    spawns: [],                 // точки входа: {id, x, y, fromLocId, main}
+    lights: [],                 // фонари: {id, x, y, feet}
+    portals: [],                // переходы: {id, x, y, cw, ch, toLocId} — уводят в другую локацию
+    spawns: [],                 // точки входа: {id, x, y, cw, ch, fromLocId, main}
     view: null,                 // {x, y, scale} — камера по умолчанию
   };
 }

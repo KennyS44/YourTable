@@ -74,11 +74,11 @@ await dm.click('[data-wallkind=erase]');
 await drag([конец.x + 200, конец.y + 100], [конец.x + 200, конец.y + 160]);
 R.ластикСтен = { было: w2.length, стало: (await walls()).length };
 
-/* 3. ФАКЕЛ */
-await dm.click('[data-wallkind=torch]');
+/* 3. ФОНАРЬ */
+await dm.click('[data-wallkind=lantern]');
 await dm.mouse.click(box.x + 300, box.y + 400);
 await dm.waitForTimeout(300);
-R.факел = (await lights()).map((l) => ({ kind: l.kind, feet: l.feet }));
+R.фонарь = (await lights()).map((l) => ({ kind: l.kind, feet: l.feet }));
 
 await dm.click('[data-wallkind=erase]');
 await drag([300, 400], [304, 404]);
