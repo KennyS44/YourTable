@@ -7,6 +7,7 @@ import { createBoard } from './board.js';
 import { DICE, roll, playAnimation } from './dice.js';
 import { packRoom } from './roomcode.js';
 import { dbPut, noteRoom } from './registry.js';
+import { fileName } from './translit.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -65,9 +66,9 @@ if (killed !== null) {
   err.hidden = false;
 }
 
-$('.gate-note').textContent = useFirebase
-  ? 'Комната живёт в облаке: заходите с любого устройства, всё сохраняется между встречами.'
-  : 'Пока работает локальная синхронизация (вкладки одного браузера). Подключим Firebase — заработает между устройствами.';
+$('.gate-note').textContent = sessionStorage.getItem('dnd.char')
+  ? 'Персонаж выбран — можно за стол.'
+  : 'Игрок входит за стол с персонажем из личного кабинета. Мастеру нужен только его ключ.';
 
 $$('[data-gate-tab]').forEach((b) => b.addEventListener('click', () => {
   $$('[data-gate-tab]').forEach((x) => x.classList.toggle('is-active', x === b));
@@ -118,6 +119,11 @@ $('#join-form').addEventListener('submit', async (e) => {
   const err = $('#join-err');
   const key = f.get('key');
   const dmkey = (f.get('dmkey') || '').trim();
+  // за стол выходят с персонажем: игрок приводит его из личного кабинета,
+  // без ключа Мастера пустой вход не пускаем
+  if (!dmkey && !sessionStorage.getItem('dnd.char')) {
+    return fail(err, 'Сначала выберите персонажа в личном кабинете — без него за стол не пускают');
+  }
   busy(e.target, true);
   try {
     const me = { id: myId(), name: f.get('name').trim(), role: 'player' };
@@ -240,33 +246,15 @@ async function bringCharacter() {
   const owner = { id: app.me.id, name: app.me.name };
   const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
   const old = Object.values(s.library).find((it) => same(it.name, ch.name));
-  let libId;
   if (old) {
-    libId = old.id;
     app.store.dispatch({ t: 'lib.update', id: old.id, patch: { kind: 'pc', assetId: assetId || old.assetId, stats, owner } });
     say(`Карточка «${ch.name}» обновлена из личного кабинета`, 'system');
   } else {
-    libId = uid('lib');
-    app.store.dispatch({ t: 'lib.add', item: { id: libId, name: ch.name, kind: 'pc', assetId, stats, owner } });
+    app.store.dispatch({ t: 'lib.add', item: { id: uid('lib'), name: ch.name, kind: 'pc', assetId, stats, owner } });
     say(`«${ch.name}» добавлен в «Иконки» — Мастер, поставьте фигурку на поле`, 'system');
   }
-  claimFigures(libId, ch.name, owner);
-}
-
-/**
- * Фигурки этого персонажа, уже стоящие на поле, тоже становятся нашими:
- * Мастер мог поставить их до того, как игрок вошёл. Чужих не трогаем.
- */
-function claimFigures(libId, charName, owner) {
-  const s = app.store.get();
-  const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
-  Object.values(s.tokens).forEach((t) => {
-    if (t.libId !== libId && !same(t.name, charName)) return;
-    const free = !t.ownerName && !t.ownerId;
-    if (!free && !same(t.ownerName, owner.name)) return;      // это чужая фигурка
-    if (t.ownerId === owner.id && same(t.ownerName, owner.name)) return;
-    upd(t.id, { ownerId: owner.id, ownerName: owner.name });
-  });
+  // уже стоящие на поле фигурки не трогаем: ничейная фигурка так и остаётся ничьей,
+  // владельца получают только те, кого Мастер поставит из этой иконки
 }
 
 function onRemoteEvent(ev) {
@@ -1532,9 +1520,11 @@ async function exportCampaign() {
   const blob = new Blob([JSON.stringify({ v: 1, state, assets })], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${state.room.name || 'кампания'}.json`;
+  a.download = fileName(state.room.name, 'campaign');
+  document.body.append(a);          // ссылку вне страницы браузер скачивает без имени
   a.click();
-  URL.revokeObjectURL(a.href);
+  // адрес отпускаем позже: если отобрать его сразу, файл сохранится без названия
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
 
 async function importCampaign(e) {

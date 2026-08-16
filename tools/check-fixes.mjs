@@ -37,6 +37,12 @@ const watch = (p, t) => {
   p.on('pageerror', (e) => errors.push(t + ': ' + e.message));
 };
 
+// Игрок выходит за стол только с персонажем из личного кабинета — кладём его
+// в сессию так же, как это делает сам кабинет.
+const СПЕРСОНАЖЕМ = () => sessionStorage.setItem('dnd.char', JSON.stringify({
+  id: 'проверка', name: 'Персонаж игрока', hp: { cur: 10, max: 10 }, vision: 30, avatar: null,
+}));
+
 const browser = await chromium.launch();
 const dm = await (await browser.newContext({ viewport: { width: 1400, height: 900 } })).newPage(); watch(dm, 'DM');
 await dm.goto(`${BASE}?${q({ r: ROOM, k: KEY, m: DMKEY })}`);
@@ -57,7 +63,9 @@ await dm.dblclick('#lib-grid .lib-item');
 await dm.waitForTimeout(800);
 
 // игрок заходит
-const pl = await (await browser.newContext({ viewport: { width: 1400, height: 900 } })).newPage(); watch(pl, 'PL');
+const plCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+await plCtx.addInitScript(СПЕРСОНАЖЕМ);
+const pl = await plCtx.newPage(); watch(pl, 'PL');
 await pl.goto(`${BASE}?${q({ r: ROOM, k: KEY })}`);
 await pl.fill('#join-form [name=name]', 'Торин');
 await pl.click('#join-form button[type=submit]');

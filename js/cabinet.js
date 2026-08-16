@@ -5,6 +5,7 @@ import { openStore, slug, uid, userPath } from './cabinet-store.js';
 import { emptySheet, fixSheet, renderSheet } from './sheet.js';
 import { unpackRoom } from './roomcode.js';
 import { noteAccount } from './registry.js';
+import { fileName } from './translit.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const el = (tag, cls = '', text = '') => {
@@ -203,6 +204,7 @@ function renderCurrent() {
   $('#btn-page-bg').hidden = !ch;
   applyPageBg();
   $('#btn-pick').disabled = !ch;
+  $('#btn-export').disabled = !ch;
   if (!ch) return;
   renderSheet($('#sheet'), ch, () => { save(ch); syncRibbonName(ch); }, {
     insp: cab.profile.insp || 0,
@@ -263,8 +265,50 @@ function wire() {
     e.target.value = '';
   });
 
+  $('#btn-export').addEventListener('click', exportChar);
+  $('#btn-import').addEventListener('change', importChar);
+
   $('#btn-back').addEventListener('click', () => { $('#wait').hidden = true; });
   $('#wait-form').addEventListener('submit', enterRoom);
+}
+
+/* ─────────────── Перенос персонажа между кабинетами ─────────────── */
+
+/** Выгружаем персонажа целиком: лист, способности и обе картинки. */
+function exportChar() {
+  const ch = cab.chars[cab.currentId];
+  if (!ch) return;
+  const blob = new Blob([JSON.stringify({ v: 1, char: ch }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName(ch.name, 'character');
+  document.body.append(a);          // ссылку вне страницы браузер скачивает без имени
+  a.click();
+  // адрес отпускаем позже: если отобрать его сразу, файл сохранится без названия
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  mark('Персонаж выгружен');
+}
+
+/** Загружаем персонажа файлом: он становится новым, чужой не затирается. */
+async function importChar(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();          // сначала читаем, потом отпускаем поле
+    e.target.value = '';
+    const data = JSON.parse(text);
+    const raw = data && (data.char || (data.sheet ? data : null));
+    if (!raw) { mark('Это не файл персонажа', true); return; }
+    const ch = fixChar({ ...raw, id: uid('ch'), at: Date.now() });
+    cab.chars[ch.id] = ch;
+    cab.currentId = ch.id;
+    await cab.store.saveChar(ch);
+    renderRibbon();
+    renderCurrent();
+    mark(`Загружен: ${ch.name}`);
+  } catch (ex) {
+    mark('Не удалось прочитать файл: ' + ex.message, true);
+  }
 }
 
 /* ───────────────────────── Комната ожидания ───────────────────────── */

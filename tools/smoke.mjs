@@ -118,6 +118,9 @@ await dm.screenshot({ path: 'tools/shot-dm.png' });
 
 // ── игрок во второй вкладке того же браузера ──
 const player = await ctxA.newPage();
+// игрок выходит за стол с персонажем из кабинета
+await player.addInitScript(() => sessionStorage.setItem('dnd.char', JSON.stringify(
+  { id: 'проверка', name: 'Персонаж игрока', hp: { cur: 10, max: 10 }, vision: 30, avatar: null })));
 player.on('console', (m) => m.type() === 'error' && errors.push('PL console: ' + m.text()));
 player.on('pageerror', (e) => errors.push('PL error: ' + e.message));
 await player.goto(URL_);

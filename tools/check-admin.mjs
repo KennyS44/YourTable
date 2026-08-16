@@ -22,6 +22,12 @@ const watch = (p, t) => {
 };
 const db = (p) => fetch(`${FIREBASE.databaseURL}/rooms/${p}.json`).then((r) => r.json());
 
+// Игрок выходит за стол только с персонажем из личного кабинета — кладём его
+// в сессию так же, как это делает сам кабинет.
+const СПЕРСОНАЖЕМ = () => sessionStorage.setItem('dnd.char', JSON.stringify({
+  id: 'проверка', name: 'Персонаж игрока', hp: { cur: 10, max: 10 }, vision: 30, avatar: null,
+}));
+
 const browser = await chromium.launch();
 
 /* ── Мастер открывает стол: он должен попасть в реестр ── */
@@ -46,7 +52,9 @@ const завестиКабинет = async (login, pass, name) => {
 
 /* ── Выданный кабинет: вход игрока отмечает аккаунт в реестре ── */
 await завестиКабинет(LOGIN, PASS, 'Торин');
-const pl = await (await browser.newContext({ viewport: { width: 1200, height: 900 } })).newPage(); watch(pl, 'PL');
+const plCtx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+await plCtx.addInitScript(СПЕРСОНАЖЕМ);
+const pl = await plCtx.newPage(); watch(pl, 'PL');
 await pl.goto(page('cabinet.html'));
 await pl.fill('#login-form [name=login]', LOGIN);
 await pl.fill('#login-form [name=pass]', PASS);

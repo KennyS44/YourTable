@@ -43,6 +43,18 @@ const завестиКабинет = async (login, pass, name) => {
   return path;
 };
 
+/* ── Без персонажа за стол не пускают ── */
+const без = await (await browser.newContext()).newPage(); watch(без, 'NOCHAR');
+await без.goto(`${page('index.html')}?${q({ r: ROOM, k: KEY })}`);
+await без.fill('#join-form [name=name]', 'Безбилетник');
+await без.click('#join-form button[type=submit]');
+await без.waitForTimeout(2500);
+R.безПерсонажа = {
+  осталсяНаВходе: await без.$eval('#gate', (g) => !g.hidden),
+  сообщение: await без.$eval('#join-err', (e) => (e.hidden ? '' : e.textContent)),
+};
+await без.close();
+
 /* ── Игрок входит в выданный ему кабинет ── */
 await завестиКабинет(LOGIN, PASS, 'Торин');
 const pl = await (await browser.newContext({ viewport: { width: 1400, height: 950 } })).newPage(); watch(pl, 'PL');
@@ -130,6 +142,29 @@ const былоСтрок = await строкАтак();
 await pl.evaluate(() => { [...document.querySelectorAll('#sheet .btn')].find((b) => b.textContent.includes('Строка')).click(); });
 await pl.waitForTimeout(500);
 R.атаки = { было: былоСтрок, стало: await строкАтак() };
+
+/* ── Экспорт и импорт персонажа ── */
+const [загрузка] = await Promise.all([
+  pl.waitForEvent('download'),
+  pl.click('#btn-export'),
+]);
+// путь строго латиницей: Playwright не прикрепляет файлы с кириллицей в пути
+const файл = '/tmp/char-' + process.pid + '.json';
+await загрузка.saveAs(файл);
+const выгружено = JSON.parse(await (await import('node:fs/promises')).readFile(файл, 'utf8'));
+R.экспорт = {
+  имяФайла: загрузка.suggestedFilename(),
+  имя: выгружено.char.name,
+  хиты: выгружено.char.sheet.hpMax,
+  способностей: выгружено.char.sheet.feats.length,
+};
+await pl.setInputFiles('#btn-import', файл);
+await pl.waitForTimeout(2500);
+R.импорт = await pl.evaluate(() => ({
+  карточек: document.querySelectorAll('.char-card:not(.char-add)').length,
+  открытый: document.querySelector('.char-card.is-active .char-name').value,
+  метка: document.querySelector('#save-mark').textContent,
+}));
 
 /* ── Перезаход: всё сохранилось в облаке ── */
 const pl2 = await (await browser.newContext({ viewport: { width: 1400, height: 950 } })).newPage(); watch(pl2, 'PL2');
@@ -219,7 +254,7 @@ await dm.waitForTimeout(800);
 await pl.reload();
 await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });
 await pl.waitForTimeout(3000);
-R.привязка.ничьюПодобрал = await dm.evaluate(() => {
+R.привязка.ничьюНеТронул = await dm.evaluate(() => {
   const t = Object.values(window.__state().tokens).find((x) => x.name === 'Торин Дубощит');
   return t ? t.ownerName : null;
 });

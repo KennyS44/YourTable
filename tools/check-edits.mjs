@@ -11,6 +11,12 @@ const watch = (p, t) => {
   p.on('pageerror', (e) => errors.push(t + ': ' + e.message));
 };
 
+// Игрок выходит за стол только с персонажем из личного кабинета — кладём его
+// в сессию так же, как это делает сам кабинет.
+const СПЕРСОНАЖЕМ = () => sessionStorage.setItem('dnd.char', JSON.stringify({
+  id: 'проверка', name: 'Персонаж игрока', hp: { cur: 10, max: 10 }, vision: 30, avatar: null,
+}));
+
 const browser = await chromium.launch();
 const dm = await (await browser.newContext({ viewport: { width: 1400, height: 900 } })).newPage(); watch(dm, 'DM');
 await dm.goto(`${BASE}?${q({ r: ROOM, k: KEY, m: DMKEY })}`);
@@ -25,7 +31,9 @@ await dm.evaluate(() => {
   window.__dispatch({ t: 'loc.update', id: s.activeLoc, patch: { fogOn: true, grid: { size: 70, ox: 0, oy: 0, feet: 5, show: true } } });
 });
 
-const pl = await (await browser.newContext({ viewport: { width: 1400, height: 900 } })).newPage(); watch(pl, 'PL');
+const plCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+await plCtx.addInitScript(СПЕРСОНАЖЕМ);
+const pl = await plCtx.newPage(); watch(pl, 'PL');
 await pl.goto(`${BASE}?${q({ r: ROOM, k: KEY })}`);
 await pl.fill('#join-form [name=name]', 'Торин');
 await pl.click('#join-form button[type=submit]');
@@ -169,7 +177,9 @@ await dm.evaluate(() => window.__dispatch({
   t: 'lib.add', item: { id: 'lib1', name: 'Гоблин', kind: 'enemy', assetId: null, stats: undefined },
 }));
 await dm.waitForTimeout(400);
-await dm.click('.lib-item .edit');
+const мояКарточка = () => dm.evaluateHandle(() => [...document.querySelectorAll('.lib-item')]
+  .find((c) => ['Гоблин', 'Гоблин-вожак'].includes(c.querySelector('.cap').textContent)));
+await (await мояКарточка()).asElement().$eval('.edit', (b) => b.click());
 await dm.waitForTimeout(300);
 await dm.evaluate(() => {
   const card = document.querySelector('#token-card');
@@ -184,7 +194,7 @@ await dm.evaluate(() => {
   vis.value = 45; vis.dispatchEvent(new Event('change'));
 });
 await dm.waitForTimeout(400);
-await dm.dblclick('.lib-item');
+await (await мояКарточка()).asElement().dblclick();
 await dm.waitForTimeout(600);
 R.базаСуществ = await dm.evaluate(() => {
   const s = window.__state();

@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=16">
+<link rel="stylesheet" href="css/app.css?v=17">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -20,16 +20,17 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=16",
-    "./js/sync.js":           "./js/sync.js?v=16",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=16",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=16",
-    "./js/store.js":          "./js/store.js?v=16",
-    "./js/board.js":          "./js/board.js?v=16",
-    "./js/dice.js":           "./js/dice.js?v=16",
-    "./js/roomcode.js":       "./js/roomcode.js?v=16",
-    "./js/registry.js":       "./js/registry.js?v=16",
-    "./js/idb.js":            "./js/idb.js?v=16"
+    "./js/main.js":           "./js/main.js?v=17",
+    "./js/sync.js":           "./js/sync.js?v=17",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=17",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=17",
+    "./js/store.js":          "./js/store.js?v=17",
+    "./js/board.js":          "./js/board.js?v=17",
+    "./js/dice.js":           "./js/dice.js?v=17",
+    "./js/roomcode.js":       "./js/roomcode.js?v=17",
+    "./js/registry.js":       "./js/registry.js?v=17",
+    "./js/translit.js":       "./js/translit.js?v=17",
+    "./js/idb.js":            "./js/idb.js?v=17"
   }
 }
 </script>
@@ -111,7 +112,7 @@
       <p class="gate-err" id="create-err" hidden></p>
     </form>
 
-    <p class="gate-note">Пока работает локальная синхронизация (вкладки одного браузера). Подключим Firebase — заработает между устройствами.</p>
+    <p class="gate-note">Игрок входит за стол с персонажем из личного кабинета. Мастеру нужен только его ключ.</p>
     <a class="btn btn-ghost w-full" href="cabinet.html" id="gate-cabinet">Личный кабинет и мои персонажи</a>
   </div>
 </div>
@@ -397,6 +398,6 @@
   <div class="token-card" id="token-card" hidden></div>
 </div>
 
-<script type="module" src="js/main.js?v=16"></script>
+<script type="module" src="js/main.js?v=17"></script>
 </body>
 </html>
