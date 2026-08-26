@@ -45,6 +45,7 @@ export function emptySheet() {
     attacks: [{ name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }],
     feats: [],                 // способности: {id, name, img, text}
     lore: '', notes: '',
+    wantPlayer: '', wantChar: '',   // желания человека за столом и самого героя
   };
   ABILITIES.forEach((a) => { s[a.id] = 10; });
   TEXTS.forEach((t) => { s[t.id] = ''; });
@@ -288,6 +289,14 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   const bottom = el('div', 'sheet-bottom');
   bottom.append(area({ id: 'lore', label: 'Лор персонажа', rows: 6 }), area({ id: 'notes', label: 'Заметки', rows: 6 }));
   root.append(bottom);
+
+  /* ── чего хотят от игры человек и герой ── */
+  const wants = el('div', 'sheet-bottom');
+  wants.append(
+    area({ id: 'wantPlayer', label: 'Чего я как игрок хочу от игры', rows: 4 }),
+    area({ id: 'wantChar', label: 'Чего я как персонаж хочу добиться', rows: 4 }),
+  );
+  root.append(wants);
 
   function refreshDerived() {
     ABILITIES.forEach((a) => { modNodes[a.id].textContent = sign(mod(s[a.id])); });
