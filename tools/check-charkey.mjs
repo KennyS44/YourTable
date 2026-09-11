@@ -169,7 +169,8 @@ await pl.evaluate(() => {
   ac.value = 15; ac.dispatchEvent(new Event('input', { bubbles: true }));
 });
 await pl.waitForTimeout(2500);
-R.правкаИзЗаСтола = { метка: await pl.$eval('#lite-hint', (e) => e.textContent) };
+// удачное сохранение ничего не пишет в панели: строка остаётся скрытой
+R.правкаИзЗаСтола = { панельМолчит: await pl.$eval('#lite-hint', (e) => e.hidden) };
 await dm.waitForFunction(() => [...document.querySelectorAll('#sheet .blk')]
   .find((b) => b.querySelector('.blk-h')?.textContent === 'Снаряжение')?.querySelector('textarea')?.value === 'Лютня, кинжал, зелье',
 null, { timeout: 20000 });

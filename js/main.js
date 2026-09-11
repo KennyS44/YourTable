@@ -1349,11 +1349,14 @@ async function wireHeroSheet() {
   tab.classList.add('is-active');
   panel.hidden = false;
 
+  // словом отзываемся только на беду: удачное сохранение молчит
   const hint = $('#lite-hint');
+  const note = (text) => { hint.textContent = text || ''; hint.hidden = !text; };
+
   const cab = JSON.parse(sessionStorage.getItem('dnd.cab') || 'null');
   const brought = JSON.parse(sessionStorage.getItem('dnd.char') || 'null');
   if (!cab || !brought) {
-    hint.textContent = 'Лист открывается, если прийти за стол из личного кабинета: там живёт персонаж.';
+    note('Лист открывается, если прийти за стол из личного кабинета: там живёт персонаж.');
     return;
   }
 
@@ -1367,22 +1370,20 @@ async function wireHeroSheet() {
     if (!raw) throw new Error('персонаж не найден в кабинете');
     ch = { ...raw, sheet: fixSheet(raw.sheet) };
   } catch (ex) {
-    hint.textContent = 'Не удалось открыть лист: ' + ex.message;
+    note('Не удалось открыть лист: ' + ex.message);
     return;
   }
 
-  hint.textContent = 'Правки сохраняются в кабинет — и Мастер видит их сразу.';
   let timer = null;
   const save = () => {
-    hint.textContent = 'Сохраняем…';
     clearTimeout(timer);
     timer = setTimeout(async () => {
       try {
         await store.saveChar(ch);
         await publishChar(ch);
-        hint.textContent = 'Сохранено в кабинет.';
+        note('');
       } catch (ex) {
-        hint.textContent = 'Не сохранилось: ' + ex.message;
+        note('Не сохранилось: ' + ex.message);
       }
     }, 900);
   };
