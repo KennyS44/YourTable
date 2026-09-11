@@ -183,6 +183,28 @@ await dm.reload();
 await dm.waitForFunction(() => document.querySelector('.dm-card-name')?.textContent === 'Лютик Бард', null, { timeout: 20000 });
 R.списокПомнится = true;
 
+/* ── Много персонажей разом ──
+   Браузер держит к одному хосту шесть соединений: когда каждый лист слушал
+   свой поток, седьмой и дальше не приходили вовсе. Берём заведомо больше. */
+const многоКлючей = Array.from({ length: 12 }, (_, i) => `TS${String(process.pid).slice(-2)}-${String(i + 1).padStart(4, '0')}`);
+for (const [i, k] of многоКлючей.entries()) {
+  await fetch(`${FIREBASE.databaseURL}/rooms/pub-${k}.json`,
+    { method: 'PUT', body: JSON.stringify({ key: k, name: 'Герой ' + (i + 1), bg: '', sheet: {}, at: Date.now() }) });
+}
+const толпа = await (await browser.newContext({ viewport: { width: 1400, height: 950 } })).newPage(); watch(толпа, 'MANY');
+await толпа.goto(page('master.html'));
+await толпа.evaluate((ks) => localStorage.setItem('dnd.dm.chars', JSON.stringify(ks)), многоКлючей);
+await толпа.reload();
+await толпа.waitForFunction((n) => [...document.querySelectorAll('.dm-card-name')]
+  .filter((x) => x.textContent.startsWith('Герой')).length === n, многоКлючей.length, { timeout: 30000 })
+  .catch(() => {});
+R.многоЛистов = await толпа.evaluate(() => ({
+  карточек: document.querySelectorAll('.dm-card').length,
+  загрузилось: [...document.querySelectorAll('.dm-card-name')].filter((x) => x.textContent.startsWith('Герой')).length,
+}));
+if (R.многоЛистов.загрузилось !== многоКлючей.length) R.многоЛистов.БЕДА = 'часть листов не пришла';
+for (const k of многоКлючей) await fetch(`${FIREBASE.databaseURL}/rooms/pub-${k}.json`, { method: 'DELETE' });
+
 /* ── Убираем за собой: тестовый кабинет и витрина ── */
 await fetch(`${FIREBASE.databaseURL}/rooms/cab-${path}.json`, { method: 'DELETE' });
 await fetch(`${FIREBASE.databaseURL}/rooms/pub-${ключ}.json`, { method: 'DELETE' });

@@ -14,6 +14,21 @@ import { FIREBASE, useFirebase } from './firebase-config.js';
 
 const BASE = FIREBASE.databaseURL ? FIREBASE.databaseURL + '/rooms/' : null;
 const LOCAL = 'dnd.pub.';           // запасной режим: витрина в этом же браузере
+const SDK = 'https://www.gstatic.com/firebasejs/10.12.5/';
+
+/**
+ * Подключение к базе — одно на всю страницу, и подписки идут по нему все разом.
+ * Это не роскошь: браузер держит к одному хосту всего шесть соединений, и на
+ * седьмом персонаже отдельные потоки событий просто вставали в очередь.
+ */
+let link = null;
+function connect() {
+  if (!link) {
+    link = Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-database.js')])
+      .then(([{ initializeApp }, db]) => ({ db, database: db.getDatabase(initializeApp(FIREBASE, 'charlink')) }));
+  }
+  return link;
+}
 
 /** Буквы без пар-двойников: ноль и О, единица и I в диктовке не путаются. */
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -62,9 +77,8 @@ export async function loadChar(key) {
 }
 
 /**
- * Следим за листом: Firebase по REST умеет поток событий, EventSource сам
- * просит text/event-stream. Без базы просто спрашиваем локальную копию.
- * Возвращаем функцию, которая закрывает подписку.
+ * Следим за листом: правка игрока должна доезжать сама. Без базы спрашиваем
+ * локальную копию. Возвращаем функцию, которая закрывает подписку.
  */
 export function watchChar(key, onChange) {
   const k = normKey(key);
@@ -75,16 +89,15 @@ export function watchChar(key, onChange) {
     const t = setInterval(tick, 1500);
     return () => clearInterval(t);
   }
-  const es = new EventSource(`${BASE}pub-${k}.json`);
-  const take = (e) => {
-    try {
-      const msg = JSON.parse(e.data);
-      // put отдаёт лист целиком, patch — изменённые поля; нам хватает перечитать
-      if (msg && msg.path === '/') onChange(msg.data);
-      else loadChar(k).then(onChange);
-    } catch { /* keep-alive и прочий служебный шум */ }
-  };
-  es.addEventListener('put', take);
-  es.addEventListener('patch', take);
-  return () => es.close();
+  let off = null;
+  let stopped = false;
+  connect().then(({ db, database }) => {
+    if (stopped) return;
+    off = db.onValue(db.ref(database, 'rooms/pub-' + k),
+      (snap) => onChange(snap.exists() ? snap.val() : null));
+  }).catch(() => {
+    // база не подключилась — покажем хотя бы то, что лежит сейчас
+    if (!stopped) loadChar(k).then(onChange);
+  });
+  return () => { stopped = true; if (off) off(); };
 }
