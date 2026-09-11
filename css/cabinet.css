@@ -184,6 +184,72 @@
 }
 .atk-head span{font-size:14px; color:var(--muted)}
 
+/* ── Ключ персонажа ── */
+.key-box{
+  display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; margin-top:var(--s3);
+  border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s2) var(--s3);
+}
+.key-val{
+  font-family:var(--f-head); font-size:20px; letter-spacing:.08em; color:var(--gold);
+  user-select:all;
+}
+
+/* ── Лист глазами Мастера: правок нет, поля просто читаются ── */
+.sheet.is-ro input,.sheet.is-ro textarea{background:var(--bg-2); color:var(--text); cursor:default}
+.sheet.is-ro input:focus,.sheet.is-ro textarea:focus{outline:1px solid var(--line)}
+.sheet.is-ro .atk-row{grid-template-columns:1.4fr .45fr 1.1fr}
+.feat-text{font-size:16px; line-height:1.5; padding:0 var(--s1) var(--s1); white-space:pre-wrap}
+
+/* ── Страница Мастера: персонажи игроков ── */
+.dm-stage{max-width:1200px; width:100%; margin:0 auto; padding:var(--s4)}
+.dm-lead{margin:var(--s2) 0 var(--s4)}
+.dm-add{
+  display:grid; grid-template-columns:1fr auto; gap:var(--s2); align-items:end; max-width:420px;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:var(--s3);
+}
+.dm-add .field{margin-bottom:0}
+.dm-add input{text-transform:uppercase; letter-spacing:.08em; font-family:var(--f-head)}
+.dm-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:var(--s3); margin-top:var(--s4);
+}
+.dm-card{
+  position:relative; height:160px; border:1px solid var(--line); border-radius:var(--r);
+  overflow:hidden; background:var(--panel-2); cursor:pointer;
+  transition:border-color .18s var(--ease), transform .18s var(--ease);
+}
+.dm-card:hover{border-color:var(--gold-dim); transform:translateY(-2px)}
+.dm-card.is-active{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-dim) inset}
+.dm-card::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(20,19,16,.15) 40%, rgba(20,19,16,.9));
+}
+.dm-card-name{
+  position:absolute; left:var(--s3); right:var(--s3); bottom:var(--s2); z-index:2;
+  font-family:var(--f-head); font-size:16px; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.dm-card-sign{
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-size:32px; color:var(--gold-dim); opacity:.5;
+}
+.dm-card-key{
+  position:absolute; left:var(--s3); bottom:36px; z-index:2;
+  font-size:14px; letter-spacing:.08em; color:var(--gold-dim);
+}
+.dm-empty{margin-top:var(--s4)}
+.sheet-head-row{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--s3);
+  margin-bottom:var(--s3);
+}
+
+/* ── Короткий лист игрока в левой панели стола ── */
+.sheet-lite{display:flex; flex-direction:column; gap:var(--s3)}
+.sheet-lite .blk{margin:0}
+.sheet-lite .blk,.sheet-lite .abil,.sheet-lite .fld{min-width:0}
+.lite-name{font-family:var(--f-head); font-size:20px; color:var(--gold); margin:0}
+[data-lpanel="hero"]{display:flex; flex-direction:column; gap:var(--s3)}
+
 /* ── Административная комната ── */
 .adm-stage{max-width:960px; width:100%; margin:0 auto; padding:var(--s4)}
 .adm-tabs{max-width:360px; margin-bottom:var(--s4)}

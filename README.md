@@ -70,6 +70,15 @@ Live: **[kennys44.github.io/YourTable](https://kennys44.github.io/YourTable/)**
   take it off everyone's screen.
 - **Who is at the table.** Presence badges and a member list show only people
   currently connected; the Master can forget everyone who is offline.
+- **Character keys.** Every character in a cabinet gets a key of its own
+  (`ABCD-2345`), printed at the top of its sheet. The player reads the key out
+  to the Master, who adds it on `master.html` — a page of player characters:
+  a portrait with a name, and behind it the full sheet, read-only, refreshing
+  itself the moment the player changes anything in the cabinet.
+- **The player's sheet at the table.** Where the Master has locations, icons and
+  the room, a player has their own character: the six abilities, armour class
+  and hit points, their features, inventory, flaws and resistances — editable on
+  the spot, saved back into the cabinet and straight through to the Master.
 - **Campaign export/import** as a single JSON file — locations, tokens, icon
   library, handouts and the log, with all images embedded.
 - **Traffic counters and a load test.** The Firebase adapter counts actions and
@@ -79,6 +88,9 @@ Live: **[kennys44.github.io/YourTable](https://kennys44.github.io/YourTable/)**
 ## Files
 
     index.html              the whole markup: gate, panels, board, dice tray
+    master.html             the Master's page: player characters by key
+    js/master.js            adding a key, the portrait grid, the live sheet
+    js/charlink.js          the character key: publishing a sheet and watching it
     css/app.css             the look: dark table, gold accent, Cinzel + Inter
     js/main.js              wiring: entry, panels, chat, dice, token card
     js/board.js             the canvas: map, grid, tokens, fog, walls, drawing
@@ -125,6 +137,10 @@ site).
   friends, not for strangers.
 - **The Firebase keys in `js/firebase-config.js` are public** — they are meant
   to be. What actually guards the data is the database rules and the room path.
+- **A character key is a secret, not a password.** The key *is* the address of
+  the sheet's copy in the database: whoever knows it reads the sheet. Give it to
+  your Master, not to the world. Writing there is one-way — only the player's
+  own cabinet publishes, and the Master's page never writes back.
 - **Everyone writes the room snapshot,** because every client applies the same
   actions. Old actions are trimmed to the last hundred.
 - **Images live inside the room** as data URLs, in the database and in

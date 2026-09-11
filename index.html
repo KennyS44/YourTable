@@ -8,7 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=18">
+<link rel="stylesheet" href="css/app.css?v=19">
+<!-- лист персонажа игрока в левой панели живёт по тем же правилам, что и в кабинете -->
+<link rel="stylesheet" href="css/cabinet.css?v=19">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -20,17 +22,20 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=18",
-    "./js/sync.js":           "./js/sync.js?v=18",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=18",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=18",
-    "./js/store.js":          "./js/store.js?v=18",
-    "./js/board.js":          "./js/board.js?v=18",
-    "./js/dice.js":           "./js/dice.js?v=18",
-    "./js/roomcode.js":       "./js/roomcode.js?v=18",
-    "./js/registry.js":       "./js/registry.js?v=18",
-    "./js/translit.js":       "./js/translit.js?v=18",
-    "./js/idb.js":            "./js/idb.js?v=18"
+    "./js/main.js":           "./js/main.js?v=19",
+    "./js/sync.js":           "./js/sync.js?v=19",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=19",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=19",
+    "./js/store.js":          "./js/store.js?v=19",
+    "./js/board.js":          "./js/board.js?v=19",
+    "./js/dice.js":           "./js/dice.js?v=19",
+    "./js/roomcode.js":       "./js/roomcode.js?v=19",
+    "./js/registry.js":       "./js/registry.js?v=19",
+    "./js/translit.js":       "./js/translit.js?v=19",
+    "./js/sheet.js":          "./js/sheet.js?v=19",
+    "./js/charlink.js":       "./js/charlink.js?v=19",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=19",
+    "./js/idb.js":            "./js/idb.js?v=19"
   }
 }
 </script>
@@ -149,14 +154,21 @@
 
   <main class="stage">
     <!-- Левая панель: Мастер -->
-    <aside class="panel panel-left dm-only" id="panel-left">
+    <aside class="panel panel-left" id="panel-left">
       <div class="tabs tabs-sm">
-        <button class="tab is-active" data-ltab="locations">Локации</button>
-        <button class="tab" data-ltab="library">Иконки</button>
-        <button class="tab" data-ltab="room">Комната</button>
+        <button class="tab is-active dm-only" data-ltab="locations">Локации</button>
+        <button class="tab dm-only" data-ltab="library">Иконки</button>
+        <button class="tab dm-only" data-ltab="room">Комната</button>
+        <button class="tab player-only" data-ltab="hero">Персонаж</button>
       </div>
 
-      <section class="panel-body panel-flex" data-lpanel="locations">
+      <!-- Лист персонажа игрока: короткий, чтобы всё нужное было под рукой -->
+      <section class="panel-body player-only" data-lpanel="hero" hidden>
+        <p class="hint" id="lite-hint">Персонажа приносят из личного кабинета.</p>
+        <div class="sheet sheet-lite" id="lite-sheet"></div>
+      </section>
+
+      <section class="panel-body dm-only panel-flex" data-lpanel="locations">
         <button class="btn btn-soft w-full" id="btn-add-location">+ Новая локация</button>
         <div class="list list-scroll" id="locations-list"></div>
 
@@ -202,7 +214,7 @@
         </div>
       </section>
 
-      <section class="panel-body" data-lpanel="library" hidden>
+      <section class="panel-body dm-only" data-lpanel="library" hidden>
         <div class="row-2">
           <label class="btn btn-soft file-btn">+ Иконки<input type="file" id="lib-upload" accept="image/*" multiple hidden></label>
           <select id="lib-kind" class="sel">
@@ -221,7 +233,7 @@
         <p class="hint">Перетащите иконку на поле или кликните дважды. ✎ — имя, хиты и дальность зрения: они сохранятся в базе и вернутся с новой фигуркой.</p>
       </section>
 
-      <section class="panel-body" data-lpanel="room" hidden>
+      <section class="panel-body dm-only" data-lpanel="room" hidden>
         <h3 class="h-sm">За столом</h3>
         <div class="list" id="members-list"></div>
         <button class="btn btn-soft btn-sm w-full" id="btn-forget-offline" hidden>Забыть всех не в сети</button>
@@ -243,6 +255,10 @@
           <button class="btn btn-soft" id="btn-cab-link">Ссылка в кабинет</button>
         </div>
         <p class="hint">Игроку пошлите ссылку в кабинет: там он соберёт персонажа и войдёт к вам по коду комнаты.</p>
+        <div class="divider"></div>
+        <h3 class="h-sm">Листы игроков</h3>
+        <a class="btn btn-soft w-full" href="master.html" target="_blank" rel="noopener">Открыть листы персонажей</a>
+        <p class="hint">Добавьте персонажа по ключу — игрок найдёт ключ в своём листе в кабинете.</p>
         <div class="divider"></div>
         <h3 class="h-sm">Кампания</h3>
         <div class="row-2">
@@ -398,6 +414,6 @@
   <div class="token-card" id="token-card" hidden></div>
 </div>
 
-<script type="module" src="js/main.js?v=18"></script>
+<script type="module" src="js/main.js?v=19"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@
 
 import { openStore, slug, uid, userPath } from './cabinet-store.js';
 import { emptySheet, fixSheet, renderSheet } from './sheet.js';
+import { newCharKey, normKey, isCharKey, publishChar } from './charlink.js';
 import { unpackRoom } from './roomcode.js';
 import { noteAccount } from './registry.js';
 import { fileName } from './translit.js';
@@ -74,7 +75,13 @@ function start(store, data) {
   cab.store = store;
   cab.profile = data.profile;
   cab.chars = {};
-  Object.values(data.chars || {}).forEach((c) => { cab.chars[c.id] = fixChar(c); });
+  Object.values(data.chars || {}).forEach((c) => {
+    const ch = fixChar(c);
+    cab.chars[ch.id] = ch;
+    // персонажи из старых записей только сейчас получили ключ — закрепим его
+    if (ch.key !== c.key) store.saveChar(ch);
+    publishChar(ch);                 // витрина для Мастера сразу свежая
+  });
 
   $('#gate').hidden = true;
   $('#cab').hidden = false;
@@ -91,12 +98,16 @@ function start(store, data) {
 function fixChar(c) {
   return {
     id: c.id, name: c.name || 'Безымянный', bg: c.bg || '', pageBg: c.pageBg || '',
+    key: isCharKey(c.key) ? normKey(c.key) : newCharKey(),
     sheet: fixSheet(c.sheet), at: c.at || Date.now(),
   };
 }
 
 function newChar() {
-  return { id: uid('ch'), name: 'Новый персонаж', bg: '', pageBg: '', sheet: emptySheet(), at: Date.now() };
+  return {
+    id: uid('ch'), name: 'Новый персонаж', bg: '', pageBg: '',
+    key: newCharKey(), sheet: emptySheet(), at: Date.now(),
+  };
 }
 
 /** Фон всей страницы — у каждого персонажа свой; нет своего, берём фон карточки. */
@@ -118,7 +129,11 @@ function save(ch) {
     const ids = [...dirty];
     dirty.clear();
     try {
-      for (const id of ids) if (cab.chars[id]) await cab.store.saveChar(cab.chars[id]);
+      for (const id of ids) {
+        if (!cab.chars[id]) continue;
+        await cab.store.saveChar(cab.chars[id]);
+        await publishChar(cab.chars[id]);     // Мастер видит правку тут же
+      }
       mark('Сохранено');
     } catch (ex) {
       mark('Не сохранилось: ' + ex.message, true);
@@ -192,6 +207,7 @@ async function addChar() {
   cab.chars[ch.id] = ch;
   cab.currentId = ch.id;
   await cab.store.saveChar(ch);
+  publishChar(ch);
   renderRibbon(); renderCurrent();
   const first = $('.char-card.is-active .char-name');
   if (first) { first.focus(); first.select(); }
@@ -207,6 +223,7 @@ function renderCurrent() {
   $('#btn-export').disabled = !ch;
   if (!ch) return;
   renderSheet($('#sheet'), ch, () => { save(ch); syncRibbonName(ch); }, {
+    charKey: ch.key,
     insp: cab.profile.insp || 0,
     pickImage: (file, side) => shrink(file, side),
   });
@@ -299,10 +316,12 @@ async function importChar(e) {
     const data = JSON.parse(text);
     const raw = data && (data.char || (data.sheet ? data : null));
     if (!raw) { mark('Это не файл персонажа', true); return; }
-    const ch = fixChar({ ...raw, id: uid('ch'), at: Date.now() });
+    // копия — отдельный персонаж: и адрес в кабинете, и ключ для Мастера свои
+    const ch = fixChar({ ...raw, id: uid('ch'), key: '', at: Date.now() });
     cab.chars[ch.id] = ch;
     cab.currentId = ch.id;
     await cab.store.saveChar(ch);
+    publishChar(ch);
     renderRibbon();
     renderCurrent();
     mark(`Загружен: ${ch.name}`);
@@ -339,6 +358,7 @@ function enterRoom(e) {
   const s = ch.sheet;
   sessionStorage.setItem('dnd.char', JSON.stringify({
     id: ch.id,
+    key: ch.key,
     name: ch.name || 'Персонаж',
     hp: { cur: num(s.hpCur, 10), max: num(s.hpMax, 10) },
     vision: num(s.vision, 30),

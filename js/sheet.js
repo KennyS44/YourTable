@@ -29,6 +29,7 @@ const TEXTS = [
   { id: 'ideals', label: 'Идеалы', rows: 2 },
   { id: 'bonds', label: 'Привязанности', rows: 2 },
   { id: 'flaws', label: 'Слабости', rows: 2 },
+  { id: 'resist', label: 'Сопротивления', rows: 2 },
   { id: 'gear', label: 'Снаряжение', rows: 4 },
   { id: 'langs', label: 'Прочие владения и языки', rows: 3 },
 ];
@@ -71,15 +72,39 @@ const el = (tag, cls = '', text = '') => {
   return n;
 };
 
+/** Ключ персонажа: игрок его диктует Мастеру, Мастер по нему смотрит лист. */
+function keyBox(key, ro) {
+  const box = el('div', 'key-box');
+  box.append(el('span', 'fld-l', ro ? 'Ключ персонажа' : 'Ключ персонажа — назовите его Мастеру'));
+  const val = el('code', 'key-val', key);
+  box.append(val);
+  if (!ro && navigator.clipboard) {
+    const copy = el('button', 'btn btn-soft btn-sm', 'Копировать');
+    copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(key);
+      copy.textContent = 'Скопировано';
+      setTimeout(() => { copy.textContent = 'Копировать'; }, 1500);
+    });
+    box.append(copy);
+  }
+  return box;
+}
+
 /**
  * Рисуем лист. onEdit(key) отдаёт правку наружу — кабинет её сохраняет.
  * ctx.insp — сколько вдохновений выдал Мастер, ctx.pickImage — выбор картинки.
+ * ctx.readOnly — лист только для чтения: так его видит Мастер.
+ * ctx.charKey — ключ персонажа: его игрок диктует Мастеру.
  */
 export function renderSheet(root, ch, onEdit, ctx = {}) {
   const s = ch.sheet;
+  const ro = !!ctx.readOnly;
   root.innerHTML = '';
+  root.classList.toggle('is-ro', ro);
 
   const bind = (node, key, cast) => {
+    if (ro) { node.readOnly = true; return node; }
     node.addEventListener('input', () => {
       s[key] = cast ? cast(node.value) : node.value;
       onEdit(key, s[key]);
@@ -124,12 +149,14 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   const nameInput = el('input');
   nameInput.value = ch.name || '';
   nameInput.placeholder = 'Имя персонажа';
-  nameInput.addEventListener('input', () => { ch.name = nameInput.value; onEdit('name', ch.name); });
+  if (ro) nameInput.readOnly = true;
+  else nameInput.addEventListener('input', () => { ch.name = nameInput.value; onEdit('name', ch.name); });
   nameWrap.append(el('span', 'fld-l', 'Имя персонажа'), nameInput);
   const headGrid = el('div', 'head-grid');
   HEAD.forEach((h) => headGrid.append(textField(h.label, h.id)));
   head.append(nameWrap, headGrid);
   root.append(head);
+  if (ctx.charKey) root.append(keyBox(ctx.charKey, ro));
 
   /* ── карточки одним потоком ── */
   const flow = el('div', 'sheet-flow');
@@ -182,26 +209,29 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
         const inp = el('input');
         inp.value = a[k] || '';
         if (k === 'name') inp.setAttribute('list', listId);
-        inp.addEventListener('input', () => { a[k] = inp.value; onEdit('attacks', s.attacks); });
+        if (ro) inp.readOnly = true;
+        else inp.addEventListener('input', () => { a[k] = inp.value; onEdit('attacks', s.attacks); });
         r.append(inp);
       });
-      const del = el('button', 'row-del', '×');
-      del.type = 'button';
-      del.title = 'Убрать строку';
-      del.addEventListener('click', () => {
-        s.attacks.splice(i, 1);
-        if (!s.attacks.length) s.attacks.push({ name: '', bonus: '', dmg: '' });
-        onEdit('attacks', s.attacks);
-        drawAttacks();
-      });
-      r.append(del);
+      if (!ro) {
+        const del = el('button', 'row-del', '×');
+        del.type = 'button';
+        del.title = 'Убрать строку';
+        del.addEventListener('click', () => {
+          s.attacks.splice(i, 1);
+          if (!s.attacks.length) s.attacks.push({ name: '', bonus: '', dmg: '' });
+          onEdit('attacks', s.attacks);
+          drawAttacks();
+        });
+        r.append(del);
+      }
       atk.append(r);
     });
   }
   drawAttacks();
 
   flow.append(block('Защита и ход', defense), block('Хиты', hp),
-    block('Атаки и заклинания', atk, addAtkBtn, datalist));
+    ro ? block('Атаки и заклинания', atk) : block('Атаки и заклинания', atk, addAtkBtn, datalist));
 
   const feats = el('div', 'feats');
   const addFeat = el('button', 'btn btn-soft btn-sm w-full', '+ Способность');
@@ -231,7 +261,11 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
       tab.addEventListener('click', () => { openFeat = openFeat === f.id ? null : f.id; drawFeats(); });
       card.append(tab);
 
-      if (openFeat === f.id) {
+      if (openFeat === f.id && ro) {
+        const body = el('div', 'feat-body');
+        body.append(el('p', 'feat-text', f.text || 'Описания нет.'));
+        card.append(body);
+      } else if (openFeat === f.id) {
         const body = el('div', 'feat-body');
         const nameI = el('input', 'feat-name-input');
         nameI.value = f.name;
@@ -281,7 +315,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   };
   drawFeats();
 
-  flow.append(block('Умения и способности', feats, addFeat));
+  flow.append(ro ? block('Умения и способности', feats) : block('Умения и способности', feats, addFeat));
   TEXTS.forEach((t) => flow.append(area(t)));
   root.append(flow);
 
@@ -302,4 +336,100 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
     ABILITIES.forEach((a) => { modNodes[a.id].textContent = sign(mod(s[a.id])); });
   }
   refreshDerived();
+}
+
+/**
+ * Короткий лист для игрока за столом: то, за чем тянешься посреди боя —
+ * характеристики, КД и хиты, способности, инвентарь, слабости и сопротивления.
+ * Остальное живёт в кабинете. onEdit сохраняет так же, как в кабинете.
+ */
+export function renderSheetLite(root, ch, onEdit) {
+  const s = ch.sheet;
+  root.innerHTML = '';
+
+  const bindArea = (id, label, rows) => {
+    const b = el('section', 'blk');
+    const a = el('textarea');
+    a.rows = rows;
+    a.value = s[id] ?? '';
+    a.placeholder = '—';
+    a.addEventListener('input', () => { s[id] = a.value; onEdit(id, s[id]); });
+    b.append(el('h3', 'blk-h', label), a);
+    return b;
+  };
+  const numCell = (label, key) => {
+    const f = el('label', 'fld fld-num');
+    const i = el('input');
+    i.type = 'number';
+    i.value = s[key] ?? 0;
+    i.addEventListener('input', () => { s[key] = Number(i.value) || 0; onEdit(key, s[key]); });
+    f.append(el('span', 'fld-l', label), i);
+    return f;
+  };
+  const block = (title, ...kids) => {
+    const b = el('section', 'blk');
+    b.append(el('h3', 'blk-h', title), ...kids);
+    return b;
+  };
+
+  root.append(el('p', 'lite-name', ch.name || 'Персонаж'));
+
+  /* ── характеристики ── */
+  const abil = el('div', 'abilities');
+  ABILITIES.forEach((a) => {
+    const c = el('div', 'abil');
+    const score = el('input', 'abil-score');
+    score.type = 'number';
+    score.value = s[a.id];
+    const m = el('div', 'abil-mod', sign(mod(s[a.id])));
+    score.addEventListener('input', () => {
+      s[a.id] = Number(score.value) || 0;
+      m.textContent = sign(mod(s[a.id]));
+      onEdit(a.id, s[a.id]);
+    });
+    c.append(el('div', 'abil-l', a.label), m, score);
+    abil.append(c);
+  });
+  root.append(block('Характеристики', abil));
+
+  /* ── КД и хиты ── */
+  const vitals = el('div', 'row-3');
+  vitals.append(numCell('КД', 'ac'), numCell('Хиты', 'hpCur'), numCell('Максимум', 'hpMax'));
+  root.append(block('Защита и хиты', vitals));
+
+  /* ── способности: вкладка разворачивается в описание ── */
+  const feats = el('div', 'feats');
+  let open = null;
+  function drawFeats() {
+    feats.innerHTML = '';
+    s.feats.forEach((f) => {
+      const card = el('div', 'feat' + (open === f.id ? ' is-open' : ''));
+      const tab = el('button', 'feat-tab');
+      tab.type = 'button';
+      const pic = el('span', 'feat-pic');
+      if (f.img) pic.style.backgroundImage = `url("${f.img}")`;
+      else pic.textContent = '✦';
+      tab.append(pic, el('span', 'feat-name', f.name || 'Без названия'));
+      tab.addEventListener('click', () => { open = open === f.id ? null : f.id; drawFeats(); });
+      card.append(tab);
+      if (open === f.id) {
+        const body = el('div', 'feat-body');
+        const ta = el('textarea');
+        ta.rows = 4;
+        ta.value = f.text || '';
+        ta.placeholder = 'Что делает способность';
+        ta.addEventListener('input', () => { f.text = ta.value; onEdit('feats', s.feats); });
+        body.append(ta);
+        card.append(body);
+      }
+      feats.append(card);
+    });
+    if (!s.feats.length) feats.append(el('p', 'hint', 'Способности заводятся в кабинете.'));
+  }
+  drawFeats();
+  root.append(block('Способности', feats));
+
+  root.append(bindArea('gear', 'Инвентарь', 5));
+  root.append(bindArea('flaws', 'Слабости', 3));
+  root.append(bindArea('resist', 'Сопротивления', 3));
 }

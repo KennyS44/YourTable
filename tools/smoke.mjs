@@ -132,7 +132,9 @@ await player.waitForSelector('#app:not([hidden])');
 await player.waitForTimeout(500);
 
 const playerSees = await player.evaluate(() => ({
-  hasDmPanel: !!document.querySelector('#panel-left'),
+  // левая панель у игрока теперь своя — его лист; инструментов Мастера в ней быть не должно
+  hasDmTools: !!document.querySelector('[data-ltab=locations], [data-ltab=library], [data-lpanel=room]'),
+  hasHeroTab: !!document.querySelector('[data-ltab=hero]'),
   showcase: !document.querySelector('#showcase').hidden,
   chat: [...document.querySelectorAll('#chat-feed .msg .body')].map((n) => n.textContent.trim()),
   rolls: document.querySelectorAll('#rolls-feed .msg').length,

@@ -6,6 +6,8 @@ import { createStore, defaultStats, emptyState, newLocation, newToken, normalize
 import { createBoard } from './board.js';
 import { DICE, roll, playAnimation } from './dice.js';
 import { packRoom } from './roomcode.js';
+import { fixSheet, renderSheetLite } from './sheet.js';
+import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
 import { fileName } from './translit.js';
 
@@ -171,7 +173,8 @@ function start(sync, state, me) {
   $('#gate').hidden = true;
   $('#app').hidden = false;
   document.body.classList.toggle('is-dm', app.isDM);
-  if (!app.isDM) $$('.dm-only').forEach((el) => el.remove());
+  if (app.isDM) $$('.player-only').forEach((el) => el.remove());
+  else $$('.dm-only').forEach((el) => el.remove());
 
   $('#room-name').textContent = app.store.get().room.name;
   $('#role-badge').textContent = app.ghost ? 'Скрытый вход' : app.isDM ? 'Мастер' : 'Игрок';
@@ -1310,22 +1313,84 @@ function wireUI() {
   });
 
   // мобильные панели
+  // На телефоне панели лежат одна поверх другой, поэтому кнопка их перебирает:
+  // нажатие — следующая панель, последнее нажатие закрывает всё.
   const btnPanel = $('#btn-panel');
-  if (btnPanel) btnPanel.addEventListener('click', () => {
-    $$('.panel').forEach((p) => p.classList.toggle('is-open'));
-  });
+  if (btnPanel) {
+    const panels = $$('.panel');
+    let open = -1;
+    btnPanel.addEventListener('click', () => {
+      open = open + 1 >= panels.length ? -1 : open + 1;
+      panels.forEach((p, i) => p.classList.toggle('is-open', i === open));
+    });
+  }
 
-  wireDM();
-  wireDrop();
-}
-
-function wireDM() {
-  if (!app.isDM) return;
-
+  // вкладки левой панели: у Мастера их три, у игрока одна — его персонаж
   $$('[data-ltab]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-ltab]').forEach((x) => x.classList.toggle('is-active', x === b));
     $$('[data-lpanel]').forEach((p) => { p.hidden = p.dataset.lpanel !== b.dataset.ltab; });
   }));
+
+  wireDM();
+  wireHeroSheet();
+  wireDrop();
+}
+
+/**
+ * Лист персонажа игрока прямо за столом: характеристики, КД и хиты,
+ * способности, инвентарь, слабости и сопротивления. Правки уходят в тот же
+ * кабинет, откуда персонаж пришёл, — и сразу видны Мастеру по ключу.
+ */
+async function wireHeroSheet() {
+  if (app.isDM || app.ghost) return;
+  const panel = $('[data-lpanel="hero"]');
+  const tab = $('[data-ltab="hero"]');
+  if (!panel || !tab) return;
+  tab.classList.add('is-active');
+  panel.hidden = false;
+
+  const hint = $('#lite-hint');
+  const cab = JSON.parse(sessionStorage.getItem('dnd.cab') || 'null');
+  const brought = JSON.parse(sessionStorage.getItem('dnd.char') || 'null');
+  if (!cab || !brought) {
+    hint.textContent = 'Лист открывается, если прийти за стол из личного кабинета: там живёт персонаж.';
+    return;
+  }
+
+  let store;
+  let ch;
+  try {
+    const { openStore } = await import('./cabinet-store.js');
+    store = await openStore(cab.path);
+    const data = await store.load();
+    const raw = data && data.chars && data.chars[brought.id];
+    if (!raw) throw new Error('персонаж не найден в кабинете');
+    ch = { ...raw, sheet: fixSheet(raw.sheet) };
+  } catch (ex) {
+    hint.textContent = 'Не удалось открыть лист: ' + ex.message;
+    return;
+  }
+
+  hint.textContent = 'Правки сохраняются в кабинет — и Мастер видит их сразу.';
+  let timer = null;
+  const save = () => {
+    hint.textContent = 'Сохраняем…';
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      try {
+        await store.saveChar(ch);
+        await publishChar(ch);
+        hint.textContent = 'Сохранено в кабинет.';
+      } catch (ex) {
+        hint.textContent = 'Не сохранилось: ' + ex.message;
+      }
+    }, 900);
+  };
+  renderSheetLite($('#lite-sheet'), ch, save);
+}
+
+function wireDM() {
+  if (!app.isDM) return;
   $$('[data-libfilter]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-libfilter]').forEach((x) => x.classList.toggle('is-active', x === b));
     libFilter = b.dataset.libfilter;
