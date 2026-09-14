@@ -99,8 +99,8 @@
 /* Слева герб во всю высоту шапки, справа имя и поля в две строки */
 .sheet-head{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); align-items:start}
 .head-main{display:flex; flex-direction:column; gap:var(--s2); min-width:0}
-/* Уровень — узкое окошко, поэтому его колонка по содержимому, а не в равную долю */
-.head-grid{display:grid; grid-template-columns:auto repeat(3,1fr); gap:var(--s2); align-items:start}
+/* Уровень и вдохновение — узкие окошки, их колонки по содержимому, а не в равную долю */
+.head-grid{display:grid; grid-template-columns:auto auto repeat(3,1fr); gap:var(--s2); align-items:start}
 /* Карточки текут в три колонки и сами выравниваются по высоте */
 .sheet-flow{column-count:3; column-gap:var(--s3); margin-top:var(--s4)}
 .sheet-flow .blk{break-inside:avoid; margin-bottom:var(--s3)}
@@ -187,6 +187,17 @@
 @media (max-width:720px){ .cls-picker-grid{grid-template-columns:repeat(3, 1fr)} }
 @media (max-width:480px){ .cls-picker-grid{grid-template-columns:repeat(2, 1fr)} }
 
+/* Личность: черты, идеалы, привязанности и слабости — один блок, как на бумаге */
+.persona{display:grid; grid-template-columns:1fr 1fr; gap:var(--s2)}
+.persona-cell{display:flex; flex-direction:column; gap:2px; min-width:0}
+.persona-cell textarea{
+  width:100%; resize:vertical; min-height:44px; padding:var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--panel);
+  color:var(--text); font-family:inherit; font-size:16px; line-height:1.5;
+}
+.persona-cell textarea:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+@media (max-width:520px){ .persona{grid-template-columns:1fr} }
+
 /* Способности: свёрнутая вкладка — картинка и название, внутри текст */
 .feats{display:flex; flex-direction:column; gap:var(--s2); margin-bottom:var(--s2)}
 .feat{border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel); overflow:hidden}
@@ -243,8 +254,10 @@
 }
 .key-val{
   font-family:var(--f-head); font-size:20px; letter-spacing:.08em; color:var(--gold);
-  user-select:all;
+  user-select:all; margin-right:auto;
 }
+/* Закрытый ключ приглушён: видно, что там что-то есть, но читать нечего */
+.key-val.is-hidden{color:var(--gold-dim); user-select:none}
 
 /* ── Лист глазами Мастера: правок нет, поля просто читаются ── */
 .sheet.is-ro input,.sheet.is-ro textarea{background:var(--bg-2); color:var(--text); cursor:default}

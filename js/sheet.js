@@ -37,6 +37,10 @@ const TEXTS = [
   { id: 'langs', label: 'Прочие владения и языки', rows: 3 },
 ];
 
+// В бумажном листе это один блок, и здесь тоже: четыре карточки порознь
+// растягивали страницу и разбредались по разным колонкам.
+const PERSONA = ['traits', 'ideals', 'bonds', 'flaws'];
+
 export const mod = (score) => Math.floor(((Number(score) || 10) - 10) / 2);
 export const sign = (n) => (n >= 0 ? '+' : '−') + Math.abs(n);
 const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
@@ -86,6 +90,14 @@ function lvlBox(n) {
   const b = el('div', 'fld fld-lvl');
   b.title = 'Уровень поднимает Мастер за столом.';
   b.append(el('span', 'fld-l', 'Уровень'), el('span', 'lvl-n', String(n || 1)));
+  return b;
+}
+
+/** Вдохновение — такое же мастерское окошко, как уровень, и стоит рядом с ним. */
+function inspBox(n) {
+  const b = el('div', 'fld fld-lvl');
+  b.title = 'Вдохновение выдаёт и забирает Мастер за столом.';
+  b.append(el('span', 'fld-l', 'Вдохновение'), el('span', 'insp-n', String(n || 0)));
   return b;
 }
 
@@ -237,12 +249,30 @@ function clsWidget(s, onEdit, ro, level) {
   return wrap;
 }
 
-/** Ключ персонажа: игрок его диктует Мастеру, Мастер по нему смотрит лист. */
+/**
+ * Ключ персонажа: игрок его диктует Мастеру, Мастер по нему смотрит лист.
+ * Ключ — это адрес листа в базе, поэтому по умолчанию он закрыт точками:
+ * за спиной игрока может стоять кто угодно, а стрим показывает экран всем.
+ * Копировать можно не раскрывая — диктовать вслух приходится редко.
+ */
 function keyBox(key, ro) {
   const box = el('div', 'key-box');
   box.append(el('span', 'fld-l', ro ? 'Ключ персонажа' : 'Ключ персонажа — назовите его Мастеру'));
-  const val = el('code', 'key-val', key);
+  const mask = String(key).replace(/[^-]/g, '•');
+  const val = el('code', 'key-val is-hidden', mask);
   box.append(val);
+
+  let shown = false;
+  const eye = el('button', 'btn btn-soft btn-sm', 'Показать');
+  eye.type = 'button';
+  eye.addEventListener('click', () => {
+    shown = !shown;
+    val.textContent = shown ? key : mask;
+    val.classList.toggle('is-hidden', !shown);
+    eye.textContent = shown ? 'Скрыть' : 'Показать';
+  });
+  box.append(eye);
+
   if (!ro && navigator.clipboard) {
     const copy = el('button', 'btn btn-soft btn-sm', 'Копировать');
     copy.type = 'button';
@@ -321,23 +351,22 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   const lvlValue = ctx.level ?? s.level;
   const headGrid = el('div', 'head-grid');
   HEAD.forEach((h) => {
-    if (h.lvl) headGrid.append(lvlBox(lvlValue));
-    else headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id));
+    if (h.lvl) {
+      // Уровень и вдохновение выдаёт Мастер: два одинаковых окошка рядом,
+      // вдохновению больше не нужна карточка на всю ширину колонки.
+      headGrid.append(lvlBox(lvlValue), inspBox(ctx.insp || 0));
+    } else headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id));
   });
   // Герб высокий, поля низкие: держим их в своей колонке, иначе под каждым
   // полем остаётся провал в половину монеты.
   const headMain = el('div', 'head-main');
   headMain.append(nameWrap, headGrid);
+  if (ctx.charKey) headMain.append(keyBox(ctx.charKey, ro));
   head.append(clsWidget(s, onEdit, ro, lvlValue), headMain);
   root.append(head);
-  if (ctx.charKey) root.append(keyBox(ctx.charKey, ro));
 
   /* ── карточки одним потоком ── */
   const flow = el('div', 'sheet-flow');
-
-  const insp = el('div', 'insp-box');
-  insp.append(el('span', 'fld-l', 'Вдохновение'), el('span', 'insp-n', String(ctx.insp || 0)));
-  const inspBlock = block('', insp, el('p', 'hint', 'Выдаёт и забирает Мастер за столом.'));
 
   const abil = el('div', 'abilities');
   const modNodes = {};
@@ -351,7 +380,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
     abil.append(c);
   });
 
-  flow.append(inspBlock, block('Характеристики', abil));
+  flow.append(block('Характеристики', abil));
 
   const defense = el('div', 'row-3');
   defense.append(numField('КД', 'ac'), numField('Скорость', 'speed'), numField('Обзор, фт', 'vision'));
@@ -490,7 +519,23 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   drawFeats();
 
   flow.append(ro ? block('Умения и способности', feats) : block('Умения и способности', feats, addFeat));
-  TEXTS.forEach((t) => flow.append(area(t)));
+
+  // Личность одной карточкой, сеткой два на два, и повыше в потоке — иначе
+  // идеалы с привязанностями уезжали в самый низ чужой колонки.
+  const persona = el('div', 'persona');
+  PERSONA.forEach((id) => {
+    const t = TEXTS.find((x) => x.id === id);
+    const cell = el('label', 'persona-cell');
+    const a = el('textarea');
+    a.rows = 2;
+    a.value = s[t.id] ?? '';
+    a.placeholder = '—';
+    cell.append(el('span', 'fld-l', t.label), bind(a, t.id));
+    persona.append(cell);
+  });
+  flow.append(block('Личность', persona));
+
+  TEXTS.filter((t) => !PERSONA.includes(t.id)).forEach((t) => flow.append(area(t)));
   root.append(flow);
 
   /* ── лор и заметки ── */
