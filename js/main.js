@@ -620,6 +620,39 @@ const inspOf = (s, key) => (s.inspiration && s.inspiration[key]) || 0;
 const levelOf = (s, key) => (s.levels && s.levels[key]) || 1;
 let gemShown = null;
 
+/**
+ * Персонаж игрока: карточка, которую он привёл из кабинета. Если карточки уже
+ * нет, спрашиваем поле — фигурка помнит владельца по имени.
+ */
+function heroOf(s, key) {
+  const lib = Object.values(s.library).find((it) => it.owner && nameKey(it.owner.name) === key);
+  if (lib) return { name: lib.name, assetId: lib.assetId };
+  const t = Object.values(s.tokens).find((x) => nameKey(x.ownerName) === key);
+  return t ? { name: t.name, assetId: t.assetId } : null;
+}
+
+/** Имя человека, под ним — имя персонажа, слева — его иконка. */
+function whoBox(s, m) {
+  const box = el('div', 'hero-who');
+  const hero = heroOf(s, m.key);
+  if (hero) {
+    const pic = el('span', 'hero-pic', hero.name.slice(0, 1).toUpperCase());
+    if (hero.assetId) assetUrl(hero.assetId).then((u) => {
+      if (!u) return;
+      const img = el('img'); img.alt = '';
+      img.src = u;
+      pic.textContent = '';
+      pic.append(img);
+    });
+    box.append(pic);
+  }
+  const names = el('div', 'hero-names');
+  names.append(el('span', 'who', m.name));
+  names.append(el('span', 'ch', hero ? hero.name : 'персонажа за столом нет'));
+  box.append(names);
+  return box;
+}
+
 /** Список героев со счётчиком вдохновения: ± только у Мастера. */
 function renderHeroes(s) {
   const box = $('#heroes-list');
@@ -632,7 +665,7 @@ function renderHeroes(s) {
   people.forEach((m) => {
     const n = inspOf(s, m.key);
     const row = el('div', 'hero-row' + (m.key === nameKey(app.me.name) ? ' is-me' : ''));
-    row.append(el('span', 'who', m.name));
+    row.append(whoBox(s, m));
     if (!m.online) row.append(el('span', 'off', 'не в сети'));
 
     const lv = levelOf(s, m.key);
@@ -646,7 +679,10 @@ function renderHeroes(s) {
     if (app.isDM) gems.append(stepBtn('−', () => setInsp(m.key, n - 1)));
     gems.append(gemNode(n === 0), el('span', 'n', String(n)));
     if (app.isDM) gems.append(stepBtn('+', () => setInsp(m.key, n + 1)));
-    row.append(lvl, gems);
+    // счётчики уходят под имя: в узкой панели имя персонажа иначе не помещается
+    const nums = el('div', 'hero-nums');
+    nums.append(lvl, gems);
+    row.append(nums);
     box.append(row);
   });
 

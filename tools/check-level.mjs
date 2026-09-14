@@ -9,6 +9,8 @@ const page = (n) => BASE.replace(/[^/]*$/, '') + n;
 const LOGIN = 'lvl' + process.pid, PASS = 'p' + process.pid;
 const ROOM = 'Уровень ' + process.pid, KEY = 'k' + process.pid, DMKEY = 'm' + process.pid;
 const q = (o) => new URLSearchParams(o).toString();
+// 48×48 картинка вместо портрета: важно, что она доезжает, а не что на ней
+const ЛИЦО = 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAAAh0lEQVR4nM3ORxHCAAAAwQg7YSeMXkNCxxR/DHAzK2CHhaQMfx/8hpaS0gutJKUXWktKL7SRlF5oKym90E5SeqG9pPRCB0nphY6S0gudJKUXOktKLzRKSi90kZReaJKUXmiWlF7oKim90E1SeqG7pPRCD0nphZ6S0gu9JKUXektKL/SRlFzoCzOPEERtZDquAAAAAElFTkSuQmCC';
 const R = {}; const errors = [];
 process.on('uncaughtException', (e) => { R.упало = e.message.split('\n')[0]; R.ошибки = errors; console.log(JSON.stringify(R, null, 2)); process.exit(1); });
 const watch = (p, t) => {
@@ -48,8 +50,12 @@ await pl.waitForSelector('#cab:not([hidden])', { timeout: 20000 });
 await pl.click('#btn-new-char');
 await pl.waitForSelector('.char-card.is-active', { timeout: 10000 });
 await pl.waitForTimeout(600);
-await pl.fill('.char-card.is-active .char-name', 'Торин');
+await pl.fill('.char-card.is-active .char-name', 'Торин Дубощит');
 await pl.waitForTimeout(400);
+// фон карточки — он же иконка персонажа за столом
+await pl.setInputFiles('.char-card.is-active .char-bg-btn input[type=file]',
+  { name: 'face.png', mimeType: 'image/png', buffer: Buffer.from(ЛИЦО, 'base64') });
+await pl.waitForTimeout(1200);
 
 /* 1. В листе кабинета уровень — окошко, а не поле для правки */
 R.вКабинете = await pl.evaluate(() => {
@@ -75,6 +81,8 @@ await pl.waitForTimeout(3000);
 
 const рядыГероев = (p) => p.evaluate(() => [...document.querySelectorAll('.hero-row')].map((r) => ({
   кто: r.querySelector('.who').textContent,
+  персонаж: r.querySelector('.ch')?.textContent,
+  иконка: !!r.querySelector('.hero-pic img')?.src,
   уровень: r.querySelector('.hero-lvl .n')?.textContent,
   кнопок: r.querySelectorAll('.hero-lvl .hero-btn').length,
 })));
