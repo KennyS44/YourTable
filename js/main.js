@@ -4,7 +4,8 @@ import { createSync } from './sync.js';
 import { FIREBASE, useFirebase } from './firebase-config.js';
 import { createStore, defaultStats, emptyState, newLocation, newToken, normalize, uid, STATUSES, STATUS_FX } from './store.js';
 import { createBoard } from './board.js';
-import { DICE, roll, playAnimation } from './dice.js';
+import { DICE, roll } from './dice.js';
+import { showRoll } from './dice3d.js';
 import { packRoom } from './roomcode.js';
 import { fixSheet, renderSheetLite } from './sheet.js';
 import { publishChar } from './charlink.js';
@@ -336,7 +337,7 @@ function canPersist() {
 /** Чужой бросок прилетает тем же каналом, что и всё остальное, — анимацию видят все. */
 function onRemoteAction(a) {
   if (a.t !== 'chat.add' || a.msg.kind !== 'roll' || a.msg.secret) return;
-  playAnimation($('#dice-stage'), a.msg.roll, `${a.msg.name}: ${a.msg.roll.formula}`);
+  showRoll($('#dice-stage'), a.msg.roll, `${a.msg.name}: ${a.msg.roll.formula}`);
 }
 
 /* ───────────────────────── Работа с картинками ───────────────────────── */
@@ -1285,15 +1286,15 @@ function doRoll(sides) {
   const r = roll(sides, count, mod, adv);
   const secret = diceMode === 'secret' && app.isDM;
   say('', 'roll', { roll: r, secret });
-  playAnimation($('#dice-stage'), r, `${app.me.name}: ${r.formula}${secret ? ' · тайно' : ''}`);
+  showRoll($('#dice-stage'), r, `${app.me.name}: ${r.formula}${secret ? ' · тайно' : ''}`);
 }
 
 /* ───────────────────────── Провода интерфейса ───────────────────────── */
 
 function wireUI() {
-  // инструменты
-  $$('#toolbar .tool').forEach((b) => b.addEventListener('click', () => {
-    $$('#toolbar .tool').forEach((x) => x.classList.toggle('is-active', x === b));
+  // инструменты; кнопка отмены стоит в том же ряду, но режимом не является
+  $$('#toolbar .tool[data-tool]').forEach((b) => b.addEventListener('click', () => {
+    $$('#toolbar .tool[data-tool]').forEach((x) => x.classList.toggle('is-active', x === b));
     app.board.setTool(b.dataset.tool);
     $('#draw-bar').hidden = b.dataset.tool !== 'draw';
     const wb = $('#wall-bar');

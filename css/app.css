@@ -312,6 +312,9 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 
 .dice-stage{position:fixed; inset:0; pointer-events:none; z-index:40}
 .die-throw{position:fixed; inset:0; transition:opacity .5s var(--ease)}
+.dice3d canvas{position:absolute; inset:0; display:block}
+/* с объёмными костями итог уезжает вниз: середину занимают сами кубики */
+.dice3d .die-result{top:auto; bottom:var(--s8)}
 .die-throw.is-out{opacity:0}
 
 .die{
