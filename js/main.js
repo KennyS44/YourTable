@@ -614,9 +614,10 @@ function updateShowcase(s) {
   assetUrl(id).then((u) => { if (u) { img.src = u; box.hidden = false; } });
 }
 
-/* ───────────────────────── Вдохновение ───────────────────────── */
+/* ─────────────────── Вдохновение и уровень ─────────────────── */
 
 const inspOf = (s, key) => (s.inspiration && s.inspiration[key]) || 0;
+const levelOf = (s, key) => (s.levels && s.levels[key]) || 1;
 let gemShown = null;
 
 /** Список героев со счётчиком вдохновения: ± только у Мастера. */
@@ -634,11 +635,18 @@ function renderHeroes(s) {
     row.append(el('span', 'who', m.name));
     if (!m.online) row.append(el('span', 'off', 'не в сети'));
 
+    const lv = levelOf(s, m.key);
+    const lvl = el('div', 'hero-lvl');
+    lvl.title = 'Уровень персонажа';
+    if (app.isDM) lvl.append(stepBtn('−', () => setLevel(m.key, lv - 1)));
+    lvl.append(el('span', 'lvl-tag', 'ур.'), el('span', 'n', String(lv)));
+    if (app.isDM) lvl.append(stepBtn('+', () => setLevel(m.key, lv + 1)));
+
     const gems = el('div', 'hero-gems');
     if (app.isDM) gems.append(stepBtn('−', () => setInsp(m.key, n - 1)));
     gems.append(gemNode(n === 0), el('span', 'n', String(n)));
     if (app.isDM) gems.append(stepBtn('+', () => setInsp(m.key, n + 1)));
-    row.append(gems);
+    row.append(lvl, gems);
     box.append(row);
   });
 
@@ -685,6 +693,9 @@ function stepBtn(label, onClick) {
 }
 function setInsp(key, value) {
   app.store.dispatch({ t: 'insp.set', key, value: Math.max(0, Math.min(99, value)) });
+}
+function setLevel(key, value) {
+  app.store.dispatch({ t: 'level.set', key, value: Math.max(1, Math.min(20, value)) });
 }
 
 /* ───────────────── Эффекты состояний на игровом поле ───────────────── */
@@ -1387,7 +1398,26 @@ async function wireHeroSheet() {
       }
     }, 900);
   };
-  renderSheetLite($('#lite-sheet'), ch, save);
+  // Уровень держит Мастер: в лист он приходит со стола и оседает в кабинете,
+  // чтобы его же увидели и лист в кабинете, и витрина по ключу персонажа.
+  const myKey = nameKey(app.me.name);
+  const showLevel = (s) => {
+    const n = levelOf(s, myKey);
+    const box = $('#lite-sheet .lvl-n');
+    if (box) box.textContent = String(n);
+    if (ch.sheet.level === n) return;
+    ch.sheet.level = n;
+    save();
+  };
+  // за столом персонажа видят впервые — берём уровень из его листа, дальше он
+  // живёт в комнате и правится только Мастером
+  const now = app.store.get();
+  if (!(now.levels && now.levels[myKey]) && Number(ch.sheet.level) > 1) {
+    setLevel(myKey, Number(ch.sheet.level));
+  }
+  renderSheetLite($('#lite-sheet'), ch, save, { level: levelOf(app.store.get(), myKey) });
+  showLevel(app.store.get());
+  app.store.subscribe(showLevel);
 }
 
 function wireDM() {

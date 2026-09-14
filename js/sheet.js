@@ -3,7 +3,7 @@
 //
 // Чего здесь нет намеренно: временных хитов, навыков с пассивной мудростью,
 // спасбросков, бонуса мастерства, предыстории, опыта, инициативы и спасбросков
-// от смерти. Вдохновение не правится: его выдаёт Мастер за столом.
+// от смерти. Вдохновение и уровень не правятся: их выдаёт Мастер за столом.
 
 export const ABILITIES = [
   { id: 'str', label: 'Сила' },
@@ -16,7 +16,7 @@ export const ABILITIES = [
 
 const HEAD = [
   { id: 'cls', label: 'Класс' },
-  { id: 'level', label: 'Уровень', num: true },
+  { id: 'level', label: 'Уровень', lvl: true },
   { id: 'race', label: 'Раса' },
   { id: 'alignment', label: 'Мировоззрение' },
   { id: 'player', label: 'Имя игрока' },
@@ -73,6 +73,17 @@ const el = (tag, cls = '', text = '') => {
   return n;
 };
 
+/**
+ * Уровень только показываем — маленьким окошком, как вдохновение: поднимает
+ * его Мастер за столом, во вкладке «Герои».
+ */
+function lvlBox(n) {
+  const b = el('div', 'fld fld-lvl');
+  b.title = 'Уровень поднимает Мастер за столом.';
+  b.append(el('span', 'fld-l', 'Уровень'), el('span', 'lvl-n', String(n || 1)));
+  return b;
+}
+
 /** Ключ персонажа: игрок его диктует Мастеру, Мастер по нему смотрит лист. */
 function keyBox(key, ro) {
   const box = el('div', 'key-box');
@@ -94,7 +105,8 @@ function keyBox(key, ro) {
 
 /**
  * Рисуем лист. onEdit(key) отдаёт правку наружу — кабинет её сохраняет.
- * ctx.insp — сколько вдохновений выдал Мастер, ctx.pickImage — выбор картинки.
+ * ctx.insp — сколько вдохновений выдал Мастер, ctx.level — уровень от Мастера
+ * (без него берём сохранённый в листе), ctx.pickImage — выбор картинки.
  * ctx.readOnly — лист только для чтения: так его видит Мастер.
  * ctx.charKey — ключ персонажа: его игрок диктует Мастеру.
  */
@@ -154,7 +166,10 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   else nameInput.addEventListener('input', () => { ch.name = nameInput.value; onEdit('name', ch.name); });
   nameWrap.append(el('span', 'fld-l', 'Имя персонажа'), nameInput);
   const headGrid = el('div', 'head-grid');
-  HEAD.forEach((h) => headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id)));
+  HEAD.forEach((h) => {
+    if (h.lvl) headGrid.append(lvlBox(ctx.level ?? s.level));
+    else headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id));
+  });
   head.append(nameWrap, headGrid);
   root.append(head);
   if (ctx.charKey) root.append(keyBox(ctx.charKey, ro));
@@ -344,7 +359,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
  * характеристики, КД и хиты, способности, инвентарь, слабости и сопротивления.
  * Остальное живёт в кабинете. onEdit сохраняет так же, как в кабинете.
  */
-export function renderSheetLite(root, ch, onEdit) {
+export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   const s = ch.sheet;
   root.innerHTML = '';
 
@@ -373,7 +388,9 @@ export function renderSheetLite(root, ch, onEdit) {
     return b;
   };
 
-  root.append(el('p', 'lite-name', ch.name || 'Персонаж'));
+  const head = el('div', 'lite-head');
+  head.append(el('p', 'lite-name', ch.name || 'Персонаж'), lvlBox(ctx.level ?? s.level));
+  root.append(head);
 
   /* ── характеристики ── */
   const abil = el('div', 'abilities');

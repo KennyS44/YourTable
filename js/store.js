@@ -18,6 +18,7 @@ export function emptyState(room) {
     activeLoc: null,
     library: {},                // id -> {id, name, kind, assetId}
     inspiration: {},            // ключ имени -> сколько вдохновений
+    levels: {},                 // ключ имени -> уровень персонажа: его поднимает Мастер
     tokens: {},                 // id -> токен
     init: { order: [], idx: 0, round: 1 },
     chat: [],                   // {id, ts, by, name, kind, text, roll, secret}
@@ -57,6 +58,7 @@ export function normalize(raw) {
   s.locations = s.locations || {};
   s.tokens = s.tokens || {};
   s.inspiration = s.inspiration || {};
+  s.levels = s.levels || {};
   s.pics = { assets: [], shown: null, ...(s.pics || {}) };
   s.pics.assets = s.pics.assets || [];
   s.init = { order: [], idx: 0, round: 1, ...(s.init || {}) };
@@ -261,6 +263,10 @@ export function reduce(s, a) {
 
     case 'insp.set':
       s.inspiration = { ...(s.inspiration || {}), [a.key]: Math.max(0, Math.min(99, a.value)) };
+      break;
+
+    case 'level.set':
+      s.levels = { ...(s.levels || {}), [a.key]: Math.max(1, Math.min(20, a.value)) };
       break;
 
     case 'draw.add': {
