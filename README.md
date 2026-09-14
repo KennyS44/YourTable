@@ -79,6 +79,9 @@ Live: **[kennys44.github.io/YourTable](https://kennys44.github.io/YourTable/)**
   the room, a player has their own character: the six abilities, armour class
   and hit points, their features, inventory, flaws and resistances — editable on
   the spot, saved back into the cabinet and straight through to the Master.
+- **Class crests.** The sheet's class field is a coin with a hand-picked emblem
+  for each of the 13 classes (`js/classes.js`); a second class flips it to its
+  other side for multiclass characters, level shown underneath either way.
 - **Campaign export/import** as a single JSON file — locations, tokens, icon
   library, handouts and the log, with all images embedded.
 - **Traffic counters and a load test.** The Firebase adapter counts actions and
@@ -96,6 +99,7 @@ Live: **[kennys44.github.io/YourTable](https://kennys44.github.io/YourTable/)**
     js/board.js             the canvas: map, grid, tokens, fog, walls, drawing
     js/store.js             room state and the pure reducer for every action
     js/dice.js              rolls and the die-shape animation
+    js/classes.js           the 13 class crests: id, label, author, icon path
     js/sync-firebase.js     Firebase Realtime Database adapter
     js/sync.js              local adapter: BroadcastChannel between tabs
     js/firebase-config.js   project config; empty databaseURL = local mode
@@ -151,3 +155,8 @@ site).
 ## License
 
 No license file yet — all rights reserved by the author.
+
+The class crests in `js/classes.js` are third-party icons by
+[Lorc](http://lorcblog.blogspot.com) and [Delapouite](http://delapouite.com),
+from [game-icons.net](https://game-icons.net), licensed under
+[CC BY 3.0](http://creativecommons.org/licenses/by/3.0/).

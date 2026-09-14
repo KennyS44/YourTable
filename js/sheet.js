@@ -5,6 +5,8 @@
 // спасбросков, бонуса мастерства, предыстории, опыта, инициативы и спасбросков
 // от смерти. Вдохновение и уровень не правятся: их выдаёт Мастер за столом.
 
+import { CLASSES, classById } from './classes.js';
+
 export const ABILITIES = [
   { id: 'str', label: 'Сила' },
   { id: 'dex', label: 'Ловкость' },
@@ -14,8 +16,8 @@ export const ABILITIES = [
   { id: 'cha', label: 'Харизма' },
 ];
 
+// Класс рисуется гербом (см. clsWidget), а не в этом списке текстовых полей.
 const HEAD = [
-  { id: 'cls', label: 'Класс' },
   { id: 'level', label: 'Уровень', lvl: true },
   { id: 'race', label: 'Раса' },
   { id: 'alignment', label: 'Мировоззрение' },
@@ -41,7 +43,7 @@ const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now()
 
 export function emptySheet() {
   const s = {
-    cls: '', level: 1, race: '', alignment: '', player: '',
+    cls: [], level: 1, race: '', alignment: '', player: '',
     ac: 10, speed: 30, vision: 30,
     hpMax: 10, hpCur: 10, hitDice: '',
     attacks: [{ name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }],
@@ -57,6 +59,9 @@ export function emptySheet() {
 /** Дополняем сохранённый лист до полного: старые записи не должны падать. */
 export function fixSheet(raw) {
   const s = { ...emptySheet(), ...(raw || {}) };
+  // старый лист хранил класс свободным текстом — заворачиваем в герб-слот как есть,
+  // герб для него нарисовать нечем, но название доживёт до ручного выбора игроком
+  s.cls = Array.isArray(s.cls) ? s.cls.filter(Boolean).slice(0, 2) : (s.cls ? [s.cls] : []);
   const rows = (raw && raw.attacks) || [];
   s.attacks = rows.length ? rows.map((a) => ({ name: '', bonus: '', dmg: '', ...a })) : emptySheet().attacks;
   s.feats = ((raw && raw.feats) || []).map((f) => ({ id: f.id || uid('ft'), name: f.name || '', img: f.img || '', text: f.text || '' }));
@@ -82,6 +87,147 @@ function lvlBox(n) {
   b.title = 'Уровень поднимает Мастер за столом.';
   b.append(el('span', 'fld-l', 'Уровень'), el('span', 'lvl-n', String(n || 1)));
   return b;
+}
+
+/* ── Герб класса: монета на две стороны, одна сторона — один класс ── */
+
+let crestDefsReady = false;
+function ensureCrestDefs() {
+  if (crestDefsReady || document.getElementById('crest-defs')) { crestDefsReady = true; return; }
+  // innerHTML должен начинаться с <svg>, иначе разметка распарсится как HTML,
+  // а не как SVG, и градиент нельзя будет сослаться через url(#...)
+  const holder = el('div');
+  holder.id = 'crest-defs';
+  holder.style.cssText = 'position:absolute; width:0; height:0; overflow:hidden';
+  holder.innerHTML = '<svg width="0" height="0"><defs><radialGradient id="crest-gold-bg" cx="50%" cy="38%" r="72%">'
+    + '<stop offset="0%" stop-color="#e3c98f"/><stop offset="100%" stop-color="#c9a45a"/></radialGradient></defs></svg>';
+  document.body.append(holder);
+  crestDefsReady = true;
+}
+
+/** Медальон герба: настоящий рисунок класса или пустая заглушка со знаком «+». */
+function crestMarkup(id) {
+  const c = id && classById(id);
+  const glyph = c
+    ? `<g transform="translate(120 120) scale(.3) translate(-256 -256)"><path fill="#141310" d="${c.d}"/></g>`
+    : '<text x="120" y="150" font-size="90" text-anchor="middle" fill="#8d7440" opacity=".6">+</text>';
+  return `<svg viewBox="0 0 240 240" class="crest-svg">
+    <circle cx="120" cy="120" r="112" fill="url(#crest-gold-bg)" stroke="#8d7440" stroke-width="4"/>
+    <circle cx="120" cy="120" r="100" fill="none" stroke="#8d7440" stroke-width="1.5" opacity=".7"/>
+    <circle cx="120" cy="120" r="112" fill="none" stroke="#8d7440" stroke-width="1" stroke-dasharray="2 10" opacity=".7"/>
+    ${glyph}
+    <circle cx="120" cy="120" r="112" fill="none" stroke="#c9a45a" stroke-width="3.5"/>
+  </svg>`;
+}
+
+/** Лёгкий наклон медальона к курсору — калька с превью, но живьём. */
+function tiltMove(e) {
+  const r = this.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width - 0.5;
+  const y = (e.clientY - r.top) / r.height - 0.5;
+  this.style.transform = `rotateY(${x * 18}deg) rotateX(${y * -18}deg)`;
+}
+function tiltReset() {
+  this.style.transform = '';
+}
+
+/** Оверлей выбора класса: те же 13 гербов, что смотрели на превью. */
+function openClassPicker(currentId, onPick) {
+  ensureCrestDefs();
+  const overlay = el('div', 'cls-picker-overlay');
+  const panel = el('div', 'cls-picker');
+  const head = el('div', 'cls-picker-head');
+  head.append(el('h3', '', 'Выбери класс'));
+  const close = el('button', 'icon-btn close', '×');
+  close.type = 'button';
+  close.addEventListener('click', () => overlay.remove());
+  head.append(close);
+  const grid = el('div', 'cls-picker-grid');
+  CLASSES.forEach((c) => {
+    const item = el('button', 'cls-pick' + (c.id === currentId ? ' is-current' : ''));
+    item.type = 'button';
+    item.innerHTML = crestMarkup(c.id) + `<span>${c.label}</span>`;
+    item.addEventListener('pointermove', tiltMove);
+    item.addEventListener('pointerleave', tiltReset);
+    item.addEventListener('click', () => { overlay.remove(); onPick(c.id); });
+    grid.append(item);
+  });
+  panel.append(head, grid);
+  overlay.append(panel);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.append(overlay);
+}
+
+/**
+ * Герб класса в шапке листа: одна монета, до двух сторон (мультикласс).
+ * Уровень не делится между классами — подпись просто повторяет общий уровень.
+ */
+function clsWidget(s, onEdit, ro, level) {
+  ensureCrestDefs();
+  const wrap = el('div', 'fld fld-cls');
+  wrap.append(el('span', 'fld-l', 'Класс'));
+
+  const tools = el('div', 'cls-tools');
+  const flipBtn = el('button', 'icon-btn cls-tool', '⟲');
+  flipBtn.type = 'button';
+  flipBtn.title = 'Показать другую сторону';
+  const editBtn = el('button', 'icon-btn cls-tool', '✎');
+  editBtn.type = 'button';
+  editBtn.title = 'Выбрать класс';
+  tools.append(flipBtn);
+  if (!ro) tools.append(editBtn);
+
+  const coin = el('div', 'cls-coin');
+  const inner = el('div', 'cls-coin-inner');
+  const faceA = el('div', 'cls-face cls-face-a');
+  const faceB = el('div', 'cls-face cls-face-b');
+  inner.append(faceA, faceB);
+  coin.append(inner);
+  const caption = el('div', 'cls-caption');
+
+  const box = el('div', 'cls-box');
+  box.append(tools, coin, caption);
+  wrap.append(box);
+
+  const setSlot = (i, id) => {
+    const ids = (Array.isArray(s.cls) ? s.cls : []).slice();
+    while (ids.length <= i) ids.push(null);
+    ids[i] = id;
+    s.cls = ids;
+    onEdit('cls', s.cls);
+  };
+
+  let side = 0;
+  function repaint() {
+    const ids = Array.isArray(s.cls) ? s.cls : [];
+    faceA.innerHTML = crestMarkup(ids[0]);
+    faceB.innerHTML = crestMarkup(ids[1]);
+    inner.classList.toggle('is-flipped', side === 1);
+    flipBtn.hidden = ro && !ids[1];
+    const shown = ids[side];
+    const known = shown && classById(shown);
+    caption.textContent = known ? `${known.label}, ур. ${level || 1}`
+      : shown ? shown
+      : 'Класс не выбран';
+  }
+
+  flipBtn.addEventListener('click', () => {
+    const ids = Array.isArray(s.cls) ? s.cls : [];
+    if (!ids[1]) {
+      if (ro) return;
+      openClassPicker(null, (id) => { setSlot(1, id); side = 1; repaint(); });
+      return;
+    }
+    side = side ? 0 : 1;
+    repaint();
+  });
+  editBtn.addEventListener('click', () => {
+    const ids = Array.isArray(s.cls) ? s.cls : [];
+    openClassPicker(ids[side], (id) => { setSlot(side, id); repaint(); });
+  });
+
+  repaint();
+  return wrap;
 }
 
 /** Ключ персонажа: игрок его диктует Мастеру, Мастер по нему смотрит лист. */
@@ -165,9 +311,11 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   if (ro) nameInput.readOnly = true;
   else nameInput.addEventListener('input', () => { ch.name = nameInput.value; onEdit('name', ch.name); });
   nameWrap.append(el('span', 'fld-l', 'Имя персонажа'), nameInput);
+  const lvlValue = ctx.level ?? s.level;
   const headGrid = el('div', 'head-grid');
+  headGrid.append(clsWidget(s, onEdit, ro, lvlValue));
   HEAD.forEach((h) => {
-    if (h.lvl) headGrid.append(lvlBox(ctx.level ?? s.level));
+    if (h.lvl) headGrid.append(lvlBox(lvlValue));
     else headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id));
   });
   head.append(nameWrap, headGrid);
