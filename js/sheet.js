@@ -26,15 +26,17 @@ const HEAD = [
 
 // Порядок карточек в потоке; по колонкам их раскладывает сама вёрстка,
 // поэтому столбцы кончаются на одной высоте, сколько бы ни было способностей.
+// rows подобраны так, чтобы три столбца кончались примерно на одной высоте:
+// в третьем живут самые словоохотливые поля, им и места побольше.
 const TEXTS = [
-  { id: 'appearance', label: 'Внешний вид', rows: 5 },
+  { id: 'appearance', label: 'Внешний вид', rows: 7 },
   { id: 'traits', label: 'Черты характера', rows: 3 },
   { id: 'ideals', label: 'Идеалы', rows: 2 },
   { id: 'bonds', label: 'Привязанности', rows: 2 },
   { id: 'flaws', label: 'Слабости', rows: 2 },
   { id: 'resist', label: 'Сопротивления', rows: 2 },
-  { id: 'gear', label: 'Снаряжение', rows: 4 },
-  { id: 'langs', label: 'Прочие владения и языки', rows: 3 },
+  { id: 'gear', label: 'Снаряжение', rows: 6 },
+  { id: 'langs', label: 'Прочие владения и языки', rows: 5 },
 ];
 
 // В бумажном листе это один блок, и здесь тоже: четыре карточки порознь
@@ -132,15 +134,42 @@ function crestMarkup(id) {
   </svg>`;
 }
 
-/** Лёгкий наклон медальона к курсору — калька с превью, но живьём. */
-function tiltMove(e) {
-  const r = this.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width - 0.5;
-  const y = (e.clientY - r.top) / r.height - 0.5;
-  this.style.transform = `rotateY(${x * 18}deg) rotateX(${y * -18}deg)`;
+// Толщина монеты: ребро набирается из тонких кружков, поставленных друг за
+// другом по оси Z. Одним слоем не обойтись — между двумя лицами была бы щель.
+const COIN_DEPTH = 10;
+function edgeMarkup(steps = 10) {
+  let out = '';
+  for (let i = 0; i <= steps; i++) {
+    const z = COIN_DEPTH / 2 - (COIN_DEPTH / steps) * i;
+    const k = 1 - Math.abs(z) / COIN_DEPTH;        // середина ребра светлее краёв
+    out += `<span class="coin-edge" style="transform:translateZ(${z.toFixed(2)}px);`
+      + `filter:brightness(${(0.55 + k * 0.5).toFixed(2)})"></span>`;
+  }
+  return out;
 }
-function tiltReset() {
-  this.style.transform = '';
+
+/**
+ * Наклон к курсору. Раньше здесь был CSS-переход, но его перезапускало
+ * каждое движение мыши — отсюда рывки. Теперь угол догоняет курсор сам,
+ * по кадру за раз, и останавливается, когда догнал.
+ */
+function attachTilt(zone, target, max = 16) {
+  let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+  const step = () => {
+    cx += (tx - cx) * 0.14;
+    cy += (ty - cy) * 0.14;
+    target.style.setProperty('--tilt-y', cx.toFixed(2) + 'deg');
+    target.style.setProperty('--tilt-x', cy.toFixed(2) + 'deg');
+    raf = (Math.abs(tx - cx) > 0.03 || Math.abs(ty - cy) > 0.03) ? requestAnimationFrame(step) : 0;
+  };
+  const kick = () => { if (!raf) raf = requestAnimationFrame(step); };
+  zone.addEventListener('pointermove', (e) => {
+    const r = zone.getBoundingClientRect();
+    tx = ((e.clientX - r.left) / r.width - 0.5) * max * 2;
+    ty = ((e.clientY - r.top) / r.height - 0.5) * -max * 2;
+    kick();
+  });
+  zone.addEventListener('pointerleave', () => { tx = 0; ty = 0; kick(); });
 }
 
 /** Оверлей выбора класса: те же 13 гербов, что смотрели на превью. */
@@ -158,9 +187,10 @@ function openClassPicker(currentId, onPick) {
   CLASSES.forEach((c) => {
     const item = el('button', 'cls-pick' + (c.id === currentId ? ' is-current' : ''));
     item.type = 'button';
-    item.innerHTML = crestMarkup(c.id) + `<span>${c.label}</span>`;
-    item.addEventListener('pointermove', tiltMove);
-    item.addEventListener('pointerleave', tiltReset);
+    item.innerHTML = `<span class="coin3d"><span class="coin-body">${edgeMarkup()}`
+      + `<span class="coin-face">${crestMarkup(c.id)}</span></span></span>`
+      + `<span>${c.label}</span>`;
+    attachTilt(item, item.querySelector('.coin-body'));
     item.addEventListener('click', () => { overlay.remove(); onPick(c.id); });
     grid.append(item);
   });
@@ -192,12 +222,19 @@ function clsWidget(s, onEdit, ro, level) {
   tools.append(flipBtn);
   if (!ro) tools.append(addBtn, editBtn);
 
+  // Три слоя, у каждого своя работа: наклон к курсору, переворот на другую
+  // сторону и сами лица. Будь это один слой, поворот затирал бы наклон.
   const coin = el('div', 'cls-coin');
+  const tilt = el('div', 'cls-tilt');
   const inner = el('div', 'cls-coin-inner');
   const faceA = el('div', 'cls-face cls-face-a');
   const faceB = el('div', 'cls-face cls-face-b');
-  inner.append(faceA, faceB);
-  coin.append(inner);
+  const edge = el('div', 'cls-edge');
+  edge.innerHTML = edgeMarkup();
+  inner.append(edge, faceA, faceB);
+  tilt.append(inner);
+  coin.append(tilt);
+  attachTilt(coin, tilt, 14);
   const caption = el('div', 'cls-caption');
 
   const box = el('div', 'cls-box');
@@ -380,7 +417,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
     abil.append(c);
   });
 
-  flow.append(block('Характеристики', abil));
+  const abilBlk = block('Характеристики', abil);
 
   const defense = el('div', 'row-3');
   defense.append(numField('КД', 'ac'), numField('Скорость', 'speed'), numField('Обзор, фт', 'vision'));
@@ -433,8 +470,10 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   }
   drawAttacks();
 
-  flow.append(block('Защита и ход', defense), block('Хиты', hp),
-    ro ? block('Атаки и заклинания', atk) : block('Атаки и заклинания', atk, addAtkBtn, datalist));
+  const defenseBlk = block('Защита и ход', defense);
+  const hpBlk = block('Хиты', hp);
+  const atkBlk = ro ? block('Атаки и заклинания', atk)
+    : block('Атаки и заклинания', atk, addAtkBtn, datalist);
 
   const feats = el('div', 'feats');
   const addFeat = el('button', 'btn btn-soft btn-sm w-full', '+ Способность');
@@ -518,7 +557,11 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   };
   drawFeats();
 
-  flow.append(ro ? block('Умения и способности', feats) : block('Умения и способности', feats, addFeat));
+  const featsBlk = ro ? block('Умения и способности', feats)
+    : block('Умения и способности', feats, addFeat);
+  // Способности раскрываются внутри своего окна: у карточки свой потолок и
+  // своя прокрутка, поэтому длинное описание не толкает вниз соседние блоки.
+  featsBlk.classList.add('blk-scroll');
 
   // Личность одной карточкой, сеткой два на два, и повыше в потоке — иначе
   // идеалы с привязанностями уезжали в самый низ чужой колонки.
@@ -533,9 +576,23 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
     cell.append(el('span', 'fld-l', t.label), bind(a, t.id));
     persona.append(cell);
   });
-  flow.append(block('Личность', persona));
 
-  TEXTS.filter((t) => !PERSONA.includes(t.id)).forEach((t) => flow.append(area(t)));
+  // Раскладываем по трём столбцам руками. Раньше это делал column-count, но он
+  // пересобирал весь поток от любой мелочи: раскрыл способность — и карточки
+  // перепрыгивали из колонки в колонку.
+  const rest = Object.fromEntries(
+    TEXTS.filter((t) => !PERSONA.includes(t.id)).map((t) => [t.id, area(t)]),
+  );
+  const cols = [
+    [abilBlk, defenseBlk, hpBlk, rest.resist],
+    [atkBlk, featsBlk, block('Личность', persona)],
+    [rest.appearance, rest.gear, rest.langs],
+  ];
+  cols.forEach((items) => {
+    const col = el('div', 'sheet-col');
+    items.filter(Boolean).forEach((n) => col.append(n));
+    flow.append(col);
+  });
   root.append(flow);
 
   /* ── лор и заметки ── */

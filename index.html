@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=27">
+<link rel="stylesheet" href="css/app.css?v=28">
 <!-- лист персонажа игрока в левой панели живёт по тем же правилам, что и в кабинете -->
-<link rel="stylesheet" href="css/cabinet.css?v=27">
+<link rel="stylesheet" href="css/cabinet.css?v=28">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -22,21 +22,21 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=27",
-    "./js/sync.js":           "./js/sync.js?v=27",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=27",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=27",
-    "./js/store.js":          "./js/store.js?v=27",
-    "./js/board.js":          "./js/board.js?v=27",
-    "./js/dice.js":           "./js/dice.js?v=27",
-    "./js/roomcode.js":       "./js/roomcode.js?v=27",
-    "./js/registry.js":       "./js/registry.js?v=27",
-    "./js/translit.js":       "./js/translit.js?v=27",
-    "./js/sheet.js":          "./js/sheet.js?v=27",
-    "./js/classes.js":        "./js/classes.js?v=27",
-    "./js/charlink.js":       "./js/charlink.js?v=27",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=27",
-    "./js/idb.js":            "./js/idb.js?v=27"
+    "./js/main.js":           "./js/main.js?v=28",
+    "./js/sync.js":           "./js/sync.js?v=28",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=28",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=28",
+    "./js/store.js":          "./js/store.js?v=28",
+    "./js/board.js":          "./js/board.js?v=28",
+    "./js/dice.js":           "./js/dice.js?v=28",
+    "./js/roomcode.js":       "./js/roomcode.js?v=28",
+    "./js/registry.js":       "./js/registry.js?v=28",
+    "./js/translit.js":       "./js/translit.js?v=28",
+    "./js/sheet.js":          "./js/sheet.js?v=28",
+    "./js/classes.js":        "./js/classes.js?v=28",
+    "./js/charlink.js":       "./js/charlink.js?v=28",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=28",
+    "./js/idb.js":            "./js/idb.js?v=28"
   }
 }
 </script>
@@ -141,6 +141,7 @@
       <button class="tool dm-only" data-tool="fog" title="Кисть тумана">☁</button>
       <button class="tool dm-only" data-tool="wall" title="Ставить стены, двери, фонари, переходы и входы">▦</button>
       <button class="tool dm-only" data-tool="edit" title="Правка: двигать и настраивать всё уже поставленное">⚙</button>
+      <button class="tool tool-undo" id="btn-undo" disabled title="Отменить последнее действие (Ctrl+Z)">↶</button>
     </div>
 
     <div class="topbar-right">
@@ -412,10 +413,13 @@
 
   <div class="dice-stage" id="dice-stage" aria-live="polite"></div>
 
+  <!-- Короткое слово о том, что только что произошло: отмена и ей подобные -->
+  <div class="toast" id="toast" hidden aria-live="polite"></div>
+
   <!-- Карточка токена -->
   <div class="token-card" id="token-card" hidden></div>
 </div>
 
-<script type="module" src="js/main.js?v=27"></script>
+<script type="module" src="js/main.js?v=28"></script>
 </body>
 </html>
