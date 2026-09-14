@@ -130,6 +130,22 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 }
 .tool:hover{color:var(--text)}
 .tool.is-active{background:var(--panel-2); color:var(--gold)}
+/* Отмена стоит особняком: это не режим, а шаг назад */
+.tool-undo{border-left:1px solid var(--line); border-radius:0 var(--r-sm) var(--r-sm) 0}
+.tool-undo:disabled{opacity:.3; cursor:default}
+.tool-undo:disabled:hover{color:var(--muted)}
+
+/* Короткое слово о случившемся: всплывает над полем и само тает */
+.toast{
+  position:fixed; left:50%; bottom:var(--s6); z-index:60; transform:translateX(-50%);
+  padding:var(--s2) var(--s4); border-radius:var(--r); pointer-events:none;
+  border:1px solid var(--gold-dim); background:rgba(23,22,19,.94); color:var(--text);
+  font-size:16px; box-shadow:var(--shadow);
+  animation:toast-in .22s var(--ease) both;
+}
+.toast.is-going{animation:toast-out .35s var(--ease) both}
+@keyframes toast-in{from{opacity:0; transform:translate(-50%,10px)} to{opacity:1; transform:translate(-50%,0)}}
+@keyframes toast-out{from{opacity:1} to{opacity:0; transform:translate(-50%,-6px)}}
 
 .stage{flex:1; display:flex; min-height:0}
 .panel{

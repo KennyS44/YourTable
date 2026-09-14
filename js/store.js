@@ -1,6 +1,8 @@
 // Единое состояние комнаты + чистый редьюсер.
 // Любое изменение проходит через dispatch: применяется у себя и уходит остальным.
 
+import { invert } from './history.js';
+
 export const STATUSES = ['Отравлен', 'Оглушён', 'Испуган', 'Обездвижен', 'Без сознания', 'Благословлён', 'Ослеплён'];
 
 /** Ключ состояния для оформления эффекта на экране игрока. */
@@ -162,6 +164,20 @@ export function reduce(s, a) {
     }
     case 'loc.active':
       s.activeLoc = a.id; break;
+    // Возврат удалённой локации (отмена): вместе с местом в списке и фигурками.
+    case 'loc.restore': {
+      s.locations = { ...s.locations, [a.loc.id]: fixLoc(a.loc) };
+      const order = s.order.filter((x) => x !== a.loc.id);
+      order.splice(Math.max(0, Math.min(order.length, a.at ?? order.length)), 0, a.loc.id);
+      s.order = order;
+      if (a.tokens && a.tokens.length) {
+        const toks = { ...s.tokens };
+        a.tokens.forEach((t) => { toks[t.id] = t; });
+        s.tokens = toks;
+      }
+      if (a.active && s.locations[a.active]) s.activeLoc = a.active;
+      break;
+    }
 
     case 'lib.add':
       s.library = { ...s.library, [a.item.id]: a.item }; break;
@@ -208,6 +224,12 @@ export function reduce(s, a) {
     case 'fog.all': {
       const loc = s.locations[a.locId]; if (!loc) break;
       s.locations = { ...s.locations, [a.locId]: { ...loc, fog: {}, fogAllOpen: !!a.open } };
+      break;
+    }
+    // Туман целиком, как он лежал до правки (отмена «открыть/скрыть всё»).
+    case 'fog.set': {
+      const loc = s.locations[a.locId]; if (!loc) break;
+      s.locations = { ...s.locations, [a.locId]: { ...loc, fog: a.fog || {}, fogAllOpen: !!a.allOpen } };
       break;
     }
 
@@ -308,6 +330,10 @@ export function reduce(s, a) {
     }
     case 'init.clear':
       s.init = { order: [], idx: 0, round: 1 }; break;
+    // Очередь боя, какой она была (отмена шага хода или сброса).
+    case 'init.restore':
+      s.init = { order: (a.init && a.init.order) || [], idx: (a.init && a.init.idx) || 0, round: (a.init && a.init.round) || 1 };
+      break;
 
     case 'pics.add':
       s.pics = { ...s.pics, assets: [...s.pics.assets, ...a.assets] }; break;
@@ -336,6 +362,9 @@ function deepMerge(base, patch) {
 /** Мини-шина: хранит состояние, раздаёт подписчикам, шлёт действия в sync. */
 export function createStore(initial, sync, onRemote, canPersist) {
   let state = initial;
+  // Стопка отмен: своя у каждого и только на эту сессию — сорок шагов назад
+  const past = [];
+  const MAX_BACK = 40;
   const subs = new Set();
   const notify = (a) => subs.forEach((fn) => fn(state, a));
 
@@ -357,9 +386,28 @@ export function createStore(initial, sync, onRemote, canPersist) {
     get: () => state,
     subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
     dispatch(a) {
+      const back = invert(state, a);              // считаем ДО правки: потом прежнего уже нет
       state = reduce({ ...state }, a);
+      if (back) {
+        past.push(back);
+        if (past.length > MAX_BACK) past.shift();
+      }
       notify(a); persist();
       sync.send(a);
+    },
+    /** Что вернёт следующий Ctrl+Z — словом, для подсказки на кнопке. */
+    lastUndo: () => (past.length ? past[past.length - 1].label : null),
+    /** Шаг назад: обратные действия идут в базу как обычные, их видят все. */
+    undo() {
+      const step = past.pop();
+      if (!step) return null;
+      [].concat(step.back).forEach((b) => {
+        state = reduce({ ...state }, b);
+        notify(b);
+        sync.send(b);
+      });
+      persist();
+      return step.label;
     },
     /** Применить без рассылки (загрузка снимка). */
     hydrate(next) { state = next; notify(null); },

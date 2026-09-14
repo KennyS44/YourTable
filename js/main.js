@@ -373,6 +373,7 @@ async function storeFiles(files, maxSide) {
  * иначе страница начинает лагать. Такие действия обновляют только поле.
  */
 function renderAll(s, action) {
+  updateUndo();
   if (action && BOARD_ONLY.has(action.t) && !touchesPanels(action)) {
     app.board.render();
     return;
@@ -612,6 +613,38 @@ function updateShowcase(s) {
   if (showcaseHiddenFor === id) { box.hidden = true; chip.hidden = false; return; }
   chip.hidden = true;
   assetUrl(id).then((u) => { if (u) { img.src = u; box.hidden = false; } });
+}
+
+/* ─────────────────────── Шаг назад ─────────────────────── */
+
+let toastTimer = null;
+/** Короткое слово о случившемся: всплыло над полем и само растаяло. */
+function toast(text) {
+  const box = $('#toast');
+  if (!box) return;
+  clearTimeout(toastTimer);
+  box.textContent = text;
+  box.hidden = false;
+  box.classList.remove('is-going');
+  toastTimer = setTimeout(() => {
+    box.classList.add('is-going');
+    toastTimer = setTimeout(() => { box.hidden = true; }, 350);
+  }, 1800);
+}
+
+/** Отмена своего последнего действия: обратное уходит всем за столом. */
+function doUndo() {
+  const label = app.store.undo();
+  toast(label ? `Отменено: ${label}` : 'Отменять нечего');
+  updateUndo();
+}
+
+function updateUndo() {
+  const b = $('#btn-undo');
+  if (!b) return;
+  const label = app.store.lastUndo();
+  b.disabled = !label;
+  b.title = label ? `Отменить: ${label} (Ctrl+Z)` : 'Отменять нечего';
 }
 
 /* ─────────────────── Вдохновение и уровень ─────────────────── */
@@ -1303,6 +1336,18 @@ function wireUI() {
   $('#draw-clear').addEventListener('click', () => {
     const s = app.store.get();
     if (s.activeLoc) app.store.dispatch({ t: 'draw.clear', locId: s.activeLoc, by: app.isDM ? null : app.me.id });
+  });
+
+  // шаг назад
+  $('#btn-undo').addEventListener('click', doUndo);
+  window.addEventListener('keydown', (e) => {
+    // код клавиши — на случай русской раскладки: там на этом месте «я»
+    if (!(e.ctrlKey || e.metaKey) || (e.key.toLowerCase() !== 'z' && e.code !== 'KeyZ')) return;
+    const t = document.activeElement;
+    // в поле ввода Ctrl+Z — дело самого поля, туда не лезем
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+    doUndo();
   });
 
   // зум
