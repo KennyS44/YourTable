@@ -16,6 +16,7 @@ export const ABILITIES = [
 
 const HEAD = [
   { id: 'cls', label: 'Класс' },
+  { id: 'level', label: 'Уровень', num: true },
   { id: 'race', label: 'Раса' },
   { id: 'alignment', label: 'Мировоззрение' },
   { id: 'player', label: 'Имя игрока' },
@@ -40,7 +41,7 @@ const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now()
 
 export function emptySheet() {
   const s = {
-    cls: '', race: '', alignment: '', player: '',
+    cls: '', level: 1, race: '', alignment: '', player: '',
     ac: 10, speed: 30, vision: 30,
     hpMax: 10, hpCur: 10, hitDice: '',
     attacks: [{ name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }],
@@ -153,7 +154,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   else nameInput.addEventListener('input', () => { ch.name = nameInput.value; onEdit('name', ch.name); });
   nameWrap.append(el('span', 'fld-l', 'Имя персонажа'), nameInput);
   const headGrid = el('div', 'head-grid');
-  HEAD.forEach((h) => headGrid.append(textField(h.label, h.id)));
+  HEAD.forEach((h) => headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id)));
   head.append(nameWrap, headGrid);
   root.append(head);
   if (ctx.charKey) root.append(keyBox(ctx.charKey, ro));
