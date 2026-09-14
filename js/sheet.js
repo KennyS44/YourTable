@@ -170,12 +170,14 @@ function clsWidget(s, onEdit, ro, level) {
   const tools = el('div', 'cls-tools');
   const flipBtn = el('button', 'icon-btn cls-tool', '⟲');
   flipBtn.type = 'button';
-  flipBtn.title = 'Показать другую сторону';
+  const addBtn = el('button', 'icon-btn cls-tool', '+');
+  addBtn.type = 'button';
+  addBtn.title = 'Добавить второй класс';
   const editBtn = el('button', 'icon-btn cls-tool', '✎');
   editBtn.type = 'button';
   editBtn.title = 'Выбрать класс';
   tools.append(flipBtn);
-  if (!ro) tools.append(editBtn);
+  if (!ro) tools.append(addBtn, editBtn);
 
   const coin = el('div', 'cls-coin');
   const inner = el('div', 'cls-coin-inner');
@@ -203,7 +205,13 @@ function clsWidget(s, onEdit, ro, level) {
     faceA.innerHTML = crestMarkup(ids[0]);
     faceB.innerHTML = crestMarkup(ids[1]);
     inner.classList.toggle('is-flipped', side === 1);
-    flipBtn.hidden = ro && !ids[1];
+    // переворачивать нечего, пока второго класса нет: у Мастера кнопки просто
+    // не будет, у игрока она погашена — рядом с ней «+», который её и оживит
+    const multi = !!ids[1];
+    flipBtn.hidden = ro && !multi;
+    flipBtn.disabled = !multi;
+    flipBtn.title = multi ? 'Показать другую сторону' : 'Второго класса нет';
+    addBtn.hidden = multi;
     const shown = ids[side];
     const known = shown && classById(shown);
     caption.textContent = known ? `${known.label}, ур. ${level || 1}`
@@ -212,14 +220,11 @@ function clsWidget(s, onEdit, ro, level) {
   }
 
   flipBtn.addEventListener('click', () => {
-    const ids = Array.isArray(s.cls) ? s.cls : [];
-    if (!ids[1]) {
-      if (ro) return;
-      openClassPicker(null, (id) => { setSlot(1, id); side = 1; repaint(); });
-      return;
-    }
     side = side ? 0 : 1;
     repaint();
+  });
+  addBtn.addEventListener('click', () => {
+    openClassPicker(null, (id) => { setSlot(1, id); side = 1; repaint(); });
   });
   editBtn.addEventListener('click', () => {
     const ids = Array.isArray(s.cls) ? s.cls : [];
