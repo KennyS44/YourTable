@@ -96,8 +96,11 @@
   margin-top:var(--s4); background:var(--panel); border:1px solid var(--line);
   border-radius:var(--r); padding:var(--s4);
 }
-.sheet-head{display:grid; grid-template-columns:minmax(220px,1fr) 2fr; gap:var(--s3); align-items:end}
-.head-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2)}
+/* Слева герб во всю высоту шапки, справа имя и поля в две строки */
+.sheet-head{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); align-items:start}
+.head-main{display:flex; flex-direction:column; gap:var(--s2); min-width:0}
+/* Уровень — узкое окошко, поэтому его колонка по содержимому, а не в равную долю */
+.head-grid{display:grid; grid-template-columns:auto repeat(3,1fr); gap:var(--s2); align-items:start}
 /* Карточки текут в три колонки и сами выравниваются по высоте */
 .sheet-flow{column-count:3; column-gap:var(--s3); margin-top:var(--s4)}
 .sheet-flow .blk{break-inside:avoid; margin-bottom:var(--s3)}
@@ -332,7 +335,8 @@
   .cab-main{order:-1}          /* на телефоне сперва персонажи, профиль ниже */
   .sheet-flow{column-count:1}
   .sheet-bottom{grid-template-columns:1fr}
-  .sheet-head{grid-template-columns:1fr}
+  .sheet-head{grid-template-columns:1fr; justify-items:center}
+  .head-main{width:100%}
   .head-grid{grid-template-columns:repeat(2,1fr)}
   .char-card{flex-basis:212px}
   .row-4{grid-template-columns:repeat(2,1fr)}

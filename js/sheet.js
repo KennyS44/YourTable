@@ -165,7 +165,8 @@ function openClassPicker(currentId, onPick) {
 function clsWidget(s, onEdit, ro, level) {
   ensureCrestDefs();
   const wrap = el('div', 'fld fld-cls');
-  wrap.append(el('span', 'fld-l', 'Класс'));
+  const title = el('span', 'fld-l', 'Класс');
+  wrap.append(title);
 
   const tools = el('div', 'cls-tools');
   const flipBtn = el('button', 'icon-btn cls-tool', '⟲');
@@ -208,6 +209,7 @@ function clsWidget(s, onEdit, ro, level) {
     // переворачивать нечего, пока второго класса нет: у Мастера кнопки просто
     // не будет, у игрока она погашена — рядом с ней «+», который её и оживит
     const multi = !!ids[1];
+    title.textContent = multi ? 'Мультикласс' : 'Класс';
     flipBtn.hidden = ro && !multi;
     flipBtn.disabled = !multi;
     flipBtn.title = multi ? 'Показать другую сторону' : 'Второго класса нет';
@@ -318,12 +320,15 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   nameWrap.append(el('span', 'fld-l', 'Имя персонажа'), nameInput);
   const lvlValue = ctx.level ?? s.level;
   const headGrid = el('div', 'head-grid');
-  headGrid.append(clsWidget(s, onEdit, ro, lvlValue));
   HEAD.forEach((h) => {
     if (h.lvl) headGrid.append(lvlBox(lvlValue));
     else headGrid.append(h.num ? numField(h.label, h.id) : textField(h.label, h.id));
   });
-  head.append(nameWrap, headGrid);
+  // Герб высокий, поля низкие: держим их в своей колонке, иначе под каждым
+  // полем остаётся провал в половину монеты.
+  const headMain = el('div', 'head-main');
+  headMain.append(nameWrap, headGrid);
+  head.append(clsWidget(s, onEdit, ro, lvlValue), headMain);
   root.append(head);
   if (ctx.charKey) root.append(keyBox(ctx.charKey, ro));
 
