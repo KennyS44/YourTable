@@ -94,6 +94,24 @@ export function fixMove(f) {
   return m;
 }
 
+/**
+ * Поле растёт под текст: описание способности бывает в десять строк, и внутри
+ * него прокрутка не нужна — она обрезала фразу на полуслове.
+ * Меряем после отрисовки: до неё scrollHeight ещё ничего не знает.
+ */
+function growWithText(ta) {
+  const fit = () => {
+    ta.style.height = 'auto';
+    // высота считается по рамке, а scrollHeight её не включает: без этой добавки
+    // поле остаётся на два пикселя ниже нужного и всё равно прокручивается
+    const рамка = ta.offsetHeight - ta.clientHeight;
+    ta.style.height = (ta.scrollHeight + рамка) + 'px';
+  };
+  ta.addEventListener('input', fit);
+  requestAnimationFrame(fit);
+  return ta;
+}
+
 /** Разбираем старое поле «Урон и вид»: «1d8+3 рубящий» — кости, прибавка и вид. */
 function parseDmg(txt) {
   const t = String(txt || '');
@@ -787,7 +805,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
           tab.querySelector('.feat-name').textContent = f.name || 'Без названия';
           moves.draw();                      // запись одна — переименовалась и в атаках
         });
-        const ta = el('textarea');
+        const ta = growWithText(el('textarea'));
         ta.rows = 5;
         ta.value = f.text;
         ta.placeholder = 'Что делает способность';
@@ -824,11 +842,10 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   }
   drawFeats();
 
+  // Потолка по высоте у блока нет: он резал раскрытое описание, а прыжков
+  // соседей всё равно не бывает — столбцы листа живут каждый сам по себе.
   const featsBlk = ro ? block('Умения и способности', feats)
     : block('Умения и способности', feats, addFeat);
-  // Способности раскрываются внутри своего окна: у карточки свой потолок и
-  // своя прокрутка, поэтому длинное описание не толкает вниз соседние блоки.
-  featsBlk.classList.add('blk-scroll');
 
   // Несколько коротких полей одной карточкой, в две колонки: порознь каждое
   // просило себе целую карточку и растягивало лист.
@@ -977,7 +994,7 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
       card.append(tab);
       if (open === f.id) {
         const body = el('div', 'feat-body');
-        const ta = el('textarea');
+        const ta = growWithText(el('textarea'));
         ta.rows = 4;
         ta.value = f.text || '';
         ta.placeholder = 'Что делает способность';

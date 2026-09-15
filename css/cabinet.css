@@ -107,8 +107,8 @@
 .sheet-flow{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s3); margin-top:var(--s4); align-items:start}
 .sheet-col{display:flex; flex-direction:column; gap:var(--s3); min-width:0}
 .sheet-col .blk{margin:0}
-/* Способности живут в своём окне: длинный список прокручивается внутри */
-.blk-scroll .feats{max-height:340px; overflow-y:auto; padding-right:var(--s1)}
+/* Описание способности растёт во всю высоту: потолок в 340px обрезал текст */
+.feat-body textarea{min-height:120px}
 .sheet-bottom{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); margin-top:var(--s3)}
 
 .blk{border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s3)}
