@@ -108,7 +108,7 @@
 .sheet-col{display:flex; flex-direction:column; gap:var(--s3); min-width:0}
 .sheet-col .blk{margin:0}
 /* Способности живут в своём окне: длинный список прокручивается внутри */
-.blk-scroll .feats,.blk-scroll .moves{max-height:340px; overflow-y:auto; padding-right:var(--s1)}
+.blk-scroll .feats{max-height:340px; overflow-y:auto; padding-right:var(--s1)}
 .sheet-bottom{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); margin-top:var(--s3)}
 
 .blk{border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s3)}
@@ -232,6 +232,15 @@
   padding:var(--s2); border:0; background:transparent; color:var(--text); cursor:pointer; text-align:left;
 }
 .feat-tab:hover{background:var(--panel-2)}
+/* крестик стоит в самой строке, чтобы убрать запись, не раскрывая её */
+.feat-head{display:flex; align-items:center}
+.feat-head .feat-tab{flex:1 1 auto; min-width:0}
+/* правило .row-del стоит ниже, поэтому рамку снимаем через .feat-head */
+.feat-head .feat-del{
+  flex:0 0 auto; margin-right:var(--s2); border-color:transparent; background:transparent;
+  font-size:20px; line-height:1;
+}
+.feat-head .feat-del:hover{border-color:var(--danger)}
 .feat-pic{
   width:40px; height:40px; flex-shrink:0; border-radius:var(--r-sm);
   background:var(--bg-2) center/cover no-repeat; border:1px solid var(--line-soft);

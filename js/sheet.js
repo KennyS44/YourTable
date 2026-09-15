@@ -430,6 +430,22 @@ function keyBox(key, ro) {
 const BONUS_FROM = [['none', 'Нет'], ...ABILITIES.map((a) => [a.id, a.label]), ['custom', 'Свой']];
 
 /**
+ * Крестик в свёрнутой строке: убрать запись, не раскрывая её.
+ * Запись одна на оба списка, поэтому и предупреждение общее.
+ */
+function rowDel(name, onYes) {
+  const x = el('button', 'row-del feat-del', '×');
+  x.type = 'button';
+  x.title = 'Убрать из листа';
+  x.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!confirm(`Убрать «${name || 'без названия'}» из листа?`)) return;
+    onYes();
+  });
+  return x;
+}
+
+/**
  * Список приёмов: свёрнутый — иконка и название, развёрнутый — все числа.
  * Одна и та же разметка идёт и в кабинет, и в панель за столом; правится и там,
  * и там, потому что посреди боя дописать урон бывает нужнее, чем до игры.
@@ -568,12 +584,19 @@ function moveList(s, onEdit, ctx = {}) {
       tab.type = 'button';
       const pic = el('span', 'feat-pic');
       if (m.img) pic.style.backgroundImage = `url("${m.img}")`;
-      // «†» вместо меча: скрещённые мечи браузер рисует цветным эмодзи, и в
-      // сорока пикселях они читаются как ножницы
-      else pic.textContent = m.kind === 'weapon' ? '†' : '✦';
+      else pic.textContent = m.kind === 'weapon' ? '⚔' : '✦';
       tab.append(pic, el('span', 'feat-name', m.name || 'Без названия'));
       tab.addEventListener('click', () => { open = open === m.id ? null : m.id; draw(); });
-      card.append(tab);
+      const head = el('div', 'feat-head');
+      head.append(tab);
+      if (!ro) {
+        head.append(rowDel(m.name, () => {
+          s.feats = s.feats.filter((x) => x.id !== m.id);
+          if (open === m.id) open = null;
+          save(true); draw();
+        }));
+      }
+      card.append(head);
       if (open === m.id) card.append(body(m));
       host.append(card);
     });
@@ -705,9 +728,10 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
 
   const defenseBlk = block('Защита и ход', defense);
   const hpBlk = block('Хиты', hp);
+  // без потолка по высоте: раскрытый приём длинный, и в окошке на 340px его
+  // нижние поля было не достать
   const atkBlk = ro ? block('Атаки и заклинания', moves.host)
     : block('Атаки и заклинания', moves.host, moves.addBtn);
-  atkBlk.classList.add('blk-scroll');
 
   const feats = el('div', 'feats');
   const addFeat = el('button', 'btn btn-soft btn-sm w-full', '+ Способность');
@@ -735,7 +759,18 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
       else pic.textContent = '✦';
       tab.append(pic, el('span', 'feat-name', f.name || 'Без названия'));
       tab.addEventListener('click', () => { openFeat = openFeat === f.id ? null : f.id; drawFeats(); });
-      card.append(tab);
+      const head = el('div', 'feat-head');
+      head.append(tab);
+      if (!ro) {
+        head.append(rowDel(f.name, () => {
+          s.feats = s.feats.filter((x) => x.id !== f.id);
+          if (openFeat === f.id) openFeat = null;
+          onEdit('feats', s.feats);
+          drawFeats();
+          moves.draw();
+        }));
+      }
+      card.append(head);
 
       if (openFeat === f.id && ro) {
         const body = el('div', 'feat-body');
@@ -923,9 +958,7 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
 
   /* ── атаки и заклинания: тот же список, что в кабинете, правится в бою ── */
   const moves = moveList(s, onEdit, { onChange: () => drawFeats() });
-  const movesBlk = block('Атаки и заклинания', moves.host, moves.addBtn);
-  movesBlk.classList.add('blk-scroll');
-  root.append(movesBlk);
+  root.append(block('Атаки и заклинания', moves.host, moves.addBtn));
 
   /* ── способности: вкладка разворачивается в описание ── */
   const feats = el('div', 'feats');
