@@ -11,6 +11,8 @@ are cached locally in IndexedDB.
 
 Live: **[kennys44.github.io/YourTable](https://kennys44.github.io/YourTable/)**
 
+Recent changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
 ## What's inside
 
 - **Rooms with keys.** The Master creates a room with a player key and a
