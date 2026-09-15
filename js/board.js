@@ -32,6 +32,7 @@ export function createBoard(opts) {
   let hoverId = null;
   let touched = false;      // камеру уже двигали руками — не вписываем автоматически
   let lastLocId = null;
+  let aiming = null;        // наводка приёма: {kind, feet, from, at, onPick, onCancel}
 
   const fogLayer = document.createElement('canvas');
 
@@ -127,6 +128,7 @@ export function createBoard(opts) {
     drawWalls();
     drawLights();
     if (ruler) drawRuler();
+    if (aiming) drawAim();
     if (drag && drag.type === 'fog') drawBrushCursor();
     if (isErasing() && hoverAt) {
       const r = (tool === 'wall' ? 16 : eraseSize * view.scale);
@@ -349,6 +351,71 @@ export function createBoard(opts) {
     const ft = Math.round((rPx / view.scale) * feetPerPx());
     const r = canvas.getBoundingClientRect();
     chip(ft + ' фт', Math.max(40, Math.min(r.width - 40, x)), Math.max(20, Math.min(r.height - 20, y)));
+  }
+
+  /* ── Наводка приёма ────────────────────────────────────────────────
+     Игрок выбрал способность и теперь показывает на поле, куда она идёт:
+     в цель, кругом от точки или конусом от себя. Пока наводка жива, поле
+     ничего больше не делает — ни фигурки не таскает, ни линейку не тянет. */
+
+  // Конус в правилах — равнобедренный треугольник: у дальнего края он такой же
+  // ширины, как длинный. Значит половина угла — арктангенс половины.
+  const CONE_HALF = Math.atan(0.5);
+  const feetToWorld = (ft) => { const g = gridOf(); return (ft / g.feet) * g.size; };
+
+  /** Кого накрыло: для цели — фигурка под курсором, дальше — геометрия. */
+  function aimTargets() {
+    if (!aiming || !aiming.at) return [];
+    const { kind, at } = aiming;
+    if (kind === 'one') { const t = tokenAt(at.x, at.y); return t ? [t] : []; }
+    const r = feetToWorld(aiming.feet);
+    if (r <= 0) return [];
+    if (kind === 'area') return toksHere().filter((t) => Math.hypot(t.x - at.x, t.y - at.y) <= r);
+    const from = aiming.from;
+    const dir = Math.atan2(at.y - from.y, at.x - from.x);
+    return toksHere().filter((t) => {
+      const dx = t.x - from.x, dy = t.y - from.y;
+      const len = Math.hypot(dx, dy);
+      if (len > r || len < 1e-6) return false;          // сам заклинатель в конус не попадает
+      let d = Math.atan2(dy, dx) - dir;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      return Math.abs(d) <= CONE_HALF;
+    });
+  }
+
+  function drawAim() {
+    if (!aiming || !aiming.at) return;
+    const hit = new Set(aimTargets().map((t) => t.id));
+    ctx.save();
+    ctx.strokeStyle = '#c9a45a';
+    ctx.fillStyle = 'rgba(201,164,90,.16)';
+    ctx.lineWidth = 2;
+    if (aiming.kind === 'area') {
+      const c = w2s(aiming.at.x, aiming.at.y);
+      const r = feetToWorld(aiming.feet) * view.scale;
+      ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      labelFeet(r, c.x, c.y - r - 16);
+    } else if (aiming.kind === 'cone') {
+      const a = w2s(aiming.from.x, aiming.from.y);
+      const r = feetToWorld(aiming.feet) * view.scale;
+      const dir = Math.atan2(aiming.at.y - aiming.from.y, aiming.at.x - aiming.from.x);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.arc(a.x, a.y, r, dir - CONE_HALF, dir + CONE_HALF);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      labelFeet(r, a.x + Math.cos(dir) * (r + 20), a.y + Math.sin(dir) * (r + 20));
+    }
+    // накрытых обводим, чтобы было видно, по кому пойдёт бросок
+    toksHere().forEach((t) => {
+      if (!hit.has(t.id)) return;
+      const p = w2s(t.x, t.y);
+      const g = gridOf();
+      const rr = (t.cells || 1) * g.size * view.scale * .52;
+      ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+      ctx.lineWidth = 3; ctx.strokeStyle = '#e3c98f'; ctx.stroke();
+    });
+    ctx.restore();
   }
 
   /** Настоящее расстояние по прямой: диагональ длиннее стороны клетки. */
@@ -837,6 +904,17 @@ export function createBoard(opts) {
     const w = s2w(p.x, p.y);
     const mid = e.button === 1 || e.shiftKey;
 
+    // наводка перебивает все инструменты: правая кнопка отменяет, левая бьёт
+    if (aiming) {
+      const done = aiming;
+      if (e.button === 2) { aiming = null; render(); done.onCancel && done.onCancel(); return; }
+      aiming.at = w;
+      const targets = aimTargets();
+      aiming = null; render();
+      done.onPick({ targets, at: w, from: done.from });
+      return;
+    }
+
     // режим «только фигурки»: карта на месте, тянуть можно лишь существ
     if ((tool === 'select' || tool === 'token') && !mid) {
       const t = tokenAt(w.x, w.y);
@@ -952,6 +1030,8 @@ export function createBoard(opts) {
 
     const p = evPos(e);
     const w = s2w(p.x, p.y);
+
+    if (aiming) { aiming.at = w; render(); return; }
 
     if (!drag) {
       if (isErasing()) { hoverAt = p; render(); return; }
@@ -1188,6 +1268,7 @@ export function createBoard(opts) {
     view: () => view,
     ruler: () => ruler && rulerReadout(),
     setTool(t) {
+      if (aiming) { aiming = null; }      // взялся за инструмент — наводка снята
       tool = t; ruler = null;
       canvas.className = t === 'select' ? '' : 'is-' + t;
       render();
@@ -1210,6 +1291,28 @@ export function createBoard(opts) {
       render();
       return true;
     },
+    /**
+     * Навести приём. kind: 'one' — в фигурку, 'area' — круг вокруг точки,
+     * 'cone' — сектор от своей фигурки в сторону курсора. feet — из способности.
+     * onPick({targets, at, from}) зовём по щелчку, onCancel — по отмене.
+     */
+    startAim(spec) {
+      if (aiming) api.cancelAim();
+      aiming = { at: null, ...spec };
+      canvas.className = 'is-aim';
+      render();
+    },
+    cancelAim() {
+      if (!aiming) return;
+      const was = aiming;
+      aiming = null;
+      canvas.className = tool === 'select' ? '' : 'is-' + tool;
+      render();
+      was.onCancel && was.onCancel();
+    },
+    aimingNow: () => !!aiming,
+    /** Для проверок: кого сейчас накрывает наводка. */
+    aimTargetIds: () => aimTargets().map((t) => t.id),
     /** Для проверок: куда достаёт обзор существа и рисуются ли стены. */
     visionPoints(t) {
       const g = gridOf();

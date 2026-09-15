@@ -628,6 +628,14 @@ function moveList(s, onEdit, ctx = {}) {
       tab.addEventListener('click', () => { open = open === m.id ? null : m.id; draw(); });
       const head = el('div', 'feat-head');
       head.append(tab);
+      // «Применить» стоит в свёрнутой строке: посреди боя разворачивать некогда
+      if (ctx.onUse) {
+        const use = el('button', 'move-use', 'Применить');
+        use.type = 'button';
+        use.title = 'Навести приём на поле';
+        use.addEventListener('click', () => ctx.onUse(m));
+        head.append(use);
+      }
       if (!ro) {
         head.append(rowDel(m.name, () => {
           s.feats = s.feats.filter((x) => x.id !== m.id);
@@ -995,7 +1003,7 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   root.append(block('Защита и хиты', vitals));
 
   /* ── атаки и заклинания: тот же список, что в кабинете, правится в бою ── */
-  const moves = moveList(s, onEdit, { onChange: () => drawFeats() });
+  const moves = moveList(s, onEdit, { onChange: () => drawFeats(), onUse: ctx.onUse });
   root.append(block('Атаки и заклинания', moves.host, moves.addBtn));
 
   /* ── способности: вкладка разворачивается в описание ── */

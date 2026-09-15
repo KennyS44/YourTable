@@ -7,7 +7,7 @@ import { createBoard } from './board.js';
 import { DICE, roll } from './dice.js';
 import { showRoll } from './dice3d.js';
 import { packRoom } from './roomcode.js';
-import { fixSheet, renderSheetLite } from './sheet.js';
+import { fixSheet, renderSheetLite, ABILITIES, mod as sheetMod } from './sheet.js';
 import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
 import { fileName } from './translit.js';
@@ -338,8 +338,19 @@ function canPersist() {
 
 /** Чужой бросок прилетает тем же каналом, что и всё остальное, — анимацию видят все. */
 function onRemoteAction(a) {
-  if (a.t !== 'chat.add' || a.msg.kind !== 'roll' || a.msg.secret) return;
-  showRoll($('#dice-stage'), a.msg.roll, rollCaption(a.msg.name, a.msg.roll, false));
+  if (a.t !== 'chat.add' || a.msg.secret) return;
+  if (a.msg.kind === 'roll') {
+    showRoll($('#dice-stage'), a.msg.roll, rollCaption(a.msg.name, a.msg.roll, false));
+    return;
+  }
+  // применённый приём: показываем тот же бросок, что видел его хозяин
+  if (a.msg.kind === 'use') {
+    const u = a.msg.use;
+    const r = u.attack
+      ? { sides: 20, mod: 0, dice: u.attack.dice, total: u.attack.total, formula: u.attack.formula }
+      : (u.dmg && { sides: u.dmg.parts[0].d, mod: 0, dice: u.dmg.parts.flatMap((p) => p.dice), total: u.dmg.total, formula: '' });
+    if (r) showRoll($('#dice-stage'), r, `${a.msg.name}: ${u.name}`);
+  }
 }
 
 /* ───────────────────────── Работа с картинками ───────────────────────── */
@@ -496,7 +507,7 @@ function renderChat(s) {
   s.chat.forEach((m) => {
     if (m.secret && !app.isDM) return;
     const node = msgNode(m);
-    (m.kind === 'roll' ? rolls : feed).append(node);
+    (m.kind === 'roll' || m.kind === 'use' ? rolls : feed).append(node);
   });
   feed.scrollTop = feed.scrollHeight;
   rolls.scrollTop = rolls.scrollHeight;
@@ -509,12 +520,43 @@ function msgNode(m) {
     d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span>
       <div class="body">${m.secret ? '🤫 ' : ''}${m.roll.label ? `<span class="roll-what">${esc(m.roll.label)}</span> ` : ''}${esc(m.roll.formula)} → <span class="total">${m.roll.total}</span>
       <span style="color:var(--muted);font-size:14px"> [${m.roll.dice.join(', ')}]${m.roll.mod ? ` ${m.roll.mod > 0 ? '+' : ''}${m.roll.mod}` : ''}</span></div>`;
+  } else if (m.kind === 'use') {
+    d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span>`
+      + `<div class="body">${useBody(m.use)}</div>`;
   } else if (m.kind === 'system') {
     d.innerHTML = `<div class="body">${esc(m.text)}</div>`;
   } else {
     d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span><div class="body">${esc(m.text)}</div>`;
   }
   return d;
+}
+
+/**
+ * Применённый приём в ленте. КД цели — число Мастера: столу показываем только
+ * «пробил броню» или «не пробил», а само КД видит лишь Мастер.
+ */
+function useBody(u) {
+  if (!u) return '';
+  const строки = [`<b class="roll-what">${esc(u.name)}</b> → ${esc(u.targets.join(', '))}`];
+  if (u.attack) {
+    const a = u.attack;
+    строки.push(`атака ${esc(a.formula)} → <span class="total">${a.total}</span>`
+      + `<span class="use-dim"> [${a.dice.join(', ')}]</span>`
+      + (app.isDM ? `<span class="use-dim"> против КД ${a.vs}</span>` : ''));
+    строки.push(a.hit ? '<span class="use-hit">пробил броню</span>' : '<span class="use-miss">не пробил</span>');
+  }
+  if (u.save) {
+    строки.push(`спасбросок ${esc(u.save.abil)}${app.isDM ? `, сложность ${u.save.dc}` : ''}`
+      + `<span class="use-dim"> при успехе ${u.save.onSave === 'half' ? 'половина' : 'ничего'}</span>`);
+  }
+  if (u.dmg) {
+    const куски = u.dmg.parts
+      .map((p) => `${p.n}д${p.d}${p.type ? ' ' + esc(p.type) : ''}<span class="use-dim"> [${p.dice.join(', ')}]</span>`)
+      .join(' + ');
+    строки.push(`${куски} → <span class="total">${u.dmg.total}</span>`);
+  }
+  if (u.conc) строки.push('<span class="use-dim">требует концентрации</span>');
+  return строки.map((s) => `<div class="use-line">${s}</div>`).join('');
 }
 
 /** Показать фигурку: если она в другой локации, сначала переходим туда. */
@@ -1305,6 +1347,83 @@ function doRoll(sides) {
    Меню выбора здесь стояло ради преимущества и помехи. Их убрали — выбирать
    стало нечего, и нажатие сразу кидает. */
 
+/* ── Применение приёма ──────────────────────────────────────────────
+   Игрок выбирает способность, потом наводит её на поле: в фигурку, кругом
+   от точки или конусом от себя. Дальше считаем сами — кроме спасбросков,
+   их катает Мастер. Числа Мастера столу не показываем. */
+
+const AIM_HINT = {
+  one: 'Укажите цель. Правая кнопка — отмена.',
+  area: 'Укажите центр области. Правая кнопка — отмена.',
+  cone: 'Укажите направление конуса. Правая кнопка — отмена.',
+};
+
+/** Бонус приёма: от характеристики листа, свой или никакой. */
+function moveBonus(m, ch) {
+  const b = m.bonus || {};
+  if (b.from === 'custom') return Number(b.value) || 0;
+  if (b.from && b.from !== 'none' && ch) return sheetMod(ch.sheet[b.from]);
+  return 0;
+}
+
+/** Кости приёма: два куска, у каждого свой вид урона. */
+function rollMoveDice(m) {
+  const parts = (m.dice || []).filter((d) => d.n > 0).map((d) => {
+    const r = roll(d.d, d.n);
+    return { n: d.n, d: d.d, type: d.type, dice: r.dice, sum: r.total };
+  });
+  if (!parts.length) return null;
+  return { parts, total: parts.reduce((a, p) => a + p.sum, 0) };
+}
+
+function useMove(m, ch) {
+  const s = app.store.get();
+  const mine = Object.values(s.tokens)
+    .find((t) => t.locId === s.activeLoc && nameKey(t.ownerName) === nameKey(app.me.name));
+  if (m.aim === 'cone' && !mine) return toast('Конус пускают от своей фигурки, а её нет на поле');
+  if (m.aim !== 'one' && !(m.size > 0)) return toast('У приёма не задан размер в футах');
+  toast(AIM_HINT[m.aim] || AIM_HINT.one);
+  app.board.startAim({
+    kind: m.aim,
+    feet: m.size,
+    from: mine ? { x: mine.x, y: mine.y } : { x: 0, y: 0 },
+    onPick: ({ targets }) => resolveMove(m, ch, targets),
+  });
+}
+
+function resolveMove(m, ch, targets) {
+  if (!targets.length) return toast('Никого не задело');
+  const use = {
+    name: m.name || 'Приём',
+    conc: !!m.conc,
+    targets: targets.map((t) => tokenName(t)),
+  };
+  let headline = null;
+
+  if (m.guard === 'ac') {
+    const t = targets[0];
+    const r = roll(20, 1, moveBonus(m, ch));
+    // равно КД — это попадание
+    const hit = r.total >= (Number(t.ac) || 10);
+    use.attack = { formula: r.formula, dice: r.dice, total: r.total, vs: Number(t.ac) || 10, hit, target: tokenName(t) };
+    use.targets = [tokenName(t)];
+    if (hit) use.dmg = rollMoveDice(m);
+    headline = r;
+  } else if (m.guard === 'save') {
+    use.save = { abil: abilLabel(m.guardAbil), dc: m.dc, onSave: m.onSave };
+    use.pending = true;                       // спасброски за целями катает Мастер
+  } else {
+    use.dmg = rollMoveDice(m);
+    headline = use.dmg && { sides: use.dmg.parts[0].d, mod: 0, dice: use.dmg.parts.flatMap((p) => p.dice), total: use.dmg.total, formula: dmgFormula(use.dmg) };
+  }
+
+  say('', 'use', { use });
+  if (headline) showRoll($('#dice-stage'), headline, `${app.me.name}: ${use.name}`);
+}
+
+const abilLabel = (id) => (ABILITIES.find((a) => a.id === id) || { label: '—' }).label;
+const dmgFormula = (d) => d.parts.map((p) => `${p.n}д${p.d}${p.type ? ' ' + p.type : ''}`).join(' + ');
+
 function rollAbility(label, mod) {
   const r = roll(20, 1, mod);
   r.label = label;
@@ -1523,6 +1642,7 @@ async function wireHeroSheet() {
   renderSheetLite($('#lite-sheet'), ch, save, {
     level: levelOf(app.store.get(), myKey),
     onRoll: rollAbility,
+    onUse: (m) => useMove(m, ch),
   });
   showLevel(app.store.get());
   app.store.subscribe(showLevel);

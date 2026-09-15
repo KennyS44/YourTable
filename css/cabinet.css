@@ -312,6 +312,13 @@
 .num-sm{width:56px; text-align:center}
 /* галочка идёт последней строкой приёма, отбивка сверху отделяет её от полей */
 .move-conc{margin-top:var(--s1); color:var(--text)}
+/* «Применить» видно, не разворачивая приём: в бою важна каждая лишняя нажатие */
+.move-use{
+  flex:0 0 auto; align-self:center; min-height:36px; margin-right:var(--s1); padding:0 var(--s2);
+  border:1px solid var(--gold-dim); border-radius:var(--r-sm); background:var(--bg-2);
+  color:var(--gold); font-size:14px; cursor:pointer; white-space:nowrap;
+}
+.move-use:hover{background:var(--panel-2); border-color:var(--gold)}
 .num-sm[hidden]{display:none}
 .sel-sm:focus,.num-sm:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
 

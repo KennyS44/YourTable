@@ -147,8 +147,12 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 @keyframes toast-in{from{opacity:0; transform:translate(-50%,10px)} to{opacity:1; transform:translate(-50%,0)}}
 @keyframes toast-out{from{opacity:1} to{opacity:0; transform:translate(-50%,-6px)}}
 
-/* название характеристики перед формулой в ленте бросков */
+/* название характеристики или приёма перед формулой в ленте бросков */
 .roll-what{color:var(--gold)}
+.use-line{margin-top:2px; line-height:1.5}
+.use-dim{color:var(--muted); font-size:14px}
+.use-hit{color:#9ccf7a}
+.use-miss{color:var(--muted)}
 
 .stage{flex:1; display:flex; min-height:0}
 .panel{
@@ -168,7 +172,7 @@ em{color:var(--muted); font-style:normal; font-size:14px}
   overflow:hidden; touch-action:none}
 #board{display:block; width:100%; height:100%; cursor:grab}
 #board.is-drag{cursor:grabbing}
-#board.is-ruler,#board.is-draw,#board.is-fog{cursor:crosshair}
+#board.is-ruler,#board.is-draw,#board.is-fog,#board.is-aim{cursor:crosshair}
 #board.is-edit{cursor:move}
 #board.is-token{cursor:pointer}
 #board.on-door{cursor:pointer}
