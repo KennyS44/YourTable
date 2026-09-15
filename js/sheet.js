@@ -138,14 +138,18 @@ function crestMarkup(id) {
 
 // Толщина монеты: ребро набирается из тонких кружков, поставленных друг за
 // другом по оси Z. Одним слоем не обойтись — между двумя лицами была бы щель.
-const COIN_DEPTH = 10;
-function edgeMarkup(steps = 10) {
+//
+// Каждый кружок браузер растрирует сам по себе, и по краю их ступеньки не
+// совпадают — контур выходит пилой. Поэтому ребро чуть уже лица и слегка
+// размыто: круглый край рисует гладкий SVG, а ребру остаётся только объём.
+const COIN_DEPTH = 9;
+function edgeMarkup(steps = 14) {
   let out = '';
   for (let i = 0; i <= steps; i++) {
     const z = COIN_DEPTH / 2 - (COIN_DEPTH / steps) * i;
     const k = 1 - Math.abs(z) / COIN_DEPTH;        // середина ребра светлее краёв
     out += `<span class="coin-edge" style="transform:translateZ(${z.toFixed(2)}px);`
-      + `filter:brightness(${(0.55 + k * 0.5).toFixed(2)})"></span>`;
+      + `filter:brightness(${(0.55 + k * 0.5).toFixed(2)}) blur(.5px)"></span>`;
   }
   return out;
 }

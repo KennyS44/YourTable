@@ -168,8 +168,9 @@
 .cls-face-b{transform:rotateY(180deg) translateZ(5px)}
 /* Ребро монеты: стопка кружков между лицами */
 .cls-edge{position:absolute; inset:0; transform-style:preserve-3d}
+/* Ребро уже лица на пару пикселей: круглый контур рисует SVG, а не эта стопка */
 .coin-edge{
-  position:absolute; inset:0; border-radius:50%;
+  position:absolute; inset:3%; border-radius:50%;
   background:linear-gradient(160deg,#e3c98f,#8d7440 55%,#5d4c29);
 }
 .cls-caption{
@@ -195,7 +196,7 @@
   background:transparent; border:0; cursor:pointer; padding:var(--s2); border-radius:var(--r-sm);
 }
 .cls-pick:hover{background:var(--panel-2)}
-.cls-pick.is-current{background:var(--panel-2); outline:1px solid var(--gold-dim)}
+.cls-pick.is-current{background:var(--panel-2); outline:1px solid var(--gold-dim); outline-offset:-1px; border-radius:var(--r)}
 /* Медальон в выборе — такая же монета с ребром, наклон идёт из JS */
 .coin3d{display:block; width:100%; aspect-ratio:1; perspective:620px}
 .coin-body{
