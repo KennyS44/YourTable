@@ -175,6 +175,8 @@ export function fixSheet(raw) {
     const bonus = String(a.bonus || '').match(/-?\d+/);
     if (bonus) m.bonus = { from: 'custom', value: Number(bonus[0]) };
     else if (plus !== null) m.bonus = { from: 'custom', value: plus };
+    // исходный текст больше не показываем, но держим в записи: если разбор
+    // когда-то ошибётся, восстановить будет откуда
     m.raw = [a.bonus, a.dmg].filter(Boolean).join(' · ');
   });
   delete s.attacks;
@@ -576,8 +578,6 @@ function moveList(s, onEdit, ctx = {}) {
     else concI.addEventListener('change', () => { m.conc = concI.checked; save(); });
     conc.append(concI, el('span', '', 'Требует концентрации'));
     b.append(conc);
-
-    if (m.raw) b.append(el('p', 'hint', `Из старой записи: ${m.raw}`));
 
     if (!ro) {
       const acts = el('div', 'feat-acts');
