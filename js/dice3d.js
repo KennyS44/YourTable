@@ -14,6 +14,7 @@
 import { playAnimation } from './dice.js';
 
 const TILT = 24 * Math.PI / 180;      // наклон взгляда от отвеса
+const PX = 30;                        // пикселей на единицу мира
 
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js';
 const CANNON_URL = 'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
@@ -119,7 +120,9 @@ function shape(kind) {
     });
     return { idx, n, c, up, flat };
   });
-  return { verts, faces, labelled: kind.labelled || kind.faces.length };
+  // как высоко центр лежащей кости: по нему и видно, что одна легла на другую
+  const inr = Math.min(...faces.map((f) => Math.abs(dot(f.n, f.c))));
+  return { verts, faces, inr, labelled: kind.labelled || kind.faces.length };
 }
 
 /* ── Настоящая раскладка чисел ─────────────────────────────────────── */
@@ -301,9 +304,13 @@ async function run(stage, result, caption) {
   holder.className = 'die-throw dice3d';
   stage.appendChild(holder);
 
+  // Кости падают на игровое поле, а не поверх панелей: холст занимает его же место
+  const area = (document.getElementById('board-wrap') || stage).getBoundingClientRect();
+  const W = Math.round(area.width) || 640;
+  const H = Math.round(area.height) || 480;
+  holder.style.cssText = `left:${area.left}px; top:${area.top}px; width:${W}px; height:${H}px; right:auto; bottom:auto`;
+
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-  const W = stage.clientWidth || window.innerWidth;
-  const H = stage.clientHeight || window.innerHeight;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setSize(W, H);
   renderer.shadowMap.enabled = true;
@@ -315,9 +322,10 @@ async function run(stage, result, caption) {
   // линия никуда не «заваливается» и дальняя кость ровно того же размера, что
   // ближняя. Небольшой наклон взгляда нужен лишь затем, чтобы боковые грани —
   // и особенно грани d4 — не вставали к нам ребром.
-  const aspect = W / H;
-  const wide = Math.min(Math.max(aspect * 20, 13), 30);
-  const view = wide / aspect;
+  // Пикселей на единицу мира — величина постоянная: кость одинакова и на
+  // ноутбуке, и на большом мониторе, а не растёт вместе с окном.
+  const wide = Math.max(W / PX, 12);
+  const view = Math.max(H / PX, 9);
   const camera = new THREE.OrthographicCamera(-wide / 2, wide / 2, view / 2, -view / 2, 1, 220);
   camera.position.set(0, Math.cos(TILT) * 80, Math.sin(TILT) * 80 + 2);
   camera.lookAt(0, 0, 2);
@@ -336,59 +344,69 @@ async function run(stage, result, caption) {
   scene.add(rim);
 
   // пол ловит только тень: самого стола не видно, кости лежат на поле игры
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.ShadowMaterial({ opacity: .36 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.ShadowMaterial({ opacity: .36 }));
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   scene.add(floor);
 
   /* ── стол с бортами ── */
-  const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -42, 0) });
-  world.allowSleep = true;
-  world.defaultContactMaterial.friction = .45;
-  world.defaultContactMaterial.restitution = .3;
-  const ground = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
-  ground.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
-  world.addBody(ground);
-
-  // Дальний борт ближе остальных: наверху экрана верхняя панель, кости не
-  // должны на неё наезжать.
   const b = bounds(THREE, camera);
-  [[-1, 0, b.x], [1, 0, b.x], [0, -1, b.near], [0, 1, b.far]].forEach(([nx, nz, dist]) => {
-    const wall = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
-    wall.quaternion.setFromEuler(0, Math.atan2(nx, nz), 0);
-    wall.position.set(-nx * dist, 0, -nz * dist);
-    world.addBody(wall);
-  });
 
-  /* ── кости: сперва падение без картинки ── */
-  const dice = list.map((item, i) => {
-    const kind = KINDS[item.kind];
-    const sh = shape(kind);
-    const bd = body(CANNON, sh, 260);
-    // кости влетают слева и укатываются к середине стола, а не в дальний угол
-    bd.linearDamping = .16;
-    bd.angularDamping = .12;
-    // каждая кость летит своей дорожкой — иначе все сваливаются в одну кучу
-    const lane = list.length > 1 ? i / (list.length - 1) - .5 : 0;
-    bd.position.set(-b.x * .55 + Math.random() * .6, 5 + i * 1.1, lane * (b.near + b.far));
-    bd.velocity.set(1.8 + b.x * .3 + Math.random() * 1.6, 1, -1 - lane * 2.4 - Math.random());
-    bd.angularVelocity.set(rnd(9), rnd(9), rnd(9));
-    bd.quaternion.setFromEuler(rnd(3), rnd(3), rnd(3));
-    world.addBody(bd);
-    return { item, kind, sh, bd, frames: [] };
-  });
+  /** Один прогон падения — без картинки, только числа. */
+  const throwOnce = () => {
+    const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -42, 0) });
+    world.allowSleep = true;
+    world.defaultContactMaterial.friction = .45;
+    world.defaultContactMaterial.restitution = .3;
+    const ground = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+    ground.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    world.addBody(ground);
 
-  const STEP = 1 / 60;
-  let steps = 0;
-  while (steps < 780) {
-    world.step(STEP);
-    dice.forEach((x) => x.frames.push([
-      x.bd.position.x, x.bd.position.y, x.bd.position.z,
-      x.bd.quaternion.x, x.bd.quaternion.y, x.bd.quaternion.z, x.bd.quaternion.w,
-    ]));
-    steps++;
-    if (steps > 60 && dice.every((x) => x.bd.sleepState === CANNON.Body.SLEEPING)) break;
-  }
+    // Дальний борт ближе остальных: наверху экрана верхняя панель, кости не
+    // должны на неё наезжать.
+    [[-1, 0, b.x], [1, 0, b.x], [0, -1, b.near], [0, 1, b.far]].forEach(([nx, nz, dist]) => {
+      const wall = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+      wall.quaternion.setFromEuler(0, Math.atan2(nx, nz), 0);
+      wall.position.set(-nx * dist, 0, -nz * dist);
+      world.addBody(wall);
+    });
+
+    const dice = list.map((item, i) => {
+      const kind = KINDS[item.kind];
+      const sh = shape(kind);
+      const bd = body(CANNON, sh, 260);
+      // кости влетают слева и укатываются к середине стола, а не в дальний угол
+      bd.linearDamping = .16;
+      bd.angularDamping = .12;
+      // каждая кость летит своей дорожкой — иначе все сваливаются в одну кучу
+      const lane = list.length > 1 ? i / (list.length - 1) - .5 : 0;
+      bd.position.set(-b.x * .55 + Math.random() * .6, 5 + i * 1.1, lane * (b.near + b.far));
+      bd.velocity.set(1.8 + b.x * .3 + Math.random() * 1.6, 1, -1 - lane * 2.4 - Math.random());
+      bd.angularVelocity.set(rnd(9), rnd(9), rnd(9));
+      bd.quaternion.setFromEuler(rnd(3), rnd(3), rnd(3));
+      world.addBody(bd);
+      return { item, kind, sh, bd, frames: [] };
+    });
+
+    const STEP = 1 / 60;
+    let steps = 0;
+    while (steps < 780) {
+      world.step(STEP);
+      dice.forEach((x) => x.frames.push([
+        x.bd.position.x, x.bd.position.y, x.bd.position.z,
+        x.bd.quaternion.x, x.bd.quaternion.y, x.bd.quaternion.z, x.bd.quaternion.w,
+      ]));
+      steps++;
+      if (steps > 60 && dice.every((x) => x.bd.sleepState === CANNON.Body.SLEEPING)) break;
+    }
+    return dice;
+  };
+
+  // Кость, залезшая на другую, не читается — такой бросок переигрываем заново.
+  // Прогон идёт без картинки и стоит доли миллисекунды, так что это не заметно.
+  const heaped = (d) => d.some((x) => x.bd.position.y > x.sh.inr * 1.9);
+  let dice = throwOnce();
+  for (let again = 0; again < 6 && heaped(dice); again++) dice = throwOnce();
 
   /* ── доворот: нужное число кверху, раскладка при этом остаётся настоящей ── */
   const up = new THREE.Vector3(0, 1, 0);
