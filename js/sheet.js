@@ -55,7 +55,7 @@ const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now()
 
 export const AIMS = [['one', 'Цель'], ['area', 'Область'], ['cone', 'Конус']];
 export const EFFECTS = [['dmg', 'Урон'], ['heal', 'Лечение'], ['buff', 'Бафф'], ['debuff', 'Дебафф']];
-export const GUARDS = [['ac', 'Бросок атаки по КД'], ['save', 'Спасбросок цели'], ['none', 'Без броска']];
+export const GUARDS = [['ac', 'Бросок атаки по КД'], ['save', 'Спасбросок цели'], ['none', 'Без проверки']];
 export const ON_SAVE = [['half', 'половина'], ['none', 'ничего']];
 export const DMG_TYPES = [
   'рубящий', 'колющий', 'дробящий', 'огонь', 'холод', 'молния', 'кислота',
