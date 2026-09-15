@@ -337,7 +337,7 @@ function canPersist() {
 /** Чужой бросок прилетает тем же каналом, что и всё остальное, — анимацию видят все. */
 function onRemoteAction(a) {
   if (a.t !== 'chat.add' || a.msg.kind !== 'roll' || a.msg.secret) return;
-  showRoll($('#dice-stage'), a.msg.roll, `${a.msg.name}: ${a.msg.roll.formula}`);
+  showRoll($('#dice-stage'), a.msg.roll, rollCaption(a.msg.name, a.msg.roll, false));
 }
 
 /* ───────────────────────── Работа с картинками ───────────────────────── */
@@ -505,7 +505,7 @@ function msgNode(m) {
   const time = new Date(m.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
   if (m.kind === 'roll') {
     d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span>
-      <div class="body">${m.secret ? '🤫 ' : ''}${esc(m.roll.formula)} → <span class="total">${m.roll.total}</span>
+      <div class="body">${m.secret ? '🤫 ' : ''}${m.roll.label ? `<span class="roll-what">${esc(m.roll.label)}</span> ` : ''}${esc(m.roll.formula)} → <span class="total">${m.roll.total}</span>
       <span style="color:var(--muted);font-size:14px"> [${m.roll.dice.join(', ')}]${m.roll.mod ? ` ${m.roll.mod > 0 ? '+' : ''}${m.roll.mod}` : ''}</span></div>`;
   } else if (m.kind === 'system') {
     d.innerHTML = `<div class="body">${esc(m.text)}</div>`;
@@ -1278,6 +1278,11 @@ function say(text, kind = 'chat', extra = {}) {
   });
 }
 
+/** Подпись под кубиками: у броска из листа впереди стоит название характеристики. */
+function rollCaption(name, r, secret) {
+  return `${name}: ${r.label ? r.label + ' · ' : ''}${r.formula}${secret ? ' · тайно' : ''}`;
+}
+
 let diceMode = 'open';
 function doRoll(sides) {
   const count = Math.max(1, Math.min(20, Number($('#dice-count').value) || 1));
@@ -1286,7 +1291,71 @@ function doRoll(sides) {
   const r = roll(sides, count, mod, adv);
   const secret = diceMode === 'secret' && app.isDM;
   say('', 'roll', { roll: r, secret });
-  showRoll($('#dice-stage'), r, `${app.me.name}: ${r.formula}${secret ? ' · тайно' : ''}`);
+  showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, secret));
+}
+
+/* ── Броски прямо из листа ──────────────────────────────────────────
+   Панель кубиков остаётся как была: лист дёргает те же roll/say/showRoll,
+   только модификатор берёт из характеристики, а способ броска спрашивает. */
+
+let rollMenu = null;
+function closeRollMenu() {
+  if (!rollMenu) return;
+  rollMenu._off();
+  rollMenu.remove();
+  rollMenu = null;
+}
+
+/** Меню у нажатой характеристики: обычный, преимущество, помеха. Пальцем тоже. */
+function askRollMode(anchor, done) {
+  const снова = rollMenu && rollMenu._anchor === anchor;
+  closeRollMenu();
+  if (снова) return;                       // второй тык по той же характеристике закрывает
+  const box = el('div', 'rollmenu');
+  box._anchor = anchor;
+  let secret = false;
+  const pick = (adv) => { closeRollMenu(); done(adv, secret); };
+  [['Обычный', null], ['Преимущество', 'adv'], ['Помеха', 'dis']].forEach(([label, adv]) => {
+    const b = el('button', 'rollmenu-b', label);
+    b.type = 'button';
+    b.addEventListener('click', () => pick(adv));
+    box.append(b);
+  });
+  if (app.isDM) {
+    const t = el('button', 'rollmenu-b rollmenu-secret', 'Только мне');
+    t.type = 'button';
+    t.addEventListener('click', () => { secret = !secret; t.classList.toggle('is-on', secret); });
+    box.append(t);
+  }
+
+  // слушаем сразу: нажатие, открывшее меню, уже прошло — до нас дойдёт только следующее
+  const away = (e) => { if (!box.contains(e.target) && !anchor.contains(e.target)) closeRollMenu(); };
+  const esc = (e) => { if (e.key === 'Escape') closeRollMenu(); };
+  box._off = () => {
+    document.removeEventListener('pointerdown', away, true);
+    document.removeEventListener('keydown', esc, true);
+  };
+
+  document.body.append(box);
+  // меню лежит на body: так его не режут края узкой боковой панели
+  const r = anchor.getBoundingClientRect();
+  const w = box.offsetWidth, h = box.offsetHeight;
+  const under = r.bottom + 6 + h <= innerHeight;
+  box.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
+  box.style.top = Math.max(8, under ? r.bottom + 6 : r.top - h - 6) + 'px';
+  box.classList.add('is-on');
+  rollMenu = box;
+  document.addEventListener('pointerdown', away, true);
+  document.addEventListener('keydown', esc, true);
+}
+
+function rollAbility(label, mod, anchor) {
+  askRollMode(anchor, (adv, secret) => {
+    const r = roll(20, 1, mod, adv);
+    r.label = label;
+    say('', 'roll', { roll: r, secret });
+    showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, secret));
+  });
 }
 
 /* ───────────────────────── Провода интерфейса ───────────────────────── */
@@ -1497,7 +1566,10 @@ async function wireHeroSheet() {
   if (!(now.levels && now.levels[myKey]) && Number(ch.sheet.level) > 1) {
     setLevel(myKey, Number(ch.sheet.level));
   }
-  renderSheetLite($('#lite-sheet'), ch, save, { level: levelOf(app.store.get(), myKey) });
+  renderSheetLite($('#lite-sheet'), ch, save, {
+    level: levelOf(app.store.get(), myKey),
+    onRoll: rollAbility,
+  });
   showLevel(app.store.get());
   app.store.subscribe(showLevel);
 }

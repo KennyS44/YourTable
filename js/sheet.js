@@ -678,14 +678,22 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   head.append(el('p', 'lite-name', ch.name || 'Персонаж'), lvlBox(ctx.level ?? s.level));
   root.append(head);
 
-  /* ── характеристики ── */
+  /* ── характеристики: модификатор — кнопка броска d20 ── */
   const abil = el('div', 'abilities');
   ABILITIES.forEach((a) => {
     const c = el('div', 'abil');
     const score = el('input', 'abil-score');
     score.type = 'number';
     score.value = s[a.id];
-    const m = el('div', 'abil-mod', sign(mod(s[a.id])));
+    // за столом отсюда бросают, в кабинете бросок девать некуда — просто число
+    const m = ctx.onRoll
+      ? el('button', 'abil-mod abil-roll', sign(mod(s[a.id])))
+      : el('div', 'abil-mod', sign(mod(s[a.id])));
+    if (ctx.onRoll) {
+      m.type = 'button';
+      m.title = `Бросок: ${a.label}`;
+      m.addEventListener('click', () => ctx.onRoll(a.label, mod(s[a.id]), m));
+    }
     score.addEventListener('input', () => {
       s[a.id] = Number(score.value) || 0;
       m.textContent = sign(mod(s[a.id]));

@@ -147,6 +147,25 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 @keyframes toast-in{from{opacity:0; transform:translate(-50%,10px)} to{opacity:1; transform:translate(-50%,0)}}
 @keyframes toast-out{from{opacity:1} to{opacity:0; transform:translate(-50%,-6px)}}
 
+/* ── Меню броска у характеристики ── */
+.rollmenu{
+  position:fixed; z-index:45; width:200px; max-width:calc(100vw - 16px);
+  display:flex; flex-direction:column; gap:var(--s1); padding:var(--s1);
+  border:1px solid var(--gold-dim); border-radius:var(--r); background:var(--panel);
+  box-shadow:var(--shadow); opacity:0; transform:translateY(-4px);
+  transition:opacity .16s var(--ease), transform .16s var(--ease);
+}
+.rollmenu.is-on{opacity:1; transform:translateY(0)}
+.rollmenu-b{
+  min-height:44px; padding:0 var(--s3); text-align:left; font-size:16px;
+  border:0; border-radius:var(--r-sm); background:transparent; color:var(--text); cursor:pointer;
+}
+.rollmenu-b:hover{background:var(--panel-2); color:var(--gold)}
+.rollmenu-secret{border-top:1px solid var(--line-soft); border-radius:0 0 var(--r-sm) var(--r-sm); color:var(--muted)}
+.rollmenu-secret.is-on{color:var(--gold)}
+.rollmenu-secret::before{content:"🤫 "}
+.roll-what{color:var(--gold)}
+
 .stage{flex:1; display:flex; min-height:0}
 .panel{
   width:300px; flex:0 0 300px; background:var(--panel); border-right:1px solid var(--line);

@@ -259,6 +259,15 @@
 }
 .abil-l{font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .abil-mod{font-family:var(--f-head); font-size:24px; color:var(--gold); line-height:1.2}
+/* за столом модификатор — кнопка броска, потому и палец достаёт, и видно, что жмётся */
+.abil-roll{
+  display:block; width:100%; min-height:44px; margin:2px 0;
+  border:1px solid var(--line-soft); border-radius:var(--r-sm);
+  background:var(--bg-2); cursor:pointer; transition:border-color .16s var(--ease), background .16s var(--ease);
+}
+.abil-roll:hover{border-color:var(--gold-dim); background:var(--panel-2)}
+.abil-roll:active{background:var(--panel-2); transform:translateY(1px)}
+.abil-roll:focus-visible{outline:2px solid var(--gold-dim); outline-offset:1px}
 .abil-score{
   width:100%; min-height:32px; margin-top:2px; text-align:center; font-size:14px;
   border-radius:var(--r-sm); border:1px solid var(--line-soft); background:var(--bg-2); color:var(--text);
