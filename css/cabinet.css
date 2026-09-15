@@ -211,6 +211,8 @@
 
 /* Личность: черты, идеалы, привязанности и слабости — один блок, как на бумаге */
 .persona{display:grid; grid-template-columns:1fr 1fr; gap:var(--s2)}
+/* Нечётное последнее поле тянется на обе колонки, иначе рядом зияет дыра */
+.persona-cell:last-child:nth-child(odd){grid-column:1 / -1}
 .persona-cell{display:flex; flex-direction:column; gap:2px; min-width:0}
 .persona-cell textarea{
   width:100%; resize:vertical; min-height:44px; padding:var(--s2);

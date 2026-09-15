@@ -39,9 +39,11 @@ const TEXTS = [
   { id: 'langs', label: 'Прочие владения и языки', rows: 5 },
 ];
 
-// В бумажном листе это один блок, и здесь тоже: четыре карточки порознь
-// растягивали страницу и разбредались по разным колонкам.
-const PERSONA = ['traits', 'ideals', 'bonds', 'flaws'];
+// В бумажном листе это один блок, и здесь тоже: карточки порознь растягивали
+// страницу и разбредались по разным колонкам.
+const PERSONA = ['traits', 'ideals', 'bonds'];
+// Чему персонаж не поддаётся и чем его взять — две стороны одного вопроса.
+const DEFENCE = ['resist', 'flaws'];
 
 export const mod = (score) => Math.floor(((Number(score) || 10) - 10) / 2);
 export const sign = (n) => (n >= 0 ? '+' : '−') + Math.abs(n);
@@ -563,29 +565,33 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   // своя прокрутка, поэтому длинное описание не толкает вниз соседние блоки.
   featsBlk.classList.add('blk-scroll');
 
-  // Личность одной карточкой, сеткой два на два, и повыше в потоке — иначе
-  // идеалы с привязанностями уезжали в самый низ чужой колонки.
-  const persona = el('div', 'persona');
-  PERSONA.forEach((id) => {
-    const t = TEXTS.find((x) => x.id === id);
-    const cell = el('label', 'persona-cell');
-    const a = el('textarea');
-    a.rows = 2;
-    a.value = s[t.id] ?? '';
-    a.placeholder = '—';
-    cell.append(el('span', 'fld-l', t.label), bind(a, t.id));
-    persona.append(cell);
-  });
+  // Несколько коротких полей одной карточкой, в две колонки: порознь каждое
+  // просило себе целую карточку и растягивало лист.
+  const pairGrid = (ids) => {
+    const g = el('div', 'persona');
+    ids.forEach((id) => {
+      const t = TEXTS.find((x) => x.id === id);
+      const cell = el('label', 'persona-cell');
+      const a = el('textarea');
+      a.rows = 2;
+      a.value = s[t.id] ?? '';
+      a.placeholder = '—';
+      cell.append(el('span', 'fld-l', t.label), bind(a, t.id));
+      g.append(cell);
+    });
+    return g;
+  };
 
   // Раскладываем по трём столбцам руками. Раньше это делал column-count, но он
   // пересобирал весь поток от любой мелочи: раскрыл способность — и карточки
   // перепрыгивали из колонки в колонку.
+  const paired = [...PERSONA, ...DEFENCE];
   const rest = Object.fromEntries(
-    TEXTS.filter((t) => !PERSONA.includes(t.id)).map((t) => [t.id, area(t)]),
+    TEXTS.filter((t) => !paired.includes(t.id)).map((t) => [t.id, area(t)]),
   );
   const cols = [
-    [abilBlk, defenseBlk, hpBlk, rest.resist],
-    [atkBlk, featsBlk, block('Личность', persona)],
+    [abilBlk, defenseBlk, hpBlk, block('Сопротивления и слабости', pairGrid(DEFENCE))],
+    [atkBlk, featsBlk, block('Личность', pairGrid(PERSONA))],
     [rest.appearance, rest.gear, rest.langs],
   ];
   cols.forEach((items) => {
