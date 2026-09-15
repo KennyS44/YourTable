@@ -125,7 +125,9 @@ function crestMarkup(id) {
   const glyph = c
     ? `<g transform="translate(120 120) scale(.3) translate(-256 -256)"><path fill="#141310" d="${c.d}"/></g>`
     : '<text x="120" y="150" font-size="90" text-anchor="middle" fill="#8d7440" opacity=".6">+</text>';
-  return `<svg viewBox="0 0 240 240" class="crest-svg">
+  // data-darkreader-ignore: расширения тёмной темы видят золотой кругляш как
+  // «светлый фон» и выворачивают чёрную чеканку в белую. Просим не трогать.
+  return `<svg viewBox="0 0 240 240" class="crest-svg" data-darkreader-ignore="true">
     <circle cx="120" cy="120" r="112" fill="url(#crest-gold-bg)" stroke="#8d7440" stroke-width="4"/>
     <circle cx="120" cy="120" r="100" fill="none" stroke="#8d7440" stroke-width="1.5" opacity=".7"/>
     <circle cx="120" cy="120" r="112" fill="none" stroke="#8d7440" stroke-width="1" stroke-dasharray="2 10" opacity=".7"/>
@@ -220,11 +222,14 @@ function clsWidget(s, onEdit, ro, level) {
   const addBtn = el('button', 'icon-btn cls-tool', '+');
   addBtn.type = 'button';
   addBtn.title = 'Добавить второй класс';
+  const dropBtn = el('button', 'icon-btn cls-tool', '×');
+  dropBtn.type = 'button';
+  dropBtn.title = 'Убрать второй класс';
   const editBtn = el('button', 'icon-btn cls-tool', '✎');
   editBtn.type = 'button';
   editBtn.title = 'Выбрать класс';
   tools.append(flipBtn);
-  if (!ro) tools.append(addBtn, editBtn);
+  if (!ro) tools.append(addBtn, dropBtn, editBtn);
 
   // Три слоя, у каждого своя работа: наклон к курсору, переворот на другую
   // сторону и сами лица. Будь это один слой, поворот затирал бы наклон.
@@ -256,18 +261,21 @@ function clsWidget(s, onEdit, ro, level) {
   let side = 0;
   function repaint() {
     const ids = Array.isArray(s.cls) ? s.cls : [];
-    faceA.innerHTML = crestMarkup(ids[0]);
-    faceB.innerHTML = crestMarkup(ids[1]);
-    inner.classList.toggle('is-flipped', side === 1);
-    // переворачивать нечего, пока второго класса нет: у Мастера кнопки просто
-    // не будет, у игрока она погашена — рядом с ней «+», который её и оживит
     const multi = !!ids[1];
+    // Один класс — обе стороны его же: монета честно крутится, но чеканка на
+    // ней одна, и никакой пустой изнанки со знаком «плюс» игрок не видит.
+    faceA.innerHTML = crestMarkup(ids[0]);
+    faceB.innerHTML = crestMarkup(multi ? ids[1] : ids[0]);
+    inner.classList.toggle('is-flipped', side === 1);
     title.textContent = multi ? 'Мультикласс' : 'Класс';
-    flipBtn.hidden = ro && !multi;
-    flipBtn.disabled = !multi;
-    flipBtn.title = multi ? 'Показать другую сторону' : 'Второго класса нет';
+    // Крутить нечего, только пока не выбран вообще никто
+    const empty = !ids[0] && !multi;
+    flipBtn.hidden = ro && empty;
+    flipBtn.disabled = empty;
+    flipBtn.title = empty ? 'Класс не выбран' : 'Показать другую сторону';
     addBtn.hidden = multi;
-    const shown = ids[side];
+    dropBtn.hidden = !multi;
+    const shown = (multi ? ids[side] : ids[0]);
     const known = shown && classById(shown);
     caption.textContent = known ? `${known.label}, ур. ${level || 1}`
       : shown ? shown
@@ -280,6 +288,14 @@ function clsWidget(s, onEdit, ro, level) {
   });
   addBtn.addEventListener('click', () => {
     openClassPicker(null, (id) => { setSlot(1, id); side = 1; repaint(); });
+  });
+  dropBtn.addEventListener('click', () => {
+    // остаётся первый класс; сторона возвращается на лицо, чтобы не смотреть
+    // на изнанку только что убранного
+    s.cls = (Array.isArray(s.cls) ? s.cls : []).slice(0, 1);
+    onEdit('cls', s.cls);
+    side = 0;
+    repaint();
   });
   editBtn.addEventListener('click', () => {
     const ids = Array.isArray(s.cls) ? s.cls : [];
