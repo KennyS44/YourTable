@@ -546,9 +546,10 @@ function moveList(s, onEdit, ctx = {}) {
       if (i) line.classList.add('move-dice-2');
       diceBox.append(line);
     });
-    const dmgLabel = el('div', 'move-fld');
-    dmgLabel.append(el('span', 'fld-l', m.effect === 'heal' ? 'Лечение' : 'Урон'), diceBox);
-    b.append(dmgLabel);
+    // «Кубы», а не «Урон»: этими же костями считают лечение, бафф и дебафф
+    const diceLabel = el('div', 'move-fld');
+    diceLabel.append(el('span', 'fld-l', 'Кубы'), diceBox);
+    b.append(diceLabel);
 
     /* бонус: от характеристики или свой — прибавка к броску, не к костям */
     const ownI = num(m.bonus.value, (v) => { m.bonus.value = v; save(); }, -20, 20);
