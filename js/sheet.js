@@ -977,7 +977,7 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
     if (ctx.onRoll) {
       m.type = 'button';
       m.title = `Бросок: ${a.label}`;
-      m.addEventListener('click', () => ctx.onRoll(a.label, mod(s[a.id]), m));
+      m.addEventListener('click', () => ctx.onRoll(a.label, mod(s[a.id])));
     }
     score.addEventListener('input', () => {
       s[a.id] = Number(score.value) || 0;

@@ -3,18 +3,14 @@
 
 export const DICE = [4, 6, 8, 10, 12, 20, 100];
 
-export function roll(sides, count = 1, mod = 0, adv = null) {
-  const rnd = () => 1 + Math.floor(Math.random() * sides);
-  let dice = Array.from({ length: count }, rnd);
-  if (adv && sides === 20) {
-    const pair = [rnd(), rnd()];
-    dice = [adv === 'adv' ? Math.max(...pair) : Math.min(...pair)];
-  }
+// Преимущества и помехи здесь нет намеренно: два д20 и выбор большего игрок
+// сводит сам, а приложению это давало только лишний переключатель.
+export function roll(sides, count = 1, mod = 0) {
+  const dice = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
   const sum = dice.reduce((a, b) => a + b, 0);
   return {
-    sides, mod, adv, dice, total: sum + mod,
-    formula: `${dice.length}d${sides}${mod ? (mod > 0 ? '+' + mod : mod) : ''}`
-      + (adv ? (adv === 'adv' ? ' с преимуществом' : ' с помехой') : ''),
+    sides, mod, dice, total: sum + mod,
+    formula: `${dice.length}d${sides}${mod ? (mod > 0 ? '+' + mod : mod) : ''}`,
   };
 }
 

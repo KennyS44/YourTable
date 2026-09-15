@@ -83,85 +83,36 @@ const ждатьБросок = async (p) => {
 };
 const лента = (p) => p.$$eval('#rolls-feed .msg', (n) => n.map((m) => m.textContent.replace(/\s+/g, ' ').trim()));
 
-/* 3. Обычный бросок Ловкости: d20+3, и он уехал в ленту обоим */
+/* 3. Нажатие по модификатору сразу кидает d20+3 — выбирать больше нечего */
 await pl.click('[data-rtab=rolls]');
 await dm.click('[data-rtab=rolls]');
 const ловкостьБтн = pl.locator('#lite-sheet .abil').nth(1).locator('.abil-roll');
 R.модификаторЛовкости = await ловкостьБтн.textContent();
 await ловкостьБтн.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-R.пунктыМеню = await pl.$$eval('.rollmenu-b', (n) => n.map((b) => b.textContent));
-await pl.locator('.rollmenu-b', { hasText: 'Обычный' }).click();
-await pl.waitForTimeout(600);
-R.менюЗакрылось = await pl.$$eval('.rollmenu', (n) => n.length === 0);
+await pl.waitForTimeout(700);
+R.менюНеПоявилось = await pl.$$eval('.rollmenu', (n) => n.length === 0);
 R.броскиИгрока = await лента(pl);
-await pl.waitForTimeout(400);
-await pl.locator('#lite-sheet').screenshot({ path: 'tools/shot-sheetroll.png' });
 await ждатьБросок(pl);
 await dm.waitForTimeout(2500);
 R.броскиМастера = await лента(dm);
 
-/* 4. Преимущество: кидается два d20, берётся больший */
+/* 4. Ни преимущества, ни помехи в формуле не осталось */
 await ловкостьБтн.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-await pl.locator('.rollmenu-b', { hasText: 'Преимущество' }).click();
-await pl.waitForTimeout(600);
-R.сПреимуществом = (await лента(pl)).at(-1);
+await pl.waitForTimeout(700);
+const записи = await лента(pl);
+R.бросковПодряд = записи.length;
+R.безПреимуществаИПомехи = записи.every((t) => !t.includes('преимущест') && !t.includes('помех'));
 await ждатьБросок(pl);
 
-/* 5. Помеха */
-await ловкостьБтн.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-await pl.locator('.rollmenu-b', { hasText: 'Помеха' }).click();
-await pl.waitForTimeout(600);
-R.сПомехой = (await лента(pl)).at(-1);
-await ждатьБросок(pl);
-
-/* 6. Меню закрывается щелчком мимо и клавишей Esc */
-await ловкостьБтн.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-await pl.mouse.click(900, 500);
-await pl.waitForTimeout(300);
-R.закрылосьМимо = await pl.$$eval('.rollmenu', (n) => n.length === 0);
-await ловкостьБтн.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-await pl.keyboard.press('Escape');
-await pl.waitForTimeout(300);
-R.закрылосьEsc = await pl.$$eval('.rollmenu', (n) => n.length === 0);
-R.лишнихБросковНет = (await лента(pl)).length === 3;
-
-/* 7. У игрока в меню нет «Только мне» — это право Мастера */
-await ловкостьБтн.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-R.тайноТолькоМастеру = await pl.$$eval('.rollmenu-secret', (n) => n.length === 0);
-await pl.keyboard.press('Escape');
-
-/* 8. Панель кубиков осталась на месте и работает как прежде */
+/* 5. Панель кубиков жива, и переключателя «С преим.» в ней больше нет */
 await pl.click('#btn-dice');
 await pl.waitForTimeout(300);
+R.переключателяПреимуществаНет = await pl.$$eval('#dice-adv', (n) => n.length === 0);
 await pl.click('#dice-buttons button:nth-child(6)');
 await pl.waitForTimeout(800);
 R.панельКубиковЖива = (await лента(pl)).at(-1);
 await ждатьБросок(pl);
-
-/* 9. Телефон: меню не вылезает за экран */
 await pl.click('#dice-close');
-await pl.setViewportSize({ width: 390, height: 780 });
-await pl.waitForTimeout(600);
-// на телефоне панели выезжают снизу по кнопке «Панели»
-await pl.click('#btn-panel');
-await pl.waitForSelector('#panel-left.is-open', { timeout: 5000 });
-await pl.waitForTimeout(500);
-const узкая = pl.locator('#lite-sheet .abil').nth(1).locator('.abil-roll');
-await узкая.scrollIntoViewIfNeeded();
-await узкая.click();
-await pl.waitForSelector('.rollmenu.is-on', { timeout: 5000 });
-R.наТелефоне = await pl.$eval('.rollmenu', (m) => {
-  const r = m.getBoundingClientRect();
-  return { влезло: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, ширина: Math.round(r.width) };
-});
-await pl.screenshot({ path: 'tools/shot-sheetroll-mobile.png' });
-await pl.keyboard.press('Escape');
 
 R.ошибки = errors;
 console.log(JSON.stringify(R, null, 2));

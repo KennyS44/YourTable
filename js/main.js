@@ -1292,8 +1292,7 @@ let diceMode = 'open';
 function doRoll(sides) {
   const count = Math.max(1, Math.min(20, Number($('#dice-count').value) || 1));
   const mod = Number($('#dice-mod').value) || 0;
-  const adv = $('#dice-adv').checked && sides === 20 ? 'adv' : null;
-  const r = roll(sides, count, mod, adv);
+  const r = roll(sides, count, mod);
   const secret = diceMode === 'secret' && app.isDM;
   say('', 'roll', { roll: r, secret });
   showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, secret));
@@ -1301,66 +1300,16 @@ function doRoll(sides) {
 
 /* ── Броски прямо из листа ──────────────────────────────────────────
    Панель кубиков остаётся как была: лист дёргает те же roll/say/showRoll,
-   только модификатор берёт из характеристики, а способ броска спрашивает. */
+   только модификатор берёт из характеристики.
 
-let rollMenu = null;
-function closeRollMenu() {
-  if (!rollMenu) return;
-  rollMenu._off();
-  rollMenu.remove();
-  rollMenu = null;
-}
+   Меню выбора здесь стояло ради преимущества и помехи. Их убрали — выбирать
+   стало нечего, и нажатие сразу кидает. */
 
-/** Меню у нажатой характеристики: обычный, преимущество, помеха. Пальцем тоже. */
-function askRollMode(anchor, done) {
-  const снова = rollMenu && rollMenu._anchor === anchor;
-  closeRollMenu();
-  if (снова) return;                       // второй тык по той же характеристике закрывает
-  const box = el('div', 'rollmenu');
-  box._anchor = anchor;
-  let secret = false;
-  const pick = (adv) => { closeRollMenu(); done(adv, secret); };
-  [['Обычный', null], ['Преимущество', 'adv'], ['Помеха', 'dis']].forEach(([label, adv]) => {
-    const b = el('button', 'rollmenu-b', label);
-    b.type = 'button';
-    b.addEventListener('click', () => pick(adv));
-    box.append(b);
-  });
-  if (app.isDM) {
-    const t = el('button', 'rollmenu-b rollmenu-secret', 'Только мне');
-    t.type = 'button';
-    t.addEventListener('click', () => { secret = !secret; t.classList.toggle('is-on', secret); });
-    box.append(t);
-  }
-
-  // слушаем сразу: нажатие, открывшее меню, уже прошло — до нас дойдёт только следующее
-  const away = (e) => { if (!box.contains(e.target) && !anchor.contains(e.target)) closeRollMenu(); };
-  const esc = (e) => { if (e.key === 'Escape') closeRollMenu(); };
-  box._off = () => {
-    document.removeEventListener('pointerdown', away, true);
-    document.removeEventListener('keydown', esc, true);
-  };
-
-  document.body.append(box);
-  // меню лежит на body: так его не режут края узкой боковой панели
-  const r = anchor.getBoundingClientRect();
-  const w = box.offsetWidth, h = box.offsetHeight;
-  const under = r.bottom + 6 + h <= innerHeight;
-  box.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), innerWidth - w - 8) + 'px';
-  box.style.top = Math.max(8, under ? r.bottom + 6 : r.top - h - 6) + 'px';
-  box.classList.add('is-on');
-  rollMenu = box;
-  document.addEventListener('pointerdown', away, true);
-  document.addEventListener('keydown', esc, true);
-}
-
-function rollAbility(label, mod, anchor) {
-  askRollMode(anchor, (adv, secret) => {
-    const r = roll(20, 1, mod, adv);
-    r.label = label;
-    say('', 'roll', { roll: r, secret });
-    showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, secret));
-  });
+function rollAbility(label, mod) {
+  const r = roll(20, 1, mod);
+  r.label = label;
+  say('', 'roll', { roll: r });
+  showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, false));
 }
 
 /* ───────────────────────── Провода интерфейса ───────────────────────── */
