@@ -80,9 +80,14 @@ await pl.fill('#login-form [name=pass]', PASS);
 await pl.click('#login-form button[type=submit]');
 await pl.waitForSelector('#cab:not([hidden])', { timeout: 20000 });
 await pl.waitForTimeout(800);
-// карточку ищем по имени: постоянный кабинет может хранить и других персонажей
-await pl.locator('.char-card', { has: pl.locator('.char-name[value="Пробник Старый"]') }).first().click()
-  .catch(async () => { await pl.click('.char-card:not(.char-add)'); });
+// строго свою карточку: в постоянном кабинете живут и персонажи других проверок,
+// а имя лежит в значении поля, по атрибуту его не выбрать
+await pl.evaluate((имя) => {
+  const card = [...document.querySelectorAll('.char-card')]
+    .find((c) => c.querySelector('.char-name') && c.querySelector('.char-name').value === имя);
+  if (!card) throw new Error('нет карточки ' + имя);
+  card.click();
+}, 'Пробник Старый');
 await pl.waitForTimeout(800);
 
 const приём = (сел) => pl.$$eval(сел, (n) => n.map((c) => ({
@@ -115,9 +120,8 @@ R.разобрано = await pl.evaluate(() => {
   const n = [...b.querySelectorAll('input[type=number]')].map((x) => x.value);
   return { выборы: s, числа: n };
 });
-// на снимок раскрываем окно во всю высоту: иначе прокрутка режет половину полей
-const безПрокрутки = (p, сел) => p.$eval(сел, (n) => { n.style.maxHeight = 'none'; });
-await безПрокрутки(pl, '#sheet .moves');
+// раскрытый приём должен помещаться целиком, без прокрутки внутри блока
+R.режетсяЛиОкно = await pl.$eval('#sheet .moves', (n) => n.scrollHeight > n.clientHeight + 1);
 await pl.locator('#sheet .moves').screenshot({ path: 'tools/shot-moves.png' });
 
 /* 4. Размер области появляется только у области и конуса */
@@ -128,11 +132,7 @@ await pl.waitForTimeout(300);
 R.размер.уОбласти = await видноРазмер();
 
 /* 5. Спасбросок раскрывает характеристику и «при успехе» */
-// вложенная строка: у внешней тоже есть этот текст внутри, её брать нельзя
-const видноСпас = () => pl.$$eval('#sheet .moves .move.is-open .move-line .move-line', (n) => {
-  const extra = n.find((x) => [...x.children].some((c) => c.textContent === 'при успехе'));
-  return extra ? !extra.hidden : null;
-});
+const видноСпас = () => pl.$eval('#sheet .moves .move.is-open .move-save', (n) => !n.hidden);
 R.спасбросок = { поКД: await видноСпас() };
 await pl.evaluate(() => {
   const sels = [...document.querySelectorAll('#sheet .moves .move.is-open select')];
@@ -193,7 +193,7 @@ await pl.evaluate(() => {
   n.value = '4'; n.dispatchEvent(new Event('input', { bubbles: true }));
 });
 await pl.waitForTimeout(2500);
-await безПрокрутки(pl, '#lite-sheet .moves');
+R.режетсяЛиЗаСтолом = await pl.$eval('#lite-sheet .moves', (n) => n.scrollHeight > n.clientHeight + 1);
 await pl.locator('#lite-sheet .moves').screenshot({ path: 'tools/shot-moves-table.png' });
 
 /* правка доехала до кабинета */
