@@ -293,7 +293,7 @@
 .move-unit{font-size:14px; color:var(--muted)}
 .move-size{display:inline-flex; align-items:center; gap:var(--s1); flex:0 0 auto}
 .move-size[hidden]{display:none}
-/* спасбросок: характеристика во всю ширину, под ней «при успехе» со списком */
+/* спасбросок: характеристика во всю ширину, под ней сложность и «при успехе» */
 .move-save{display:grid; grid-template-columns:auto 1fr; gap:var(--s1); align-items:center; width:100%}
 .move-save > .sel-sm:first-child{grid-column:1 / -1}
 .move-save[hidden]{display:none}
@@ -310,6 +310,8 @@
   border:1px solid var(--line); background:var(--bg-2); color:var(--text);
 }
 .num-sm{width:56px; text-align:center}
+/* галочка идёт последней строкой приёма, отбивка сверху отделяет её от полей */
+.move-conc{margin-top:var(--s1); color:var(--text)}
 .num-sm[hidden]{display:none}
 .sel-sm:focus,.num-sm:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
 

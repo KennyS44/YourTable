@@ -70,6 +70,8 @@ export function emptyMove(kind = 'feat') {
     effect: 'dmg',
     dice: [{ n: 0, d: 6, type: '' }, { n: 0, d: 6, type: '' }],   // урон бывает из двух кусков
     guard: 'ac', guardAbil: 'dex', onSave: 'half',    // чем защищается цель
+    dc: 10,                                           // сложность спасброска цели
+    conc: false,                                      // держится ли концентрацией
     bonus: { from: 'none', value: 0 },                // от характеристики или свой
     raw: '',                                          // текст из старой строки атаки
   };
@@ -89,6 +91,8 @@ export function fixMove(f) {
   if (!EFFECTS.some(([v]) => v === m.effect)) m.effect = 'dmg';
   if (!GUARDS.some(([v]) => v === m.guard)) m.guard = 'ac';
   m.size = Math.max(0, Number(m.size) || 0);
+  m.dc = Math.max(0, Math.min(40, Number(m.dc) || 10));
+  m.conc = !!m.conc;
   const b = m.bonus || {};
   m.bonus = { from: b.from || 'none', value: Number(b.value) || 0 };
   return m;
@@ -523,11 +527,17 @@ function moveList(s, onEdit, ctx = {}) {
 
     b.append(fld('Тип', sel(EFFECTS, m.effect, (v) => { m.effect = v; save(); })));
 
-    /* чем защищается цель: по КД, спасброском или никак */
+    /* чем защищается цель: по КД, спасброском или никак.
+       У спасброска своя сложность — её и надо перебить броском цели. */
     const abilSel = sel(ABILITIES.map((a) => [a.id, a.label]), m.guardAbil, (v) => { m.guardAbil = v; save(); });
+    const dcI = num(m.dc, (v) => { m.dc = v; save(); }, 0, 40);
     const onSaveSel = sel(ON_SAVE, m.onSave, (v) => { m.onSave = v; save(); });
     const saveExtra = el('span', 'move-save');
-    saveExtra.append(abilSel, el('span', 'move-unit', 'при успехе'), onSaveSel);
+    saveExtra.append(
+      abilSel,
+      el('span', 'move-unit', 'сложность'), dcI,
+      el('span', 'move-unit', 'при успехе'), onSaveSel,
+    );
     const showSave = () => { saveExtra.hidden = m.guard !== 'save'; };
     b.append(fld('Чем защищается цель',
       sel(GUARDS, m.guard, (v) => { m.guard = v; showSave(); save(); }), saveExtra));
@@ -556,6 +566,16 @@ function moveList(s, onEdit, ctx = {}) {
     const showOwn = () => { ownI.hidden = m.bonus.from !== 'custom'; };
     b.append(fld('Бонус', sel(BONUS_FROM, m.bonus.from, (v) => { m.bonus.from = v; showOwn(); save(); }), ownI));
     showOwn();
+
+    /* концентрация: пока держишь это, второе концентрационное не удержать */
+    const conc = el('label', 'check move-conc');
+    const concI = el('input');
+    concI.type = 'checkbox';
+    concI.checked = m.conc;
+    if (ro) concI.disabled = true;
+    else concI.addEventListener('change', () => { m.conc = concI.checked; save(); });
+    conc.append(concI, el('span', '', 'Требует концентрации'));
+    b.append(conc);
 
     if (m.raw) b.append(el('p', 'hint', `Из старой записи: ${m.raw}`));
 

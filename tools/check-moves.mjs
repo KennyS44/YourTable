@@ -141,6 +141,25 @@ await pl.evaluate(() => {
 });
 await pl.waitForTimeout(300);
 R.спасбросок.поСпасу = await видноСпас();
+// сложность спасброска стоит рядом с характеристикой и правится
+R.спасбросок.сложность = await pl.evaluate(() => {
+  const s = document.querySelector('#sheet .moves .move.is-open .move-save');
+  const dc = s.querySelector('.num-sm');
+  const было = dc.value;
+  dc.value = '15'; dc.dispatchEvent(new Event('input', { bubbles: true }));
+  return { поУмолчанию: было, подписи: [...s.querySelectorAll('.move-unit')].map((u) => u.textContent) };
+});
+
+/* 5б. Концентрация: галочка есть и запоминается */
+R.концентрация = await pl.evaluate(() => {
+  const c = document.querySelector('#sheet .moves .move.is-open .move-conc');
+  if (!c) return 'галочки нет';
+  const i = c.querySelector('input');
+  const было = i.checked;
+  i.click();
+  return { подпись: c.textContent.trim(), было, стало: i.checked };
+});
+await pl.waitForTimeout(400);
 
 /* 6. Переключение вида: способность уходит из вкладки описаний и обратно */
 await pl.click('#sheet .moves .move:nth-child(1) .feat-tab');
@@ -200,6 +219,8 @@ await pl.locator('#lite-sheet .moves').screenshot({ path: 'tools/shot-moves-tabl
 const сохранено = await (await fetch(`${FIREBASE.databaseURL}/rooms/cab-${path}/chars/${charId}.json`)).json();
 const секира = (сохранено.sheet.feats || []).find((f) => f.name === 'Секира');
 R.правкаВБою = { костей: секира && секира.dice[0].n, вид: секира && секира.dice[0].type };
+// сложность и концентрация доехали до базы вместе с остальным
+R.новыеПоляСохранились = секира && { сложность: секира.dc, концентрация: секира.conc };
 R.старыеСтрокиУбраны = сохранено.sheet.attacks === undefined;
 
 /* 9. КД фигурки задаёт Мастер, игрок его не видит */
