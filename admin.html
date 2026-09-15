@@ -8,20 +8,20 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=36">
-<link rel="stylesheet" href="css/cabinet.css?v=36">
+<link rel="stylesheet" href="css/app.css?v=37">
+<link rel="stylesheet" href="css/cabinet.css?v=37">
 
 <!-- Версия сборки — общая для всех страниц. Поднимайте при каждом обновлении. -->
 <script type="importmap">
 {
   "imports": {
-    "./js/admin.js":          "./js/admin.js?v=36",
-    "./js/registry.js":       "./js/registry.js?v=36",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=36",
-    "./js/roomcode.js":       "./js/roomcode.js?v=36",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=36",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=36",
-    "./js/idb.js":            "./js/idb.js?v=36"
+    "./js/admin.js":          "./js/admin.js?v=37",
+    "./js/registry.js":       "./js/registry.js?v=37",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=37",
+    "./js/roomcode.js":       "./js/roomcode.js?v=37",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=37",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=37",
+    "./js/idb.js":            "./js/idb.js?v=37"
   }
 }
 </script>
@@ -74,6 +74,11 @@
       </form>
       <p class="gate-err" id="acc-err" hidden></p>
 
+      <div class="adm-bulk" data-bulk="acc" hidden>
+        <label class="adm-check"><input type="checkbox" data-all="acc"><span>Выбрать все</span></label>
+        <span class="hint" data-count="acc"></span>
+        <button class="btn btn-danger btn-sm" data-del="acc" type="button">Удалить выбранные</button>
+      </div>
       <div class="adm-list" id="acc-list"></div>
     </section>
 
@@ -83,11 +88,16 @@
         <span class="hint" id="room-count"></span>
       </div>
       <p class="hint">Стол попадает в список, когда за него кто-то входит. Вход отсюда — скрытый: за столом не появится ни отметки, ни строки в чате.</p>
+      <div class="adm-bulk" data-bulk="room" hidden>
+        <label class="adm-check"><input type="checkbox" data-all="room"><span>Выбрать все</span></label>
+        <span class="hint" data-count="room"></span>
+        <button class="btn btn-danger btn-sm" data-del="room" type="button">Удалить выбранные</button>
+      </div>
       <div class="adm-list" id="room-list"></div>
     </section>
   </main>
 </div>
 
-<script type="module" src="js/admin.js?v=36"></script>
+<script type="module" src="js/admin.js?v=37"></script>
 </body>
 </html>
