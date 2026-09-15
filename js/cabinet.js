@@ -361,6 +361,7 @@ function enterRoom(e) {
     key: ch.key,
     name: ch.name || 'Персонаж',
     hp: { cur: num(s.hpCur, 10), max: num(s.hpMax, 10) },
+    ac: num(s.ac, 10),
     vision: num(s.vision, 30),
     avatar: ch.bg || null,
     player: cab.profile.name || cab.profile.login,

@@ -212,6 +212,7 @@ function start(sync, state, me) {
   window.__me = () => app.me;
   window.__ruler = () => app.board.ruler();
   window.__stats = () => (app.sync.stats ? app.sync.stats() : null);
+  window.__openToken = (id) => openTokenCard(app.store.get().tokens[id], { x: 200, y: 200 });
   wireUI();
   renderAll(app.store.get());
   app.board.fit();
@@ -243,6 +244,7 @@ async function bringCharacter() {
   }
   const stats = {
     hp: { cur: ch.hp && ch.hp.cur > 0 ? ch.hp.cur : 10, max: ch.hp && ch.hp.max > 0 ? ch.hp.max : 10 },
+    ac: ch.ac > 0 ? ch.ac : 10,
     vision: ch.vision > 0 ? ch.vision : 30,
     cells: 1, hpPublic: true, namePublic: true,
   };
@@ -873,6 +875,7 @@ function openLibCard(it, ev) {
   card.append(field('Хиты (тек./макс.)', pair(
     numInput(st.hp.cur, (v) => libUpd(it.id, { stats: { hp: { cur: v } } })),
     numInput(st.hp.max, (v) => libUpd(it.id, { stats: { hp: { max: v } } })))));
+  card.append(field('КД', numInput(st.ac, (v) => libUpd(it.id, { stats: { ac: Math.max(0, v) } }))));
   card.append(field('Дальность зрения, футов (0 — без обзора)',
     numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
   card.append(field('Размер, клеток',
@@ -949,6 +952,8 @@ function openTokenCard(t, screenPos) {
   card.append(field('Хиты (тек./макс.)', pair(
     numInput(t.hp.cur, (v) => upd(t.id, { hp: { cur: v } })),
     numInput(t.hp.max, (v) => upd(t.id, { hp: { max: v } })))));
+  // КД видит только Мастер: игроку незачем знать, во что он целится
+  card.append(field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))));
   card.append(field('Дальность зрения, футов (0 — без обзора)',
     numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
   card.append(checkRow('Имя видно игрокам', t.namePublic !== false,
@@ -1259,7 +1264,7 @@ function dropToken(libId, worldPos) {
   const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
   const token = newToken({
     locId: s.activeLoc, x: c.x, y: c.y, assetId: it.assetId, libId: it.id, name: it.name, kind: it.kind,
-    cells: st.cells, vision: st.vision, hp: { ...st.hp },
+    cells: st.cells, vision: st.vision, hp: { ...st.hp }, ac: st.ac,
     hpPublic: st.hpPublic, namePublic: st.namePublic,
     // персонаж из кабинета принадлежит своему игроку — привязываем сразу
     ownerId: it.owner ? it.owner.id : null,

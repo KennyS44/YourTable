@@ -47,13 +47,76 @@ export const mod = (score) => Math.floor(((Number(score) || 10) - 10) / 2);
 export const sign = (n) => (n >= 0 ? '+' : '−') + Math.abs(n);
 const uid = (p) => p + '_' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
 
+/* ── Приёмы: один список на две вкладки ──────────────────────────────
+   Раньше «Атаки» и «Способности» были двумя списками, которых роднило только
+   совпадение названий. Теперь запись одна: у неё есть и описание с картинкой,
+   и числа. Вкладки — два взгляда на неё. Оружию описание не нужно, поэтому
+   в способности лезут только записи с kind 'feat'. */
+
+export const AIMS = [['one', 'Цель'], ['area', 'Область'], ['cone', 'Конус']];
+export const EFFECTS = [['dmg', 'Урон'], ['heal', 'Лечение'], ['buff', 'Польза'], ['debuff', 'Помеха']];
+export const GUARDS = [['ac', 'Бросок атаки по КД'], ['save', 'Спасбросок цели'], ['none', 'Без броска']];
+export const ON_SAVE = [['half', 'половина'], ['none', 'ничего']];
+export const DMG_TYPES = [
+  'рубящий', 'колющий', 'дробящий', 'огонь', 'холод', 'молния', 'кислота',
+  'яд', 'некротический', 'излучение', 'психический', 'силовое', 'звук',
+];
+export const FACES = [4, 6, 8, 10, 12, 20, 100];
+
+export function emptyMove(kind = 'feat') {
+  return {
+    id: uid('mv'), name: '', img: '', text: '', kind,
+    aim: 'one', size: 0,                              // область и конус меряем в футах
+    effect: 'dmg',
+    dice: [{ n: 0, d: 6, type: '' }, { n: 0, d: 6, type: '' }],   // урон бывает из двух кусков
+    guard: 'ac', guardAbil: 'dex', onSave: 'half',    // чем защищается цель
+    bonus: { from: 'none', value: 0 },                // от характеристики или свой
+    raw: '',                                          // текст из старой строки атаки
+  };
+}
+
+const fixDie = (d) => ({
+  n: Math.max(0, Math.min(20, Number(d && d.n) || 0)),
+  d: FACES.includes(Number(d && d.d)) ? Number(d.d) : 6,
+  type: DMG_TYPES.includes(d && d.type) ? d.type : '',
+});
+
+export function fixMove(f) {
+  const m = { ...emptyMove(f && f.kind === 'weapon' ? 'weapon' : 'feat'), ...(f || {}) };
+  m.id = m.id || uid('mv');
+  m.dice = [fixDie((f && f.dice || [])[0]), fixDie((f && f.dice || [])[1])];
+  if (!AIMS.some(([v]) => v === m.aim)) m.aim = 'one';
+  if (!EFFECTS.some(([v]) => v === m.effect)) m.effect = 'dmg';
+  if (!GUARDS.some(([v]) => v === m.guard)) m.guard = 'ac';
+  m.size = Math.max(0, Number(m.size) || 0);
+  const b = m.bonus || {};
+  m.bonus = { from: b.from || 'none', value: Number(b.value) || 0 };
+  return m;
+}
+
+/** Разбираем старое поле «Урон и вид»: «1d8+3 рубящий» — кости, прибавка и вид. */
+function parseDmg(txt) {
+  const t = String(txt || '');
+  const dice = t.match(/(\d*)\s*[dдк]\s*(\d+)/gi) || [];
+  const out = dice.slice(0, 2).map((piece) => {
+    const [, n, d] = piece.match(/(\d*)\s*[dдк]\s*(\d+)/i);
+    return fixDie({ n: Number(n) || 1, d: Number(d), type: '' });
+  });
+  const low = t.toLowerCase();
+  const type = DMG_TYPES.find((x) => low.includes(x.slice(0, 5)));
+  if (type && out[0]) out[0].type = type;
+  const plus = t.match(/[dдк]\s*\d+\s*([+-]\s*\d+)/i);
+  return { dice: out, plus: plus ? Number(plus[1].replace(/\s/g, '')) : null };
+}
+
+const nameKeyOf = (v) => String(v || '').trim().toLowerCase();
+
 export function emptySheet() {
   const s = {
     cls: [], level: 1, race: '', alignment: '', player: '',
     ac: 10, speed: 30, vision: 30,
     hpMax: 10, hpCur: 10, hitDice: '',
-    attacks: [{ name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }, { name: '', bonus: '', dmg: '' }],
-    feats: [],                 // способности: {id, name, img, text}
+    feats: [],                 // приёмы: способности и оружие одним списком
     lore: '', notes: '',
     wantPlayer: '', wantChar: '',   // желания человека за столом и самого героя
   };
@@ -68,12 +131,31 @@ export function fixSheet(raw) {
   // старый лист хранил класс свободным текстом — заворачиваем в герб-слот как есть,
   // герб для него нарисовать нечем, но название доживёт до ручного выбора игроком
   s.cls = Array.isArray(s.cls) ? s.cls.filter(Boolean).slice(0, 2) : (s.cls ? [s.cls] : []);
-  const rows = (raw && raw.attacks) || [];
-  s.attacks = rows.length ? rows.map((a) => ({ name: '', bonus: '', dmg: '', ...a })) : emptySheet().attacks;
-  s.feats = ((raw && raw.feats) || []).map((f) => ({ id: f.id || uid('ft'), name: f.name || '', img: f.img || '', text: f.text || '' }));
+  s.feats = ((raw && raw.feats) || []).map(fixMove);
   // старое текстовое поле «Умения и особенности» переносим в первую способность
-  if (!s.feats.length && raw && raw.features) s.feats = [{ id: uid('ft'), name: 'Особенности', img: '', text: raw.features }];
+  if (!s.feats.length && raw && raw.features) {
+    s.feats = [fixMove({ name: 'Особенности', text: raw.features })];
+  }
   delete s.features;
+
+  // Строки старых атак вливаем в общий список: совпало имя — в ту же запись,
+  // не совпало — новым оружием. Исходный текст держим рядом, чтобы при кривом
+  // разборе ничего не пропало молча.
+  ((raw && raw.attacks) || []).forEach((a) => {
+    if (!a || (!a.name && !a.bonus && !a.dmg)) return;
+    let m = s.feats.find((f) => f.name && nameKeyOf(f.name) === nameKeyOf(a.name));
+    if (!m) {
+      m = fixMove({ name: a.name || 'Оружие', kind: 'weapon' });
+      s.feats.push(m);
+    }
+    const { dice, plus } = parseDmg(a.dmg);
+    if (dice.length) m.dice = [dice[0] || fixDie(), dice[1] || fixDie()];
+    const bonus = String(a.bonus || '').match(/-?\d+/);
+    if (bonus) m.bonus = { from: 'custom', value: Number(bonus[0]) };
+    else if (plus !== null) m.bonus = { from: 'custom', value: plus };
+    m.raw = [a.bonus, a.dmg].filter(Boolean).join(' · ');
+  });
+  delete s.attacks;
   return s;
 }
 
@@ -343,6 +425,175 @@ function keyBox(key, ro) {
   return box;
 }
 
+/* ── Окно «Атаки и заклинания» ────────────────────────────────────── */
+
+const BONUS_FROM = [['none', 'Нет'], ...ABILITIES.map((a) => [a.id, a.label]), ['custom', 'Свой']];
+
+/**
+ * Список приёмов: свёрнутый — иконка и название, развёрнутый — все числа.
+ * Одна и та же разметка идёт и в кабинет, и в панель за столом; правится и там,
+ * и там, потому что посреди боя дописать урон бывает нужнее, чем до игры.
+ *
+ * ctx.onChange зовём, когда поменялось имя или вид: соседний список
+ * способностей смотрит в тот же массив и должен перерисоваться.
+ */
+function moveList(s, onEdit, ctx = {}) {
+  const ro = !!ctx.readOnly;
+  const host = el('div', 'moves');
+  let open = null;
+  const save = (deep) => { onEdit('feats', s.feats); if (deep && ctx.onChange) ctx.onChange(); };
+
+  const sel = (pairs, cur, on) => {
+    const n = el('select', 'sel sel-sm');
+    pairs.forEach(([v, label]) => {
+      const o = new Option(label, v);
+      if (String(cur) === String(v)) o.selected = true;
+      n.append(o);
+    });
+    if (ro) n.disabled = true;
+    else n.addEventListener('change', () => on(n.value));
+    return n;
+  };
+  const num = (val, on, min = 0, max = 99) => {
+    const n = el('input', 'num-sm');
+    n.type = 'number'; n.min = min; n.max = max; n.value = val;
+    if (ro) n.readOnly = true;
+    else n.addEventListener('input', () => on(Math.max(min, Math.min(max, Number(n.value) || 0))));
+    return n;
+  };
+  const fld = (label, ...kids) => {
+    const f = el('div', 'move-fld');
+    const line = el('div', 'move-line');
+    line.append(...kids);
+    f.append(el('span', 'fld-l', label), line);
+    return f;
+  };
+
+  function body(m) {
+    const b = el('div', 'move-body');
+
+    const nameI = el('input', 'feat-name-input');
+    nameI.value = m.name;
+    nameI.placeholder = m.kind === 'weapon' ? 'Название оружия' : 'Название способности';
+    if (ro) nameI.readOnly = true;
+    else nameI.addEventListener('input', () => { m.name = nameI.value; save(true); });
+    b.append(nameI);
+
+    /* направленность и размер пятна */
+    const sizeI = num(m.size, (v) => { m.size = v; save(); }, 0, 500);
+    const sizeWrap = el('span', 'move-size');
+    sizeWrap.append(sizeI, el('span', 'move-unit', 'фт'));
+    const showSize = () => { sizeWrap.hidden = m.aim === 'one'; };
+    b.append(fld('Направленность', sel(AIMS, m.aim, (v) => { m.aim = v; showSize(); save(); }), sizeWrap));
+    showSize();
+
+    b.append(fld('Тип', sel(EFFECTS, m.effect, (v) => { m.effect = v; save(); })));
+
+    /* чем защищается цель: по КД, спасброском или никак */
+    const abilSel = sel(ABILITIES.map((a) => [a.id, a.label]), m.guardAbil, (v) => { m.guardAbil = v; save(); });
+    const onSaveSel = sel(ON_SAVE, m.onSave, (v) => { m.onSave = v; save(); });
+    const saveExtra = el('span', 'move-save');
+    saveExtra.append(abilSel, el('span', 'move-unit', 'при успехе'), onSaveSel);
+    const showSave = () => { saveExtra.hidden = m.guard !== 'save'; };
+    b.append(fld('Чем защищается цель',
+      sel(GUARDS, m.guard, (v) => { m.guard = v; showSave(); save(); }), saveExtra));
+    showSave();
+
+    /* кости: двумя кусками — «1д8 рубящий + 2д6 огонь» */
+    const diceBox = el('div', 'move-dice');
+    m.dice.forEach((d, i) => {
+      const line = el('div', 'move-line');
+      line.append(
+        num(d.n, (v) => { d.n = v; save(); }, 0, 20),
+        el('span', 'move-unit', 'д'),
+        sel(FACES.map((f) => [f, String(f)]), d.d, (v) => { d.d = Number(v); save(); }),
+        sel([['', 'вид не указан'], ...DMG_TYPES.map((t) => [t, t])], d.type, (v) => { d.type = v; save(); }),
+      );
+      if (i) line.classList.add('move-dice-2');
+      diceBox.append(line);
+    });
+    const dmgLabel = el('div', 'move-fld');
+    dmgLabel.append(el('span', 'fld-l', m.effect === 'heal' ? 'Лечение' : 'Урон'), diceBox);
+    b.append(dmgLabel);
+
+    /* бонус: от характеристики или свой — прибавка к броску, не к костям */
+    const ownI = num(m.bonus.value, (v) => { m.bonus.value = v; save(); }, -20, 20);
+    const showOwn = () => { ownI.hidden = m.bonus.from !== 'custom'; };
+    b.append(fld('Бонус', sel(BONUS_FROM, m.bonus.from, (v) => { m.bonus.from = v; showOwn(); save(); }), ownI));
+    showOwn();
+
+    if (m.raw) b.append(el('p', 'hint', `Из старой записи: ${m.raw}`));
+
+    if (!ro) {
+      const acts = el('div', 'feat-acts');
+      if (ctx.pickImage) {
+        const up = el('label', 'btn btn-soft btn-sm file-btn', '🖼 Картинка');
+        const inp = el('input');
+        inp.type = 'file'; inp.accept = 'image/*'; inp.hidden = true;
+        inp.addEventListener('change', async () => {
+          if (!inp.files[0]) return;
+          m.img = await ctx.pickImage(inp.files[0], 220);
+          save(true); draw();
+        });
+        up.append(inp);
+        acts.append(up);
+      }
+      // вид решает, попадёт ли запись во вкладку способностей: оружию описание не нужно
+      const flip = el('button', 'btn btn-soft btn-sm',
+        m.kind === 'feat' ? 'Это оружие' : 'Это способность');
+      flip.type = 'button';
+      flip.title = 'Способности видны на вкладке с описаниями, оружие — только здесь';
+      flip.addEventListener('click', () => {
+        m.kind = m.kind === 'feat' ? 'weapon' : 'feat';
+        save(true); draw();
+      });
+      const del = el('button', 'btn btn-danger btn-sm', 'Убрать');
+      del.type = 'button';
+      del.addEventListener('click', () => {
+        if (!confirm(`Убрать «${m.name || 'без названия'}» совсем?`)) return;
+        s.feats = s.feats.filter((x) => x.id !== m.id);
+        save(true); draw();
+      });
+      acts.append(flip, del);
+      b.append(acts);
+    }
+    return b;
+  }
+
+  function draw() {
+    host.innerHTML = '';
+    s.feats.forEach((m) => {
+      const card = el('div', 'move feat' + (open === m.id ? ' is-open' : ''));
+      const tab = el('button', 'feat-tab');
+      tab.type = 'button';
+      const pic = el('span', 'feat-pic');
+      if (m.img) pic.style.backgroundImage = `url("${m.img}")`;
+      // «†» вместо меча: скрещённые мечи браузер рисует цветным эмодзи, и в
+      // сорока пикселях они читаются как ножницы
+      else pic.textContent = m.kind === 'weapon' ? '†' : '✦';
+      tab.append(pic, el('span', 'feat-name', m.name || 'Без названия'));
+      tab.addEventListener('click', () => { open = open === m.id ? null : m.id; draw(); });
+      card.append(tab);
+      if (open === m.id) card.append(body(m));
+      host.append(card);
+    });
+    if (!s.feats.length) host.append(el('p', 'hint', 'Пусто. Добавь оружие или заведи способность.'));
+  }
+  draw();
+
+  const addBtn = el('button', 'btn btn-soft btn-sm w-full', '+ Оружие');
+  addBtn.type = 'button';
+  addBtn.addEventListener('click', () => {
+    const m = emptyMove('weapon');
+    m.name = 'Новое оружие';
+    s.feats.push(m);
+    open = m.id;
+    save(true); draw();
+  });
+
+  return { host, draw, addBtn };
+}
+
 /**
  * Рисуем лист. onEdit(key) отдаёт правку наружу — кабинет её сохраняет.
  * ctx.insp — сколько вдохновений выдал Мастер, ctx.level — уровень от Мастера
@@ -445,74 +696,37 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   const hp = el('div', 'row-3');
   hp.append(numField('Хиты сейчас', 'hpCur'), numField('Максимум хитов', 'hpMax'), textField('Кость хитов', 'hitDice'));
 
-  /* Атаки: строки добавляются, названия подсказываются из способностей */
-  const listId = 'feat-names';
-  const datalist = el('datalist');
-  datalist.id = listId;
-  const atk = el('div', 'attacks');
-  const addAtkBtn = el('button', 'btn btn-soft btn-sm w-full', '+ Строка');
-  addAtkBtn.type = 'button';
-  addAtkBtn.addEventListener('click', () => {
-    s.attacks.push({ name: '', bonus: '', dmg: '' });
-    onEdit('attacks', s.attacks);
-    drawAttacks();
+  /* Атаки и заклинания: общий список приёмов, способности видны и здесь */
+  const moves = moveList(s, onEdit, {
+    readOnly: ro,
+    pickImage: ctx.pickImage,
+    onChange: () => drawFeats(),
   });
-
-  function drawAttacks() {
-    atk.innerHTML = '';
-    const h = el('div', 'atk-row atk-head');
-    h.append(el('span', '', 'Название'), el('span', '', 'Бонус'), el('span', '', 'Урон и вид'), el('span', '', ''));
-    atk.append(h);
-    s.attacks.forEach((a, i) => {
-      const r = el('div', 'atk-row');
-      ['name', 'bonus', 'dmg'].forEach((k) => {
-        const inp = el('input');
-        inp.value = a[k] || '';
-        if (k === 'name') inp.setAttribute('list', listId);
-        if (ro) inp.readOnly = true;
-        else inp.addEventListener('input', () => { a[k] = inp.value; onEdit('attacks', s.attacks); });
-        r.append(inp);
-      });
-      if (!ro) {
-        const del = el('button', 'row-del', '×');
-        del.type = 'button';
-        del.title = 'Убрать строку';
-        del.addEventListener('click', () => {
-          s.attacks.splice(i, 1);
-          if (!s.attacks.length) s.attacks.push({ name: '', bonus: '', dmg: '' });
-          onEdit('attacks', s.attacks);
-          drawAttacks();
-        });
-        r.append(del);
-      }
-      atk.append(r);
-    });
-  }
-  drawAttacks();
 
   const defenseBlk = block('Защита и ход', defense);
   const hpBlk = block('Хиты', hp);
-  const atkBlk = ro ? block('Атаки и заклинания', atk)
-    : block('Атаки и заклинания', atk, addAtkBtn, datalist);
+  const atkBlk = ro ? block('Атаки и заклинания', moves.host)
+    : block('Атаки и заклинания', moves.host, moves.addBtn);
+  atkBlk.classList.add('blk-scroll');
 
   const feats = el('div', 'feats');
   const addFeat = el('button', 'btn btn-soft btn-sm w-full', '+ Способность');
   addFeat.type = 'button';
   addFeat.addEventListener('click', () => {
-    const f = { id: uid('ft'), name: 'Новая способность', img: '', text: '' };
+    const f = emptyMove('feat');
+    f.name = 'Новая способность';
     s.feats.push(f);
     onEdit('feats', s.feats);
     openFeat = f.id;
     drawFeats();
+    moves.draw();
   });
 
   let openFeat = null;
   function drawFeats() {
     feats.innerHTML = '';
-    datalist.innerHTML = '';
-    s.feats.forEach((f) => {
-      if (f.name) datalist.append(new Option(f.name));
-
+    // во вкладке описаний живут только способности: оружию описывать нечего
+    s.feats.filter((f) => f.kind !== 'weapon').forEach((f) => {
       const card = el('div', 'feat' + (openFeat === f.id ? ' is-open' : ''));
       const tab = el('button', 'feat-tab');
       tab.type = 'button';
@@ -536,7 +750,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
           f.name = nameI.value;
           onEdit('feats', s.feats);
           tab.querySelector('.feat-name').textContent = f.name || 'Без названия';
-          refreshNames();
+          moves.draw();                      // запись одна — переименовалась и в атаках
         });
         const ta = el('textarea');
         ta.rows = 5;
@@ -553,6 +767,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
           f.img = await ctx.pickImage(inp.files[0], 220);
           onEdit('feats', s.feats);
           drawFeats();
+          moves.draw();
         });
         up.append(inp);
         const del = el('button', 'btn btn-danger btn-sm', 'Убрать');
@@ -562,6 +777,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
           s.feats = s.feats.filter((x) => x.id !== f.id);
           onEdit('feats', s.feats);
           drawFeats();
+          moves.draw();
         });
         row.append(up, del);
         body.append(nameI, ta, row);
@@ -569,12 +785,8 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
       }
       feats.append(card);
     });
-    if (!s.feats.length) feats.append(el('p', 'hint', 'Способностей пока нет.'));
+    if (!feats.children.length) feats.append(el('p', 'hint', 'Способностей пока нет.'));
   }
-  const refreshNames = () => {
-    datalist.innerHTML = '';
-    s.feats.forEach((f) => { if (f.name) datalist.append(new Option(f.name)); });
-  };
   drawFeats();
 
   const featsBlk = ro ? block('Умения и способности', feats)
@@ -709,12 +921,18 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   vitals.append(numCell('КД', 'ac'), numCell('Хиты', 'hpCur'), numCell('Максимум', 'hpMax'));
   root.append(block('Защита и хиты', vitals));
 
+  /* ── атаки и заклинания: тот же список, что в кабинете, правится в бою ── */
+  const moves = moveList(s, onEdit, { onChange: () => drawFeats() });
+  const movesBlk = block('Атаки и заклинания', moves.host, moves.addBtn);
+  movesBlk.classList.add('blk-scroll');
+  root.append(movesBlk);
+
   /* ── способности: вкладка разворачивается в описание ── */
   const feats = el('div', 'feats');
   let open = null;
   function drawFeats() {
     feats.innerHTML = '';
-    s.feats.forEach((f) => {
+    s.feats.filter((f) => f.kind !== 'weapon').forEach((f) => {
       const card = el('div', 'feat' + (open === f.id ? ' is-open' : ''));
       const tab = el('button', 'feat-tab');
       tab.type = 'button';
@@ -730,13 +948,16 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
         ta.rows = 4;
         ta.value = f.text || '';
         ta.placeholder = 'Что делает способность';
-        ta.addEventListener('input', () => { f.text = ta.value; onEdit('feats', s.feats); });
+        ta.addEventListener('input', () => {
+          f.text = ta.value;
+          onEdit('feats', s.feats);
+        });
         body.append(ta);
         card.append(body);
       }
       feats.append(card);
     });
-    if (!s.feats.length) feats.append(el('p', 'hint', 'Способности заводятся в кабинете.'));
+    if (!feats.children.length) feats.append(el('p', 'hint', 'Способности заводятся в кабинете.'));
   }
   drawFeats();
   root.append(block('Способности', feats));

@@ -108,7 +108,7 @@
 .sheet-col{display:flex; flex-direction:column; gap:var(--s3); min-width:0}
 .sheet-col .blk{margin:0}
 /* Способности живут в своём окне: длинный список прокручивается внутри */
-.blk-scroll .feats{max-height:340px; overflow-y:auto; padding-right:var(--s1)}
+.blk-scroll .feats,.blk-scroll .moves{max-height:340px; overflow-y:auto; padding-right:var(--s1)}
 .sheet-bottom{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); margin-top:var(--s3)}
 
 .blk{border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s3)}
@@ -273,13 +273,36 @@
   border-radius:var(--r-sm); border:1px solid var(--line-soft); background:var(--bg-2); color:var(--text);
 }
 
-.attacks{display:flex; flex-direction:column; gap:var(--s1)}
-.atk-row{display:grid; grid-template-columns:1.4fr .45fr 1.1fr 32px; gap:var(--s1)}
-.atk-row input{
-  min-height:36px; padding:0 var(--s2); border-radius:var(--r-sm);
-  border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:14px; width:100%;
+/* ── Приёмы: свёрнуто — только названия, развёрнуто — все числа ── */
+.moves{display:flex; flex-direction:column; gap:var(--s1)}
+.move-body{padding:0 var(--s2) var(--s2); display:flex; flex-direction:column; gap:var(--s2)}
+.move-fld{display:flex; flex-direction:column; gap:var(--s1)}
+.move-line{display:flex; align-items:center; gap:var(--s1); flex-wrap:wrap}
+.move-line[hidden]{display:none}
+/* панель за столом узкая: выпадающие списки тянутся во всю строку, а не по тексту */
+.move-line > .sel-sm{flex:1 1 140px; min-width:0}
+.move-unit{font-size:14px; color:var(--muted)}
+.move-size{display:inline-flex; align-items:center; gap:var(--s1); flex:0 0 auto}
+.move-size[hidden]{display:none}
+/* спасбросок: характеристика во всю ширину, под ней «при успехе» со списком */
+.move-save{display:grid; grid-template-columns:auto 1fr; gap:var(--s1); align-items:center; width:100%}
+.move-save > .sel-sm:first-child{grid-column:1 / -1}
+.move-save[hidden]{display:none}
+.move-dice{display:flex; flex-direction:column; gap:var(--s1)}
+/* «4 д 8» держим одной строкой, вид урона уходит под неё во всю ширину */
+.move-dice .move-line{display:grid; grid-template-columns:56px auto 1fr; align-items:center}
+.move-dice .move-line > .sel-sm{flex:none}
+.move-dice .move-line > .sel-sm:last-child{grid-column:1 / -1}
+/* второй кусок урона — продолжение первого, отсюда знак «плюс» на поле */
+.move-dice-2{position:relative; padding-left:var(--s3)}
+.move-dice-2::before{content:"+"; position:absolute; left:0; top:8px; color:var(--gold-dim); font-size:16px}
+.sel-sm,.num-sm{
+  min-height:36px; padding:0 var(--s2); border-radius:var(--r-sm); font-size:14px;
+  border:1px solid var(--line); background:var(--bg-2); color:var(--text);
 }
-.atk-head span{font-size:14px; color:var(--muted)}
+.num-sm{width:56px; text-align:center}
+.num-sm[hidden]{display:none}
+.sel-sm:focus,.num-sm:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
 
 /* ── Ключ персонажа ── */
 .key-box{
@@ -296,7 +319,6 @@
 /* ── Лист глазами Мастера: правок нет, поля просто читаются ── */
 .sheet.is-ro input,.sheet.is-ro textarea{background:var(--bg-2); color:var(--text); cursor:default}
 .sheet.is-ro input:focus,.sheet.is-ro textarea:focus{outline:1px solid var(--line)}
-.sheet.is-ro .atk-row{grid-template-columns:1.4fr .45fr 1.1fr}
 .feat-text{font-size:16px; line-height:1.5; padding:0 var(--s1) var(--s1); white-space:pre-wrap}
 
 /* ── Страница Мастера: персонажи игроков ── */

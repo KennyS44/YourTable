@@ -75,6 +75,7 @@ export function normalize(raw) {
     t.statuses = t.statuses || [];
     t.vision = t.vision || 0;
     t.cells = t.cells || 1;
+    t.ac = Number(t.ac) || 10;
   });
   // Карточки существ: имя, хиты и обзор живут в базе, а не только на фигурке
   Object.values(s.library).forEach((it) => { it.stats = { ...defaultStats(it.kind), ...(it.stats || {}) }; });
@@ -106,6 +107,7 @@ export function newLocation(name) {
 export function defaultStats(kind) {
   return {
     hp: { cur: 10, max: 10 },
+    ac: 10,                      // по нему сверяют попадание
     vision: kind === 'pc' ? 30 : 0,
     cells: 1,
     hpPublic: kind === 'pc',
@@ -117,7 +119,8 @@ export function newToken(patch) {
   return {
     id: uid('tok'), locId: null, x: 0, y: 0, cells: 1,
     assetId: null, libId: null, name: 'Существо', kind: 'npc',
-    ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, hpPublic: true, namePublic: true, statuses: [],
+    ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, ac: 10,
+    hpPublic: true, namePublic: true, statuses: [],
     vision: 0, ...patch,
   };
 }

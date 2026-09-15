@@ -86,7 +86,7 @@ const поле = async (label, value) => {
 await поле('Максимум хитов', 34);
 await поле('Хиты сейчас', 28);
 await поле('Обзор, фт', 60);
-await поле('Класс', 'Воин 4');
+// класс теперь выбирают гербом-монетой, вписать в него текстом нечего
 await pl.evaluate(() => {
   const a = [...document.querySelectorAll('#sheet .abil')].find((x) => x.querySelector('.abil-l').textContent === 'Сила');
   const i = a.querySelector('.abil-score');
@@ -118,7 +118,7 @@ R.лист = await pl.evaluate(() => {
   };
 });
 
-/* способность: добавляем, называем — имя должно попасть в подсказки атак */
+/* способность: добавляем, называем — запись одна, её видно и в атаках */
 await pl.evaluate(() => {
   [...document.querySelectorAll('#sheet .btn')].find((b) => b.textContent.includes('Способность')).click();
 });
@@ -131,17 +131,21 @@ await pl.evaluate(() => {
 });
 await pl.waitForTimeout(600);
 R.способности = await pl.evaluate(() => ({
-  вкладок: document.querySelectorAll('#sheet .feat').length,
-  название: document.querySelector('#sheet .feat-name').textContent,
-  подтянулосьВАтаки: [...document.querySelectorAll('#sheet datalist option')].map((o) => o.value),
+  вкладок: document.querySelectorAll('#sheet .feats .feat').length,
+  название: document.querySelector('#sheet .feats .feat-name').textContent,
+  подтянулосьВАтаки: [...document.querySelectorAll('#sheet .moves .feat-name')].map((n) => n.textContent),
 }));
 
-/* строки атак добавляются */
-const строкАтак = () => pl.$$eval('#sheet .atk-row:not(.atk-head)', (n) => n.length);
-const былоСтрок = await строкАтак();
-await pl.evaluate(() => { [...document.querySelectorAll('#sheet .btn')].find((b) => b.textContent.includes('Строка')).click(); });
+/* оружие добавляется в общий список и в способности не лезет */
+const приёмов = () => pl.$$eval('#sheet .moves .move', (n) => n.length);
+const былоПриёмов = await приёмов();
+await pl.evaluate(() => { [...document.querySelectorAll('#sheet .btn')].find((b) => b.textContent.includes('Оружие')).click(); });
 await pl.waitForTimeout(500);
-R.атаки = { было: былоСтрок, стало: await строкАтак() };
+R.атаки = {
+  было: былоПриёмов,
+  стало: await приёмов(),
+  вСпособностях: await pl.$$eval('#sheet .feats .feat', (n) => n.length),
+};
 
 /* ── Экспорт и импорт персонажа ── */
 const [загрузка] = await Promise.all([
@@ -177,12 +181,13 @@ await pl2.waitForTimeout(800);
 R.послеПерезахода = await pl2.evaluate(() => {
   const f = (l) => {
     const x = [...document.querySelectorAll('#sheet .fld')].find((n) => n.querySelector('.fld-l').textContent === l);
-    return x ? x.querySelector('input').value : null;
+    // у класса вместо поля герб-монета — входа для текста там нет
+    return x && x.querySelector('input') ? x.querySelector('input').value : null;
   };
   return {
     имя: document.querySelector('.char-card.is-active .char-name').value,
-    хиты: f('Максимум хитов'), обзор: f('Обзор, фт'), класс: f('Класс'),
-    способность: document.querySelector('#sheet .feat-name')?.textContent,
+    хиты: f('Максимум хитов'), обзор: f('Обзор, фт'),
+    способность: document.querySelector('#sheet .feats .feat-name')?.textContent,
   };
 });
 R.чужойПароль = await (async () => {
