@@ -329,6 +329,9 @@ async function run(stage, result, caption) {
   const camera = new THREE.OrthographicCamera(-wide / 2, wide / 2, view / 2, -view / 2, 1, 220);
   camera.position.set(0, Math.cos(TILT) * 80, Math.sin(TILT) * 80 + 2);
   camera.lookAt(0, 0, 2);
+  // без этого мировая матрица камеры пустая, и промер стола лучом мимо кассы:
+  // борта вставали по запасным числам, а стол выходил вчетверо меньше
+  camera.updateMatrixWorld(true);
 
   scene.add(new THREE.HemisphereLight(0xfff0d0, 0x4a4136, 1.35));
   const key = new THREE.DirectionalLight(0xffe9bd, 2.2);
@@ -371,17 +374,29 @@ async function run(stage, result, caption) {
       world.addBody(wall);
     });
 
+    // Бросаем с четырёх сторон по очереди: кости идут навстречу друг другу и
+    // расходятся по столу, а не выстраиваются в очередь к дальнему борту.
+    const turn = Math.floor(Math.random() * 4);
     const dice = list.map((item, i) => {
       const kind = KINDS[item.kind];
       const sh = shape(kind);
       const bd = body(CANNON, sh, 260);
-      // кости влетают слева и укатываются к середине стола, а не в дальний угол
       bd.linearDamping = .16;
       bd.angularDamping = .12;
-      // каждая кость летит своей дорожкой — иначе все сваливаются в одну кучу
-      const lane = list.length > 1 ? i / (list.length - 1) - .5 : 0;
-      bd.position.set(-b.x * .55 + Math.random() * .6, 5 + i * 1.1, lane * (b.near + b.far));
-      bd.velocity.set(1.8 + b.x * .3 + Math.random() * 1.6, 1, -1 - lane * 2.4 - Math.random());
+
+      const side = (i + turn) % 4;
+      const along = (k) => (Math.random() - .5) * 1.4 * k;      // разброс вдоль борта
+      // Скорость по задуманному пути: дальше половины стола кость не улетает,
+      // иначе весь бросок кончается у противоположного борта.
+      const ходу = (d) => 1.2 + .8 * d * (.3 + Math.random() * .22);
+      let px, pz, vx, vz;
+      if (side === 0) { px = -b.x + .6; pz = along(b.near); vx = ходу(2 * b.x); vz = -pz * .35; }
+      else if (side === 1) { px = b.x - .6; pz = along(b.near); vx = -ходу(2 * b.x); vz = -pz * .35; }
+      else if (side === 2) { pz = b.near - .6; px = along(b.x); vz = -ходу(b.near + b.far); vx = -px * .35; }
+      else { pz = -b.far + .6; px = along(b.x); vz = ходу(b.near + b.far); vx = -px * .35; }
+
+      bd.position.set(px, 4 + (i % 3) * .9, pz);
+      bd.velocity.set(vx, 1, vz);
       bd.angularVelocity.set(rnd(9), rnd(9), rnd(9));
       bd.quaternion.setFromEuler(rnd(3), rnd(3), rnd(3));
       world.addBody(bd);
@@ -402,11 +417,36 @@ async function run(stage, result, caption) {
     return dice;
   };
 
-  // Кость, залезшая на другую, не читается — такой бросок переигрываем заново.
-  // Прогон идёт без картинки и стоит доли миллисекунды, так что это не заметно.
-  const heaped = (d) => d.some((x) => x.bd.position.y > x.sh.inr * 1.9);
-  let dice = throwOnce();
-  for (let again = 0; again < 6 && heaped(dice); again++) dice = throwOnce();
+  /**
+   * Чем плох этот бросок: кость забралась на соседку, уткнулась в борт или
+   * стоит к соседке вплотную. Ноль — значит все лежат врозь и читаются.
+   */
+  const faults = (d) => {
+    let bad = 0;
+    d.forEach((x, i) => {
+      const p = x.bd.position;
+      if (p.y > x.sh.inr * 1.6) bad++;                                    // залезла на другую
+      const edge = x.kind.r * .9;
+      if (Math.abs(p.x) > b.x - edge || p.z > b.near - edge || p.z < -b.far + edge) bad++;
+      for (let j = i + 1; j < d.length; j++) {
+        const q = d[j].bd.position;
+        const need = (x.kind.r + d[j].kind.r) * 1.12;
+        if (Math.hypot(p.x - q.x, p.z - q.z) < need) bad++;               // жмётся к соседке
+      }
+    });
+    return bad;
+  };
+
+  // Плохой бросок просто переигрываем: прогон идёт без картинки и стоит доли
+  // миллисекунды, поэтому со стороны это всё тот же один бросок.
+  let dice = null;
+  let worst = Infinity;
+  for (let again = 0; again < 12; again++) {
+    const d = throwOnce();
+    const bad = faults(d);
+    if (bad < worst) { worst = bad; dice = d; }
+    if (!bad) break;
+  }
 
   /* ── доворот: нужное число кверху, раскладка при этом остаётся настоящей ── */
   const up = new THREE.Vector3(0, 1, 0);
@@ -447,7 +487,12 @@ async function run(stage, result, caption) {
       : (x.kind.corners ? values.vert[ups] : values.face[ups]);
   });
   // для проверки: что просили показать и что в самом деле легло кверху
-  window.__dice3dLast = dice.map((x) => ({ надо: x.item.want, сверху: x.shown }));
+  window.__dice3dLast = dice.map((x) => ({
+    надо: x.item.want, сверху: x.shown, r: x.kind.r,
+    x: +x.bd.position.x.toFixed(2), y: +x.bd.position.y.toFixed(2), z: +x.bd.position.z.toFixed(2),
+  }));
+  window.__dice3dTray = { x: +b.x.toFixed(2), near: +b.near.toFixed(2), far: +b.far.toFixed(2) };
+  window.__dice3dFaults = worst;      // сколько огрехов осталось в раскладке костей
 
   /* ── и только теперь собираем видимые кости ── */
   const trash = [];
