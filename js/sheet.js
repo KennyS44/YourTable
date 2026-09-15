@@ -24,19 +24,17 @@ const HEAD = [
   { id: 'player', label: 'Имя игрока' },
 ];
 
-// Порядок карточек в потоке; по колонкам их раскладывает сама вёрстка,
-// поэтому столбцы кончаются на одной высоте, сколько бы ни было способностей.
-// rows подобраны так, чтобы три столбца кончались примерно на одной высоте:
-// в третьем живут самые словоохотливые поля, им и места побольше.
+// rows подобраны так, чтобы три столбца (см. cols ниже) кончались примерно на
+// одной высоте: где поле стоит в одиночку, там ему и места побольше.
 const TEXTS = [
-  { id: 'appearance', label: 'Внешний вид', rows: 7 },
+  { id: 'appearance', label: 'Внешний вид', rows: 8 },
   { id: 'traits', label: 'Черты характера', rows: 3 },
   { id: 'ideals', label: 'Идеалы', rows: 2 },
   { id: 'bonds', label: 'Привязанности', rows: 2 },
   { id: 'flaws', label: 'Слабости', rows: 2 },
   { id: 'resist', label: 'Сопротивления', rows: 2 },
-  { id: 'gear', label: 'Снаряжение', rows: 6 },
-  { id: 'langs', label: 'Прочие владения и языки', rows: 5 },
+  { id: 'gear', label: 'Снаряжение', rows: 4 },
+  { id: 'langs', label: 'Прочие владения и языки', rows: 8 },
 ];
 
 // В бумажном листе это один блок, и здесь тоже: карточки порознь растягивали
@@ -593,10 +591,12 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   const rest = Object.fromEntries(
     TEXTS.filter((t) => !paired.includes(t.id)).map((t) => [t.id, area(t)]),
   );
+  // Слева всё, что про тело и снаряжение героя, посередине — что он делает,
+  // справа — каким его видят и чем его не взять.
   const cols = [
-    [abilBlk, defenseBlk, hpBlk, block('Сопротивления и слабости', pairGrid(DEFENCE))],
+    [abilBlk, defenseBlk, hpBlk, rest.gear],
     [atkBlk, featsBlk, block('Личность', pairGrid(PERSONA))],
-    [rest.appearance, rest.gear, rest.langs],
+    [rest.appearance, rest.langs, block('Сопротивления и слабости', pairGrid(DEFENCE))],
   ];
   cols.forEach((items) => {
     const col = el('div', 'sheet-col');
