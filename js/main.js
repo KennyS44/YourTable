@@ -7,7 +7,10 @@ import { createBoard } from './board.js';
 import { DICE, roll } from './dice.js';
 import { showRoll } from './dice3d.js';
 import { packRoom } from './roomcode.js';
-import { fixSheet, renderSheetLite, ABILITIES, DMG_TYPES, mod as sheetMod } from './sheet.js';
+import {
+  fixSheet, renderSheetLite, ABILITIES, DMG_TYPES,
+  damageTypesIn, savesFromSheet, mod as sheetMod,
+} from './sheet.js';
 import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
 import { fileName } from './translit.js';
@@ -1891,8 +1894,30 @@ async function wireHeroSheet() {
       app.store.dispatch({ t: 'token.update', id: t.id, patch: { hp: { cur: ch.sheet.hpCur, max: ch.sheet.hpMax } } });
     });
   };
+  /* Стойкость и спасброски героя фигурка берёт из листа сама. Мастеру их в
+     карточке не показываем: у героя они не вписываются руками, а считаются —
+     спасбросок равен модификатору характеристики, а виды урона вычитываются
+     из полей «Сопротивления» (×½) и «Слабости» (×2). */
+  const traitsOf = () => ({
+    saves: savesFromSheet(ch.sheet),
+    resist: damageTypesIn(ch.sheet.resist),
+    vuln: damageTypesIn(ch.sheet.flaws),
+  });
+  const pushTraitsToToken = () => {
+    const { saves, resist, vuln } = traitsOf();
+    myTokens(app.store.get()).forEach((t) => {
+      const тоже = ABILITIES.every((a) => (Number((t.saves || {})[a.id]) || 0) === saves[a.id])
+        && (t.resist || []).join() === resist.join()
+        && (t.vuln || []).join() === vuln.join();
+      if (тоже) return;
+      app.store.dispatch({ t: 'token.update', id: t.id, patch: { saves, resist, vuln } });
+    });
+  };
+
   const onEdit = (key) => {
     if (key === 'hpCur' || key === 'hpMax') pushHpToToken();
+    // характеристики двигают спасброски, поля стойкости — множители урона
+    if (ABILITIES.some((a) => a.id === key) || key === 'resist' || key === 'flaws') pushTraitsToToken();
     save();
   };
 
@@ -1903,7 +1928,10 @@ async function wireHeroSheet() {
   });
   showLevel(app.store.get());
   syncHpFromToken(app.store.get());
-  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); });
+  pushTraitsToToken();
+  // фигурку ставит Мастер, и появиться она может позже: следим за столом и
+  // дописываем в неё лист, как только она встала
+  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); pushTraitsToToken(); });
 }
 
 function wireDM() {
