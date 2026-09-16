@@ -1846,13 +1846,49 @@ async function wireHeroSheet() {
   if (!(now.levels && now.levels[myKey]) && Number(ch.sheet.level) > 1) {
     setLevel(myKey, Number(ch.sheet.level));
   }
-  renderSheetLite($('#lite-sheet'), ch, save, {
+  /* ── Хиты листа и фигурки — одни и те же ──────────────────────────
+     Главная здесь фигурка: по ней бьют, её лечат, и лист показывает то же
+     число. Правка хитов в листе доходит до фигурки обратным ходом. */
+  const myTokens = (s) => {
+    const мои = Object.values(s.tokens).filter((t) => nameKey(t.ownerName) === myKey);
+    const поИмени = мои.filter((t) => nameKey(t.name) === nameKey(ch.name));
+    return поИмени.length ? поИмени : мои;
+  };
+  const setHpInputs = () => {
+    [['hpCur', ch.sheet.hpCur], ['hpMax', ch.sheet.hpMax]].forEach(([key, v]) => {
+      const i = $(`#lite-sheet .fld-${key} input`);
+      // поле под курсором не трогаем: иначе вырвем число из-под пальцев
+      if (i && document.activeElement !== i) i.value = v;
+    });
+  };
+  const syncHpFromToken = (s) => {
+    const t = myTokens(s)[0];
+    if (!t || !t.hp || !(t.hp.max > 0)) return;
+    if (ch.sheet.hpCur === t.hp.cur && ch.sheet.hpMax === t.hp.max) return;
+    ch.sheet.hpCur = t.hp.cur;
+    ch.sheet.hpMax = t.hp.max;
+    setHpInputs();
+    save();
+  };
+  const pushHpToToken = () => {
+    myTokens(app.store.get()).forEach((t) => {
+      if (t.hp && t.hp.cur === ch.sheet.hpCur && t.hp.max === ch.sheet.hpMax) return;
+      app.store.dispatch({ t: 'token.update', id: t.id, patch: { hp: { cur: ch.sheet.hpCur, max: ch.sheet.hpMax } } });
+    });
+  };
+  const onEdit = (key) => {
+    if (key === 'hpCur' || key === 'hpMax') pushHpToToken();
+    save();
+  };
+
+  renderSheetLite($('#lite-sheet'), ch, onEdit, {
     level: levelOf(app.store.get(), myKey),
     onRoll: rollAbility,
     onUse: (m) => useMove(m, ch),
   });
   showLevel(app.store.get());
-  app.store.subscribe(showLevel);
+  syncHpFromToken(app.store.get());
+  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); });
 }
 
 function wireDM() {

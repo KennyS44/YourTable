@@ -953,7 +953,9 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
     return b;
   };
   const numCell = (label, key) => {
-    const f = el('label', 'fld fld-num');
+    // класс по имени поля: стол находит хиты снаружи, чтобы обновить их,
+    // когда фигурке на поле досталось
+    const f = el('label', 'fld fld-num fld-' + key);
     const i = el('input');
     i.type = 'number';
     i.value = s[key] ?? 0;
