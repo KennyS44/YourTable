@@ -232,7 +232,6 @@
           <button class="tab" data-libfilter="enemy">Враги</button>
         </div>
         <div class="lib-grid" id="lib-grid"></div>
-        <p class="hint">Перетащите иконку на поле или кликните дважды. ✎ — карточка существа: имя, хиты, КД и дальность зрения сохранятся в базе и вернутся с новой фигуркой.</p>
       </section>
 
       <section class="panel-body dm-only" data-lpanel="room" hidden>
@@ -241,13 +240,9 @@
         <button class="btn btn-soft btn-sm w-full" id="btn-forget-offline" hidden>Забыть всех не в сети</button>
         <div class="divider"></div>
         <h3 class="h-sm">Ключи</h3>
-        <!-- за спиной Мастера может стоять кто угодно: ключи закрыты точками -->
-        <label class="field"><span>Ключ игроков</span><input id="key-player" type="password" autocomplete="off"></label>
-        <label class="field"><span>Ключ Мастера</span><input id="key-dm" type="password" autocomplete="off"></label>
-        <div class="row-2">
-          <button class="btn btn-soft" id="btn-show-keys">Показать</button>
-          <button class="btn btn-soft" id="btn-save-keys">Сохранить</button>
-        </div>
+        <label class="field"><span>Ключ игроков</span><input id="key-player" type="text" autocomplete="off"></label>
+        <label class="field"><span>Ключ Мастера</span><input id="key-dm" type="text" autocomplete="off"></label>
+        <button class="btn btn-soft w-full" id="btn-save-keys">Сохранить ключи</button>
         <div class="divider"></div>
         <h3 class="h-sm">Ссылки-приглашения</h3>
         <button class="btn btn-soft w-full" id="btn-invite">Пригласить</button>

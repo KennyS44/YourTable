@@ -179,8 +179,7 @@
 .mini{border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; padding:var(--s1)}
 .mini:hover{color:var(--gold)}
 
-/* Две колонки, а не три: в 85 пикселях имя существа не помещалось никогда */
-.lib-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:var(--s2); margin-top:var(--s3)}
+.lib-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:var(--s2); margin-top:var(--s3)}
 .lib-item{position:relative; border:1px solid var(--line-soft); border-radius:var(--r-sm); overflow:hidden; background:var(--bg-2); cursor:grab}
 .lib-item img{width:100%; aspect-ratio:1; object-fit:cover; display:block}
 .lib-item .cap{font-size:14px; padding:2px var(--s1); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}

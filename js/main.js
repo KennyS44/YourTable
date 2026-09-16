@@ -1699,12 +1699,6 @@ function wireDM() {
   $('#key-dm').value = s0.room.dmKey || '';
   // ключ игроков задан при создании комнаты: поле просто заперто, без подписи
   if (useFirebase) $('#key-player').disabled = true;
-  // ключи показываем только по просьбе — и тут же прячем обратно
-  $('#btn-show-keys').addEventListener('click', () => {
-    const скрыты = $('#key-player').type === 'password';
-    $('#key-player').type = $('#key-dm').type = скрыты ? 'text' : 'password';
-    $('#btn-show-keys').textContent = скрыты ? 'Скрыть' : 'Показать';
-  });
   $('#btn-save-keys').addEventListener('click', () => {
     app.store.dispatch({ t: 'room.keys', patch: { playerKey: $('#key-player').value, dmKey: $('#key-dm').value } });
     say('Ключи комнаты изменены', 'system');
