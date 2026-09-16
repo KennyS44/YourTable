@@ -252,6 +252,7 @@ async function bringCharacter() {
     hp: { cur: ch.hp && ch.hp.cur > 0 ? ch.hp.cur : 10, max: ch.hp && ch.hp.max > 0 ? ch.hp.max : 10 },
     ac: ch.ac > 0 ? ch.ac : 10,
     vision: ch.vision > 0 ? ch.vision : 30,
+    speed: ch.speed > 0 ? ch.speed : 30,
     cells: 1, hpPublic: true, namePublic: true,
   };
   // персонаж принадлежит тому, кто его привёл: и карточка, и будущие фигурки
@@ -552,16 +553,27 @@ function renderInit(s) {
       }
     }
     if (app.isDM) {
+      // висят только наложенные состояния, остальные ждут под «+ состояние»:
+      // иначе каждая строка боя разрастается в стену одинаковых слов
       const st = el('div', 'status-row');
-      STATUSES.forEach((name) => {
-        const on = (t.statuses || []).includes(name);
+      const свои = t.statuses || [];
+      const кнопка = (name, on) => {
         const b = el('button', 'status' + (on ? ' on' : ''), name);
         b.addEventListener('click', () => {
-          const next = on ? t.statuses.filter((x) => x !== name) : [...(t.statuses || []), name];
+          const next = on ? свои.filter((x) => x !== name) : [...свои, name];
           app.store.dispatch({ t: 'token.status', id: t.id, statuses: next });
         });
-        st.append(b);
+        return b;
+      };
+      свои.forEach((name) => st.append(кнопка(name, true)));
+      const add = el('button', 'status status-add', свои.length ? '+' : '+ состояние');
+      add.title = 'Наложить состояние';
+      add.addEventListener('click', () => {
+        const box = el('div', 'status-row status-pick');
+        STATUSES.filter((n) => !свои.includes(n)).forEach((n) => box.append(кнопка(n, false)));
+        add.replaceWith(box);
       });
+      st.append(add);
       row.append(st);
     } else if ((t.statuses || []).length) {
       const st = el('div', 'status-row');
@@ -843,8 +855,11 @@ function libFields(host, it, redraw, kinds = null) {
     field('КД', numInput(st.ac, (v) => libUpd(it.id, { stats: { ac: Math.max(0, v) } }))),
     field('Размер, клеток',
       numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } })))));
-  host.append(field('Обзор, футов (0 — без обзора)',
-    numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
+  host.append(pair(
+    field('Обзор, футов (0 — без обзора)',
+      numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))),
+    field('Скорость, футов за ход',
+      numInput(st.speed, (v) => libUpd(it.id, { stats: { speed: Math.max(0, v) } })))));
   // Герой приносит своё: стойкость к урону и спасброски у него в листе, а не
   // в базе иконок. Поэтому эти поля — только у НПС и врагов.
   if (it.kind !== 'pc') {
@@ -977,8 +992,11 @@ function openTokenCard(t, screenPos) {
   card.append(pair(
     field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))),
     field('Размер, клеток', numInput(t.cells, (v) => upd(t.id, { cells: Math.max(1, Math.min(6, v)) })))));
-  card.append(field('Дальность зрения, футов (0 — без обзора)',
-    numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
+  card.append(pair(
+    field('Дальность зрения, футов (0 — без обзора)',
+      numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))),
+    field('Скорость, футов за ход',
+      numInput(t.speed, (v) => upd(t.id, { speed: Math.max(0, v) })))));
   // то же и у фигурки: у героя стойкость и спасброски берутся из его листа
   if (t.kind !== 'pc') {
     const живой = () => app.store.get().tokens[t.id] || t;
@@ -1040,7 +1058,7 @@ function openTokenCard(t, screenPos) {
       libUpd(lib.id, {
         name: cur.name,
         stats: {
-          hp: { ...cur.hp }, ac: cur.ac, vision: cur.vision, cells: cur.cells,
+          hp: { ...cur.hp }, ac: cur.ac, vision: cur.vision, speed: cur.speed, cells: cur.cells,
           hpPublic: cur.hpPublic !== false, namePublic: cur.namePublic !== false,
           resist: [...(cur.resist || [])], vuln: [...(cur.vuln || [])], immune: [...(cur.immune || [])],
           saves: { ...(cur.saves || {}) }, moves: (cur.moves || []).map((m) => ({ ...m })),
@@ -1183,7 +1201,7 @@ function dropToken(libId, worldPos) {
   const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
   const token = newToken({
     locId: s.activeLoc, x: c.x, y: c.y, assetId: it.assetId, libId: it.id, name: it.name, kind: it.kind,
-    cells: st.cells, vision: st.vision, hp: { ...st.hp }, ac: st.ac,
+    cells: st.cells, vision: st.vision, speed: st.speed, hp: { ...st.hp }, ac: st.ac,
     hpPublic: st.hpPublic, namePublic: st.namePublic,
     resist: [...(st.resist || [])], vuln: [...(st.vuln || [])], immune: [...(st.immune || [])],
     saves: { ...(st.saves || {}) }, moves: (st.moves || []).map(fixMove),
@@ -1681,6 +1699,12 @@ function wireDM() {
   $('#key-dm').value = s0.room.dmKey || '';
   // ключ игроков задан при создании комнаты: поле просто заперто, без подписи
   if (useFirebase) $('#key-player').disabled = true;
+  // ключи показываем только по просьбе — и тут же прячем обратно
+  $('#btn-show-keys').addEventListener('click', () => {
+    const скрыты = $('#key-player').type === 'password';
+    $('#key-player').type = $('#key-dm').type = скрыты ? 'text' : 'password';
+    $('#btn-show-keys').textContent = скрыты ? 'Скрыть' : 'Показать';
+  });
   $('#btn-save-keys').addEventListener('click', () => {
     app.store.dispatch({ t: 'room.keys', patch: { playerKey: $('#key-player').value, dmKey: $('#key-dm').value } });
     say('Ключи комнаты изменены', 'system');

@@ -179,7 +179,8 @@
 .mini{border:0; background:transparent; color:var(--muted); cursor:pointer; font-size:14px; padding:var(--s1)}
 .mini:hover{color:var(--gold)}
 
-.lib-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(64px,1fr)); gap:var(--s2); margin-top:var(--s3)}
+/* Две колонки, а не три: в 85 пикселях имя существа не помещалось никогда */
+.lib-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:var(--s2); margin-top:var(--s3)}
 .lib-item{position:relative; border:1px solid var(--line-soft); border-radius:var(--r-sm); overflow:hidden; background:var(--bg-2); cursor:grab}
 .lib-item img{width:100%; aspect-ratio:1; object-fit:cover; display:block}
 .lib-item .cap{font-size:14px; padding:2px var(--s1); color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -230,6 +231,9 @@
 .status-row{display:flex; gap:var(--s1); flex-wrap:wrap; margin-top:var(--s1)}
 .status{font-size:14px; padding:0 var(--s2); border-radius:999px; border:1px solid var(--line); color:var(--muted); background:var(--panel-2); cursor:pointer}
 .status.on{color:var(--gold); border-color:var(--gold-dim)}
+/* «+ состояние» — приглашение, а не состояние: рамка пунктиром */
+.status-add{border-style:dashed}
+.status-pick{margin-top:0}
 
 /* ── Кубики ──────────────────────────────────────────────────────── */
 .dice-tray{
@@ -239,8 +243,14 @@
 }
 .dice-tray-head{display:flex; align-items:center; gap:var(--s2); margin-bottom:var(--s3)}
 .dice-tray-head .tabs{flex:1}
+/* Кости ровной сеткой: в свободном ряду они разъезжались по ширине */
+#dice-buttons{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2)}
 .dice-row{display:flex; gap:var(--s2); flex-wrap:wrap}
 .dice-mods{margin-top:var(--s3); align-items:center}
+/* Подписи «Кол-во» и «Модиф.» ломались надвое и растягивали панель */
+.dice-mods .field-row{flex:1 1 0; min-width:0}
+.dice-mods .field-row span{white-space:nowrap}
+.dice-mods input{width:100%; min-width:0}
 .die-btn{
   flex:1 0 60px; min-height:44px; border-radius:var(--r-sm); border:1px solid var(--line);
   background:var(--panel-2); color:var(--text); cursor:pointer; font-family:var(--f-head);
