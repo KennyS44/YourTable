@@ -507,15 +507,41 @@ function renderLibrary(s) {
     });
 }
 
-/** Разговор, служебные строки и броски идут одной лентой; фильтр прячет лишнее. */
+// Что сейчас лежит в ленте, по порядку. Кроме renderChat в ленту никто не пишет.
+let chatIds = [];
+
+/**
+ * Разговор, служебные строки и броски идут одной лентой; фильтр прячет лишнее.
+ *
+ * Лента дописывается, а не пересобирается заново. Перерисовка панелей идёт на
+ * каждое действие за столом, и полная сборка трёхсот сообщений стоила 53 мс —
+ * даже когда действие чата не касалось вовсе. Теперь общее начало остаётся на
+ * месте, а трогаются только ушедшие сверху и пришедшие снизу.
+ */
 function renderChat(s) {
   const feed = $('#chat-feed');
-  feed.innerHTML = '';
-  s.chat.forEach((m) => {
-    if (m.secret && !app.isDM) return;
-    feed.append(msgNode(m));
-  });
-  feed.scrollTop = feed.scrollHeight;
+  const нужны = s.chat.filter((m) => !m.secret || app.isDM);
+  const ids = нужны.map((m) => m.id);
+
+  // у чата есть потолок: самые старые сообщения уходят с начала
+  const место = ids.length && chatIds.length ? chatIds.indexOf(ids[0]) : 0;
+  const срез = место > 0 ? место : 0;
+  const хвост = chatIds.slice(срез);
+  const продолжение = хвост.length <= ids.length && хвост.every((id, i) => id === ids[i]);
+
+  // мерим до правки: если игрок отлистал ленту назад, не дёргаем его вниз
+  const уНиза = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
+
+  if (!продолжение) {
+    feed.innerHTML = '';
+    нужны.forEach((m) => feed.append(msgNode(m)));
+  } else {
+    for (let i = 0; i < срез && feed.firstChild; i++) feed.firstChild.remove();
+    for (let i = хвост.length; i < нужны.length; i++) feed.append(msgNode(нужны[i]));
+  }
+  const добавили = !продолжение || нужны.length > хвост.length;
+  chatIds = ids;
+  if (добавили && уНиза) feed.scrollTop = feed.scrollHeight;
 }
 
 function msgNode(m) {
@@ -2222,10 +2248,8 @@ function wireDM() {
   const s0 = app.store.get();
   $('#key-player').value = s0.room.playerKey || '';
   $('#key-dm').value = s0.room.dmKey || '';
-  if (useFirebase) {
-    $('#key-player').disabled = true;
-    $('#key-player').closest('.field').append(el('span', 'hint', 'Ключ игроков задан при создании комнаты и не меняется.'));
-  }
+  // ключ игроков задан при создании комнаты: поле просто заперто, без подписи
+  if (useFirebase) $('#key-player').disabled = true;
   $('#btn-save-keys').addEventListener('click', () => {
     app.store.dispatch({ t: 'room.keys', patch: { playerKey: $('#key-player').value, dmKey: $('#key-dm').value } });
     say('Ключи комнаты изменены', 'system');

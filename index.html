@@ -144,11 +144,11 @@
       <button class="tool dm-only" data-tool="wall" title="Ставить стены, двери, фонари, переходы и входы">▦</button>
       <button class="tool dm-only" data-tool="edit" title="Правка: двигать и настраивать всё уже поставленное">⚙</button>
       <button class="tool tool-undo" id="btn-undo" disabled title="Отменить последнее действие (Ctrl+Z)">↶</button>
-      <!-- туман — не инструмент, а выключатель: стоит особняком, у правого края -->
-      <button class="tool tool-fog dm-only" id="btn-fog-on" title="Туман войны: включить или выключить">🌫</button>
     </div>
 
     <div class="topbar-right">
+      <!-- туман — не инструмент, а выключатель: стоит у правого края, отдельно от тулбара -->
+      <button class="btn btn-ghost dm-only" id="btn-fog-on" title="Туман войны: включить или выключить">Туман</button>
       <button class="gem-badge" id="gem-badge" hidden title="Ваше вдохновение">
         <span class="gem" aria-hidden="true"><svg class="gem-svg" viewBox="0 0 40 44"><use href="#gem-shape"/></svg></span><span class="gem-count" id="gem-count">0</span>
       </button>
@@ -245,22 +245,19 @@
           <button class="btn btn-soft w-full" data-invite="cab">Ссылка в кабинет</button>
         </div>
         <input id="link-out" class="link-out" readonly hidden>
-        <p class="hint">Клик по строке — и она уже в буфере. Игроку пошлите ссылку в кабинет: там он соберёт персонажа и войдёт к вам по коду комнаты.</p>
         <div class="divider"></div>
         <h3 class="h-sm">Листы игроков</h3>
         <a class="btn btn-soft w-full" href="master.html" target="_blank" rel="noopener">Открыть листы персонажей</a>
-        <p class="hint">Добавьте персонажа по ключу — игрок найдёт ключ в своём листе в кабинете.</p>
         <div class="divider"></div>
         <h3 class="h-sm">Кампания</h3>
         <div class="row-2">
           <button class="btn btn-soft" id="btn-export">Экспорт</button>
           <label class="btn btn-soft file-btn">Импорт<input type="file" id="btn-import" accept="application/json" hidden></label>
         </div>
-        <p class="hint">Сейв включает локации, токены, иконки и журнал.</p>
         <div class="divider"></div>
         <h3 class="h-sm h-danger">Удаление стола</h3>
+        <!-- предупреждение не потерялось: оно целиком в окне подтверждения -->
         <button class="btn btn-danger w-full" id="btn-delete-room">Удалить стол насовсем</button>
-        <p class="hint">Стол пропадёт у всех, кто за ним сидит: локации, фигурки, иконки, картинки и журнал. Вернуть нельзя — сначала сделайте экспорт.</p>
       </section>
     </aside>
 
