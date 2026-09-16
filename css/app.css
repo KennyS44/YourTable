@@ -159,6 +159,9 @@ em{color:var(--muted); font-style:normal; font-size:14px}
   width:300px; flex:0 0 300px; background:var(--panel); border-right:1px solid var(--line);
   display:flex; flex-direction:column; min-height:0; padding:var(--s3);
 }
+/* «Иконки» живут шире прочих вкладок: там сетка существ, а не список строк */
+.panel-left{transition:width .22s var(--ease), flex-basis .22s var(--ease)}
+.panel-left.is-wide{width:440px; flex-basis:440px}
 .panel-right{border-right:0; border-left:1px solid var(--line); width:320px; flex-basis:320px}
 .panel-body{padding-top:var(--s3); overflow:auto; min-height:0}
 .panel-flex{display:flex; flex-direction:column; flex:1}

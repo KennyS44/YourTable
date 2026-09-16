@@ -488,10 +488,11 @@ function renderLibrary(s) {
       assetUrl(it.assetId).then((u) => { if (u) img.src = u; });
       const cap = el('div', 'cap', it.name);
       const edit = el('button', 'edit', '✎');
-      edit.title = 'Имя, хиты, дальность зрения';
+      edit.title = 'Карточка существа: имя, хиты, КД, обзор';
       edit.addEventListener('click', (e) => { e.stopPropagation(); openLibCard(it, e); });
       const del = el('button', 'del', '×');
-      del.addEventListener('click', () => {
+      del.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (confirm(`Убрать «${it.name}» из базы? Фигурки на поле останутся.`)) app.store.dispatch({ t: 'lib.remove', id: it.id });
       });
       card.append(img, cap, edit, del);
@@ -1564,6 +1565,8 @@ function wireUI() {
   $$('[data-ltab]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-ltab]').forEach((x) => x.classList.toggle('is-active', x === b));
     $$('[data-lpanel]').forEach((p) => { p.hidden = p.dataset.lpanel !== b.dataset.ltab; });
+    // иконкам нужна ширина: в 300 пикселях в ряд влезает три существа и обрезанное имя
+    $('#panel-left').classList.toggle('is-wide', b.dataset.ltab === 'library');
   }));
 
   wireDM();
