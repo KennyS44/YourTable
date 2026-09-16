@@ -928,11 +928,12 @@ const libUpd = (id, patch) => app.store.dispatch({ t: 'lib.update', id, patch })
  * подготовки. redraw зовём, когда сменился вид: у героя нет ни стойкости,
  * ни спасбросков, ни своих приёмов, и лишние поля должны уйти сразу.
  */
-function libFields(host, it, redraw) {
+function libFields(host, it, redraw, kinds = null) {
   host.append(field('Имя', textInput(it.name, (v) => libUpd(it.id, { name: v }))));
 
   const kindSel = el('select', 'sel');
-  [['pc', 'Персонаж'], ['npc', 'НПС'], ['enemy', 'Враг']].forEach(([v, label]) => {
+  // на странице подготовки героя выбрать нельзя: карточка просто исчезла бы
+  (kinds || [['pc', 'Персонаж'], ['npc', 'НПС'], ['enemy', 'Враг']]).forEach(([v, label]) => {
     const o = new Option(label, v);
     if (it.kind === v) o.selected = true;
     kindSel.append(o);
@@ -974,7 +975,11 @@ function renderPrep() {
   const grid = $('#prep-grid');
   if (!grid || $('#prep').hidden) return;
   const s = app.store.get();
-  const список = Object.values(s.library).filter((it) => prepFilter === 'all' || it.kind === prepFilter);
+  // героев здесь нет: их приносят из кабинета, когда садятся за стол, и всё
+  // своё — хиты, стойкость, приёмы — они несут в листе
+  const список = Object.values(s.library)
+    .filter((it) => it.kind !== 'pc')
+    .filter((it) => prepFilter === 'all' || it.kind === prepFilter);
   grid.innerHTML = '';
   $('#prep-empty').hidden = !!список.length;
   список.forEach((it) => {
@@ -986,7 +991,7 @@ function renderPrep() {
     head.append(pic, el('span', 'prep-name', it.name || 'Без имени'), el('span', 'use-dim', кого));
     card.append(head);
     // перерисовываем страницу целиком: сменился вид — поменялся и состав полей
-    libFields(card, it, renderPrep);
+    libFields(card, it, renderPrep, [['npc', 'НПС'], ['enemy', 'Враг']]);
     grid.append(card);
   });
 }
