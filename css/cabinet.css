@@ -394,6 +394,21 @@
 /* ── Защита и хиты: щит с КД и полоска здоровья ──────────────────────
    Три одинаковых окошка не давали главного — «сколько осталось». Полоска
    говорит это длиной и цветом, а числа остались её же подписями. */
+/* Фишки стойкости в листе: та же разметка, что в карточке существа */
+.guard-pick{display:flex; flex-direction:column; gap:var(--s2); margin-bottom:var(--s2)}
+.guard-pick .guard-chips{display:flex; flex-wrap:wrap; gap:var(--s1)}
+.guard-pick .guard-chip{
+  display:inline-flex; align-items:center; min-height:28px; padding:0 var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--bg-2);
+  color:var(--text); font-size:14px; cursor:pointer;
+}
+.guard-pick .guard-chip:hover{border-color:var(--danger); color:var(--danger)}
+.guard-pick .guard-resist{border-color:var(--gold-dim)}
+.guard-pick .guard-vuln{border-color:var(--danger)}
+.guard-pick .guard-add{display:grid; grid-template-columns:1fr auto auto; gap:var(--s1); align-items:center}
+.guard-pick .guard-add .btn{min-width:44px}
+.guard-wrap{display:flex; flex-direction:column; gap:var(--s1)}
+
 .vitals{display:flex; align-items:center; gap:var(--s3)}
 .vit-shield{position:relative; width:56px; height:64px; flex:0 0 auto}
 .vit-shield svg{position:absolute; inset:0; width:100%; height:100%}

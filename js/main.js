@@ -9,7 +9,7 @@ import { showRoll } from './dice3d.js';
 import { packRoom } from './roomcode.js';
 import {
   fixSheet, renderSheetLite, ABILITIES, DMG_TYPES,
-  damageTypesIn, savesFromSheet, mod as sheetMod,
+  savesFromSheet, mod as sheetMod,
 } from './sheet.js';
 import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
@@ -1900,8 +1900,8 @@ async function wireHeroSheet() {
      из полей «Сопротивления» (×½) и «Слабости» (×2). */
   const traitsOf = () => ({
     saves: savesFromSheet(ch.sheet),
-    resist: damageTypesIn(ch.sheet.resist),
-    vuln: damageTypesIn(ch.sheet.flaws),
+    resist: [...(ch.sheet.dmgResist || [])],
+    vuln: [...(ch.sheet.dmgVuln || [])],
   });
   const pushTraitsToToken = () => {
     const { saves, resist, vuln } = traitsOf();
@@ -1917,7 +1917,7 @@ async function wireHeroSheet() {
   const onEdit = (key) => {
     if (key === 'hpCur' || key === 'hpMax') pushHpToToken();
     // характеристики двигают спасброски, поля стойкости — множители урона
-    if (ABILITIES.some((a) => a.id === key) || key === 'resist' || key === 'flaws') pushTraitsToToken();
+    if (ABILITIES.some((a) => a.id === key) || key === 'dmgResist' || key === 'dmgVuln') pushTraitsToToken();
     save();
   };
 

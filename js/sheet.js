@@ -80,6 +80,69 @@ export function damageTypesIn(text) {
   return DMG_TYPES.filter((t) => DMG_STEMS[t].some((корень) => low.includes(корень)));
 }
 
+/* Множители урона героя: половина и вдвое. Неуязвимости у героев не бывает,
+   поэтому третьей кнопки, как у врагов, здесь нет. */
+export const SHEET_GUARDS = [
+  ['dmgResist', '×½', 'получает половину урона'],
+  ['dmgVuln', '×2', 'получает двойной урон'],
+];
+
+/**
+ * Стойкость героя: вид урона выбирается из списка, фишка снимается щелчком.
+ * Рядом остаётся своё поле словами — оно живёт для истории персонажа, в счёт
+ * урона не идёт, и об этом прямо сказано подписью.
+ */
+export function guardPicker(s, onEdit, ro) {
+  const box = el('div', 'guard-pick');
+  const чипы = el('div', 'guard-chips');
+
+  const draw = () => {
+    чипы.innerHTML = '';
+    SHEET_GUARDS.forEach(([key, знак, подпись]) => {
+      (s[key] || []).forEach((тип) => {
+        const c = el(ro ? 'span' : 'button', 'guard-chip guard-' + (key === 'dmgVuln' ? 'vuln' : 'resist'), `${тип} ${знак}`);
+        if (ro) { c.title = подпись; чипы.append(c); return; }
+        c.type = 'button';
+        c.title = `${подпись} — щёлкните, чтобы убрать`;
+        c.addEventListener('click', (e) => {
+          e.stopPropagation();
+          s[key] = (s[key] || []).filter((x) => x !== тип);
+          onEdit(key, s[key]);
+          draw();
+        });
+        чипы.append(c);
+      });
+    });
+    if (!чипы.children.length) чипы.append(el('span', 'hint', 'Весь урон проходит как есть.'));
+  };
+
+  box.append(чипы);
+  if (!ro) {
+    const row = el('div', 'guard-add');
+    const sel = el('select', 'sel sel-sm');
+    DMG_TYPES.forEach((t) => sel.append(new Option(t, t)));
+    row.append(sel);
+    SHEET_GUARDS.forEach(([key, знак, подпись]) => {
+      const b = el('button', 'btn btn-soft btn-sm', знак);
+      b.type = 'button';
+      b.title = подпись;
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const тип = sel.value;
+        // вид урона берут одним способом: назначили новый — старый снимаем
+        SHEET_GUARDS.forEach(([k]) => { s[k] = (s[k] || []).filter((x) => x !== тип); });
+        s[key] = [...s[key], тип];
+        SHEET_GUARDS.forEach(([k]) => onEdit(k, s[k]));
+        draw();
+      });
+      row.append(b);
+    });
+    box.append(row);
+  }
+  draw();
+  return box;
+}
+
 /**
  * Спасброски героя: прибавка равна модификатору характеристики. Отдельных
  * полей в листе нет и не нужно — числа уже есть, надо только их сложить.
@@ -165,6 +228,7 @@ export function emptySheet() {
     cls: [], level: 1, race: '', alignment: '', player: '',
     ac: 10, speed: 30, vision: 30,
     hpMax: 10, hpCur: 10, hitDice: '',
+    dmgResist: [], dmgVuln: [],    // виды урона: половина и вдвое
     feats: [],                 // приёмы: способности и оружие одним списком
     lore: '', notes: '',
     wantPlayer: '', wantChar: '',   // желания человека за столом и самого героя
@@ -180,6 +244,12 @@ export function fixSheet(raw) {
   // старый лист хранил класс свободным текстом — заворачиваем в герб-слот как есть,
   // герб для него нарисовать нечем, но название доживёт до ручного выбора игроком
   s.cls = Array.isArray(s.cls) ? s.cls.filter(Boolean).slice(0, 2) : (s.cls ? [s.cls] : []);
+  // стойкость: только знакомые виды урона, остальное игрок пишет словами рядом
+  const виды = (v) => (Array.isArray(v) ? v.filter((x) => DMG_TYPES.includes(x)) : []);
+  // у листов, заполненных до появления фишек, вытаскиваем виды урона из текста —
+  // один раз, дальше правится только фишками
+  s.dmgResist = raw && raw.dmgResist ? виды(raw.dmgResist) : damageTypesIn(raw && raw.resist);
+  s.dmgVuln = виды(raw && raw.dmgVuln);
   s.feats = ((raw && raw.feats) || []).map(fixMove);
   // старое текстовое поле «Умения и особенности» переносим в первую способность
   if (!s.feats.length && raw && raw.features) {
@@ -932,7 +1002,11 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   const cols = [
     [abilBlk, defenseBlk, hpBlk, rest.gear],
     [atkBlk, featsBlk, block('Личность', pairGrid(PERSONA))],
-    [rest.appearance, rest.langs, block('Сопротивления и слабости', pairGrid(DEFENCE))],
+    [rest.appearance, rest.langs,
+      block('Сопротивления и слабости',
+        guardPicker(s, onEdit, ro),
+        el('p', 'hint', 'В счёт урона идут только фишки. Текст ниже — для себя.'),
+        pairGrid(DEFENCE))],
   ];
   cols.forEach((items) => {
     const col = el('div', 'sheet-col');
@@ -1114,6 +1188,10 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   root.append(block('Способности', feats));
 
   root.append(bindArea('gear', 'Инвентарь', 5));
+  const защита = el('div', 'guard-wrap');
+  защита.append(guardPicker(s, onEdit, false),
+    el('p', 'hint', 'В счёт урона идут только фишки. Поля ниже — словами, для себя.'));
+  root.append(block('Сопротивления и слабости', защита));
   root.append(bindArea('flaws', 'Слабости', 3));
   root.append(bindArea('resist', 'Сопротивления', 3));
 }
