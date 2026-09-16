@@ -546,7 +546,8 @@ function useBody(u) {
     строки.push(`атака ${esc(a.formula)} → <span class="total">${a.total}</span>`
       + `<span class="use-dim"> [${a.dice.join(', ')}]</span>`
       + (app.isDM ? `<span class="use-dim"> против КД ${a.vs}</span>` : ''));
-    строки.push(a.hit ? '<span class="use-hit">пробил броню</span>' : '<span class="use-miss">не пробил</span>');
+    строки.push(a.crit ? '<span class="use-crit">двадцатка — критический удар, урон вдвое</span>'
+      : a.hit ? '<span class="use-hit">пробил броню</span>' : '<span class="use-miss">не пробил</span>');
   }
   if (u.save) {
     строки.push(`спасбросок ${esc(u.save.abil)}${app.isDM ? `, сложность ${u.save.dc}` : ''}`
@@ -556,7 +557,8 @@ function useBody(u) {
     const куски = u.dmg.parts
       .map((p) => `${p.n}д${p.d}${p.type ? ' ' + esc(p.type) : ''}<span class="use-dim"> [${p.dice.join(', ')}]</span>`)
       .join(' + ');
-    строки.push(`${куски} → <span class="total">${u.dmg.total}</span>`);
+    строки.push(`${куски} → <span class="total">${u.dmg.total}</span>`
+      + (u.dmg.crit ? '<span class="use-dim"> (уже вдвое)</span>' : ''));
   }
   // хиты уже сняты: строка говорит, чем дело кончилось. Полоску чужих хитов
   // игрокам показывать нельзя, поэтому остаток видит только Мастер и хозяин
@@ -1488,12 +1490,14 @@ function resolveMove(m, ch, targets) {
   if (m.guard === 'ac') {
     const t = targets[0];
     const r = roll(20, 1, moveBonus(m, ch));
+    // натуральная двадцатка бьёт всегда и бьёт вдвое — броня её не держит
+    const crit = r.dice[0] === 20;
     // равно КД — это попадание
-    const hit = r.total >= (Number(t.ac) || 10);
-    use.attack = { formula: r.formula, dice: r.dice, total: r.total, vs: Number(t.ac) || 10, hit, target: tokenName(t) };
+    const hit = crit || r.total >= (Number(t.ac) || 10);
+    use.attack = { formula: r.formula, dice: r.dice, total: r.total, vs: Number(t.ac) || 10, hit, crit, target: tokenName(t) };
     use.targets = [tokenName(t)];
     задетые = hit ? [t] : [];
-    if (hit) use.dmg = rollMoveDice(m);
+    if (hit) use.dmg = critDouble(rollMoveDice(m), crit);
     headline = r;
   } else if (m.guard === 'save') {
     use.save = { abil: abilLabel(m.guardAbil), dc: m.dc, onSave: m.onSave };
@@ -1506,6 +1510,20 @@ function resolveMove(m, ch, targets) {
   if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect);
   say('', 'use', { use });
   if (headline) showRoll($('#dice-stage'), headline, `${app.me.name}: ${use.name}`);
+}
+
+/**
+ * Критический удар: выпала двадцатка — урон удваивается целиком. Удваиваем
+ * каждый кусок, а не только итог: стойкость к виду урона считается по кускам,
+ * и иначе она делила бы уже не то число.
+ */
+function critDouble(dmg, crit) {
+  if (!dmg || !crit) return dmg;
+  return {
+    crit: true,
+    parts: dmg.parts.map((p) => ({ ...p, sum: p.sum * 2 })),
+    total: dmg.total * 2,
+  };
 }
 
 /**

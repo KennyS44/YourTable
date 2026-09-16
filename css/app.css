@@ -153,6 +153,8 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .use-dim{color:var(--muted); font-size:14px}
 .use-hit{color:#9ccf7a}
 .use-miss{color:var(--muted)}
+/* двадцатка — единственная строка в ленте, которой позволено кричать */
+.use-crit{color:var(--gold); font-family:var(--f-head)}
 
 .stage{flex:1; display:flex; min-height:0}
 .panel{
