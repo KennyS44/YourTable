@@ -999,9 +999,52 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   });
   root.append(block('Характеристики', abil));
 
-  /* ── КД и хиты ── */
-  const vitals = el('div', 'row-3');
-  vitals.append(numCell('КД', 'ac'), numCell('Хиты', 'hpCur'), numCell('Максимум', 'hpMax'));
+  /* ── КД и хиты: щит и полоска вместо трёх одинаковых окошек ──────────
+     В бою важно не число из трёх, а «сколько осталось» — это видно цветом и
+     длиной. Числа при этом правятся на месте: они и есть подписи полоски. */
+  const vitals = el('div', 'vitals');
+
+  const shield = el('div', 'vit-shield');
+  shield.title = 'Класс доспеха';
+  const герб = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  герб.setAttribute('viewBox', '0 0 40 46');
+  герб.setAttribute('aria-hidden', 'true');
+  const тело = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  тело.setAttribute('d', 'M20 2 L37 8 V23 C37 33 29 40 20 44 C11 40 3 33 3 23 V8 Z');
+  герб.append(тело);
+  const acI = el('input', 'vit-ac');
+  acI.type = 'number'; acI.min = 0; acI.max = 40;
+  acI.value = s.ac ?? 10;
+  acI.setAttribute('aria-label', 'Класс доспеха');
+  acI.addEventListener('input', () => { s.ac = Number(acI.value) || 0; onEdit('ac', s.ac); });
+  shield.append(герб, acI);
+
+  const hp = el('div', 'vit-hp');
+  const fill = el('div', 'vit-fill');
+  const nums = el('div', 'vit-nums');
+  const hpNum = (key, cls) => {
+    const i = el('input', 'vit-num ' + cls);
+    i.type = 'number'; i.min = 0; i.max = 999;
+    i.value = s[key] ?? 0;
+    i.setAttribute('aria-label', key === 'hpCur' ? 'Хиты сейчас' : 'Максимум хитов');
+    i.addEventListener('input', () => { s[key] = Number(i.value) || 0; onEdit(key, s[key]); paint(); });
+    return i;
+  };
+  const curI = hpNum('hpCur', 'vit-cur');
+  const maxI = hpNum('hpMax', 'vit-max');
+  nums.append(curI, el('span', 'vit-slash', '/'), maxI);
+  // цвет по остатку: полный — золото, половина — янтарь, край — кровь
+  const paint = () => {
+    const max = Math.max(1, Number(s.hpMax) || 1);
+    const доля = Math.max(0, Math.min(1, (Number(s.hpCur) || 0) / max));
+    fill.style.width = (доля * 100).toFixed(1) + '%';
+    hp.dataset.level = доля > 0.5 ? 'ok' : доля > 0.25 ? 'low' : 'bad';
+  };
+  paint();
+  hp.append(fill, nums);
+  hp.title = 'Хиты: сейчас и максимум';
+
+  vitals.append(shield, hp);
   root.append(block('Защита и хиты', vitals));
 
   /* ── атаки и заклинания: тот же список, что в кабинете, правится в бою ── */

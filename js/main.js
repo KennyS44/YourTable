@@ -1855,10 +1855,13 @@ async function wireHeroSheet() {
     return поИмени.length ? поИмени : мои;
   };
   const setHpInputs = () => {
-    [['hpCur', ch.sheet.hpCur], ['hpMax', ch.sheet.hpMax]].forEach(([key, v]) => {
-      const i = $(`#lite-sheet .fld-${key} input`);
+    [['.vit-cur', ch.sheet.hpCur], ['.vit-max', ch.sheet.hpMax]].forEach(([сел, v]) => {
+      const i = $('#lite-sheet ' + сел);
       // поле под курсором не трогаем: иначе вырвем число из-под пальцев
-      if (i && document.activeElement !== i) i.value = v;
+      if (!i || document.activeElement === i || i.value === String(v)) return;
+      i.value = v;
+      // полоска перекрашивается в ответ на правку — говорим ей, что число новое
+      i.dispatchEvent(new Event('input', { bubbles: true }));
     });
   };
   const syncHpFromToken = (s) => {

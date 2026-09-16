@@ -391,6 +391,47 @@
 .sheet-lite .fld-lvl{flex:0 0 auto; width:72px}
 [data-lpanel="hero"]{display:flex; flex-direction:column; gap:var(--s3)}
 
+/* ── Защита и хиты: щит с КД и полоска здоровья ──────────────────────
+   Три одинаковых окошка не давали главного — «сколько осталось». Полоска
+   говорит это длиной и цветом, а числа остались её же подписями. */
+.vitals{display:flex; align-items:center; gap:var(--s3)}
+.vit-shield{position:relative; width:56px; height:64px; flex:0 0 auto}
+.vit-shield svg{position:absolute; inset:0; width:100%; height:100%}
+.vit-shield path{fill:var(--panel); stroke:var(--gold-dim); stroke-width:2}
+.vit-ac{
+  position:absolute; inset:0; width:100%; height:100%; padding:0 0 4px;
+  background:transparent; border:0; text-align:center;
+  font-family:var(--f-head); font-size:24px; color:var(--gold);
+}
+.vit-ac:focus{outline:2px solid var(--gold-dim); outline-offset:-6px; border-radius:var(--r-sm)}
+/* стрелки у числа съедают место и сбивают центровку */
+.vit-ac::-webkit-outer-spin-button,.vit-ac::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.vit-num::-webkit-outer-spin-button,.vit-num::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.vit-ac,.vit-num{-moz-appearance:textfield}
+
+.vit-hp{
+  position:relative; flex:1 1 auto; min-width:0; height:44px; border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--bg-2); overflow:hidden;
+}
+.vit-fill{
+  position:absolute; inset:0 auto 0 0; background:var(--gold-dim);
+  transition:width .28s var(--ease), background-color .28s var(--ease);
+}
+.vit-hp[data-level="low"] .vit-fill{background:#a8762f}
+.vit-hp[data-level="bad"] .vit-fill{background:var(--danger)}
+.vit-nums{
+  position:relative; display:flex; align-items:center; justify-content:center; gap:4px;
+  height:100%; font-family:var(--f-head); font-size:20px; color:var(--text);
+  text-shadow:0 1px 2px rgba(20,19,16,.75);
+}
+.vit-num{
+  width:3ch; min-width:3ch; padding:0; background:transparent; border:0; text-align:center;
+  font-family:inherit; font-size:inherit; color:inherit;
+}
+.vit-num:hover{border-bottom:1px solid var(--gold-dim)}
+.vit-num:focus{outline:2px solid var(--gold); outline-offset:2px; border-radius:4px}
+.vit-slash{opacity:.7}
+
 /* ── Административная комната ── */
 .adm-stage{max-width:960px; width:100%; margin:0 auto; padding:var(--s4)}
 .adm-tabs{max-width:360px; margin-bottom:var(--s4)}
