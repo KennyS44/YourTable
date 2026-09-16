@@ -74,6 +74,7 @@ export function normalize(raw) {
     t.namePublic = t.namePublic === undefined || t.namePublic === null ? t.kind === 'pc' : t.namePublic !== false;
     t.statuses = t.statuses || [];
     t.vision = t.vision || 0;
+    t.speed = Number(t.speed) || 30;   // футов за ход: по ней меряют передвижение в бою
     t.cells = t.cells || 1;
     t.ac = Number(t.ac) || 10;
     // стойкость по видам урона: половина, вдвое и «не берёт вовсе»
@@ -126,6 +127,7 @@ export function defaultStats(kind) {
     hp: { cur: 10, max: 10 },
     ac: 10,                      // по нему сверяют попадание
     vision: kind === 'pc' ? 30 : 0,
+    speed: 30,                   // футов за ход
     cells: 1,
     hpPublic: kind === 'pc',
     namePublic: kind === 'pc',
@@ -142,7 +144,7 @@ export function newToken(patch) {
     ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, ac: 10,
     hpPublic: true, namePublic: true, statuses: [],
     resist: [], vuln: [], immune: [], saves: emptySaves(), moves: [],
-    vision: 0, ...patch,
+    vision: 0, speed: 30, ...patch,
   };
 }
 

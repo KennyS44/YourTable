@@ -33,6 +33,9 @@ export function createBoard(opts) {
   let touched = false;      // камеру уже двигали руками — не вписываем автоматически
   let lastLocId = null;
   let aiming = null;        // наводка приёма: {kind, feet, from, at, onPick, onCancel}
+  // Сколько футов фигурка уже прошла в этом ходу. Счёт свой у каждого, кто
+  // тянет: считать вскладчину незачем — чужие фигурки тянет кто-то другой.
+  let walked = { turn: '', by: {} };
 
   const fogLayer = document.createElement('canvas');
 
@@ -88,6 +91,48 @@ export function createBoard(opts) {
   }
   const feetPerPx = () => { const g = gridOf(); return g.feet / g.size; };
 
+  /* ── передвижение в бою ────────────────────────────────────────────
+     Скорость держит только тех, кто стоит в очереди боя: вне боя фигурки
+     ходят свободно, и мерить там нечего. Счёт обнуляется сам, когда ход
+     переходит дальше или очередь пересобрали. */
+
+  /** Чей сейчас ход, одной строкой: сменилась — значит начался новый ход. */
+  function turnKey() {
+    const i = S().init;
+    return i.order.length ? i.round + ':' + i.idx + ':' + i.order.length : '';
+  }
+
+  /** Скорость и уже пройденное, если фигурка в бою. Иначе null. */
+  function walkLimit(t) {
+    const key = turnKey();
+    if (!key || !S().init.order.some((o) => o.id === t.id)) return null;
+    if (walked.turn !== key) walked = { turn: key, by: {} };
+    return { speed: Math.max(0, Number(t.speed) || 0), spent: walked.by[t.id] || 0 };
+  }
+
+  /** Футы по прямой между двумя точками карты — как их меряет линейка. */
+  function feetBetween(a, b) {
+    const g = gridOf();
+    return Math.round((Math.hypot(b.x - a.x, b.y - a.y) / g.size) * g.feet);
+  }
+
+  /** След от начала перетаскивания: пунктир и подпись «25 / 30 фт». */
+  function drawWalk() {
+    const t = S().tokens[drag.id]; if (!t) return;
+    const всего = drag.limit.spent + feetBetween(drag.start, t);
+    if (!всего) return;
+    const много = всего > drag.limit.speed;
+    const цвет = много ? '#d08a6a' : '#c9a45a';
+    const a = w2s(drag.start.x, drag.start.y), b = w2s(t.x, t.y);
+    ctx.save();
+    ctx.setLineDash([8, 6]); ctx.lineWidth = 2; ctx.strokeStyle = цвет;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(a.x, a.y, 4, 0, Math.PI * 2); ctx.fillStyle = цвет; ctx.fill();
+    ctx.restore();
+    chip(`${всего} / ${drag.limit.speed} фт`, b.x, b.y - gridOf().size * t.cells * view.scale / 2 - 18, цвет);
+  }
+
   /* ── отрисовка ─────────────────────────────────────────────── */
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -127,6 +172,7 @@ export function createBoard(opts) {
     drawZones();
     drawWalls();
     drawLights();
+    if (drag && drag.type === 'token' && drag.limit) drawWalk();
     if (ruler) drawRuler();
     if (aiming) drawAim();
     if (drag && drag.type === 'fog') drawBrushCursor();
@@ -439,7 +485,7 @@ export function createBoard(opts) {
   }
 
   /** Подпись на плашке-табличке: тёмная кость с золотым кантом, читается везде. */
-  function chip(text, x, y) {
+  function chip(text, x, y, кант = 'rgba(201,164,90,.75)') {
     ctx.save();
     ctx.globalAlpha = 1;
     ctx.font = '14px Inter, sans-serif';
@@ -451,7 +497,7 @@ export function createBoard(opts) {
     g.addColorStop(1, 'rgba(23,22,19,.96)');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(201,164,90,.75)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = кант; ctx.lineWidth = 1;
     ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.08)';
     ctx.beginPath(); ctx.roundRect(bx + 1.5, by + 1.5, bw - 3, bh - 3, 6); ctx.stroke();
@@ -919,7 +965,10 @@ export function createBoard(opts) {
     if ((tool === 'select' || tool === 'token') && !mid) {
       const t = tokenAt(w.x, w.y);
       if (t && canMove(t)) {
-        drag = { type: 'token', id: t.id, dx: t.x - w.x, dy: t.y - w.y, moved: false };
+        drag = {
+          type: 'token', id: t.id, dx: t.x - w.x, dy: t.y - w.y, moved: false,
+          start: { x: t.x, y: t.y }, limit: walkLimit(t),
+        };
         return;
       }
       // дверь открывается кликом в любом режиме, не только при черчении стен
@@ -1132,6 +1181,10 @@ export function createBoard(opts) {
       if (t) {
         const c = cellCenter(t.x, t.y);
         store.dispatch({ t: 'token.update', id: drag.id, patch: { x: c.x, y: c.y } });
+        // футы кладём в счёт хода по вставшей клетке, а не по месту, где отпустили
+        if (drag.moved && drag.limit) {
+          walked.by[drag.id] = drag.limit.spent + feetBetween(drag.start, c);
+        }
         if (!drag.moved) onTokenOpen && onTokenOpen(t, evPos(e));
         // встали на клетку перехода — уходим в другую локацию
         const hitZ = drag.moved && zoneAt(c);
@@ -1313,6 +1366,8 @@ export function createBoard(opts) {
     aimingNow: () => !!aiming,
     /** Для проверок: кого сейчас накрывает наводка. */
     aimTargetIds: () => aimTargets().map((t) => t.id),
+    /** Для проверок: сколько футов фигурка прошла в этом ходу. */
+    walkedFeet(id) { return walked.turn === turnKey() ? (walked.by[id] || 0) : 0; },
     /** Для проверок: куда достаёт обзор существа и рисуются ли стены. */
     visionPoints(t) {
       const g = gridOf();
