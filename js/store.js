@@ -338,10 +338,11 @@ export function reduce(s, a) {
     case 'chat.add':
       s.chat = [...s.chat, a.msg].slice(-300); break;
     case 'chat.clear':
-      // 'roll' — только журнал бросков, 'chat' — разговор и служебные строки
-      s.chat = a.kind === 'roll'
-        ? s.chat.filter((m) => m.kind !== 'roll')
-        : s.chat.filter((m) => m.kind === 'roll');
+      // 'roll' — только броски, 'chat' — разговор и служебные строки, 'all' — всё
+      s.chat = a.kind === 'all' ? []
+        : a.kind === 'roll'
+          ? s.chat.filter((m) => m.kind !== 'roll' && m.kind !== 'use')
+          : s.chat.filter((m) => m.kind === 'roll' || m.kind === 'use');
       break;
 
     case 'init.set':

@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=58">
+<link rel="stylesheet" href="css/app.css?v=59">
 <!-- лист персонажа игрока в левой панели живёт по тем же правилам, что и в кабинете -->
-<link rel="stylesheet" href="css/cabinet.css?v=58">
+<link rel="stylesheet" href="css/cabinet.css?v=59">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -22,23 +22,23 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=58",
-    "./js/sync.js":           "./js/sync.js?v=58",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=58",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=58",
-    "./js/store.js":          "./js/store.js?v=58",
-    "./js/history.js":        "./js/history.js?v=58",
-    "./js/board.js":          "./js/board.js?v=58",
-    "./js/dice.js":           "./js/dice.js?v=58",
-    "./js/dice3d.js":         "./js/dice3d.js?v=58",
-    "./js/roomcode.js":       "./js/roomcode.js?v=58",
-    "./js/registry.js":       "./js/registry.js?v=58",
-    "./js/translit.js":       "./js/translit.js?v=58",
-    "./js/sheet.js":          "./js/sheet.js?v=58",
-    "./js/classes.js":        "./js/classes.js?v=58",
-    "./js/charlink.js":       "./js/charlink.js?v=58",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=58",
-    "./js/idb.js":            "./js/idb.js?v=58"
+    "./js/main.js":           "./js/main.js?v=59",
+    "./js/sync.js":           "./js/sync.js?v=59",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=59",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=59",
+    "./js/store.js":          "./js/store.js?v=59",
+    "./js/history.js":        "./js/history.js?v=59",
+    "./js/board.js":          "./js/board.js?v=59",
+    "./js/dice.js":           "./js/dice.js?v=59",
+    "./js/dice3d.js":         "./js/dice3d.js?v=59",
+    "./js/roomcode.js":       "./js/roomcode.js?v=59",
+    "./js/registry.js":       "./js/registry.js?v=59",
+    "./js/translit.js":       "./js/translit.js?v=59",
+    "./js/sheet.js":          "./js/sheet.js?v=59",
+    "./js/classes.js":        "./js/classes.js?v=59",
+    "./js/charlink.js":       "./js/charlink.js?v=59",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=59",
+    "./js/idb.js":            "./js/idb.js?v=59"
   }
 }
 </script>
@@ -144,6 +144,8 @@
       <button class="tool dm-only" data-tool="wall" title="Ставить стены, двери, фонари, переходы и входы">▦</button>
       <button class="tool dm-only" data-tool="edit" title="Правка: двигать и настраивать всё уже поставленное">⚙</button>
       <button class="tool tool-undo" id="btn-undo" disabled title="Отменить последнее действие (Ctrl+Z)">↶</button>
+      <!-- туман — не инструмент, а выключатель: стоит особняком, у правого края -->
+      <button class="tool tool-fog dm-only" id="btn-fog-on" title="Туман войны: включить или выключить">🌫</button>
     </div>
 
     <div class="topbar-right">
@@ -200,27 +202,12 @@
             </div>
           </details>
 
-          <details class="fold" data-fold="fog">
-            <summary>Туман войны</summary>
-            <div class="fold-body">
-              <label class="check"><input type="checkbox" id="fog-on"><span>Включить туман</span></label>
-              <div class="tabs tabs-sm">
-                <button class="tab is-active" data-fogmode="reveal">Кисть открывает</button>
-                <button class="tab" data-fogmode="hide">Кисть прячет</button>
-              </div>
-              <label class="field field-row"><span>Кисть, клеток</span><input type="number" id="fog-brush" min="1" max="12" step="1" value="1"></label>
-              <div class="row-2">
-                <button class="btn btn-soft" id="fog-reveal-all">Открыть всё</button>
-                <button class="btn btn-soft" id="fog-hide-all">Закрыть всё</button>
-              </div>
-              <p class="hint">1 — ровно одна клетка. Alt или правая кнопка временно меняет режим на обратный.</p>
-              <p class="hint">Дальность зрения каждого существа задаётся в его карточке: клик по фигурке на поле → «Дальность зрения». Для новых — во вкладке «Иконки» (кнопка ✎).</p>
-            </div>
-          </details>
         </div>
       </section>
 
       <section class="panel-body dm-only" data-lpanel="library" hidden>
+        <button class="btn btn-soft w-full" id="btn-prep">⚒ Подготовка существ</button>
+        <div class="divider"></div>
         <div class="row-2">
           <label class="btn btn-soft file-btn">+ Иконки<input type="file" id="lib-upload" accept="image/*" multiple hidden></label>
           <select id="lib-kind" class="sel">
@@ -236,7 +223,6 @@
           <button class="tab" data-libfilter="enemy">Враги</button>
         </div>
         <div class="lib-grid" id="lib-grid"></div>
-        <button class="btn btn-soft w-full" id="btn-prep">⚒ Подготовка существ</button>
         <p class="hint">Перетащите иконку на поле или кликните дважды. ✎ — карточка существа: имя, хиты, КД и дальность зрения сохранятся в базе и вернутся с новой фигуркой.</p>
       </section>
 
@@ -251,17 +237,15 @@
         <button class="btn btn-soft w-full" id="btn-save-keys">Сохранить ключи</button>
         <div class="divider"></div>
         <h3 class="h-sm">Ссылки-приглашения</h3>
-        <div class="row-2">
-          <button class="btn btn-soft" id="btn-link-player">Для игрока</button>
-          <button class="btn btn-soft" id="btn-link-dm">Для Мастера</button>
+        <button class="btn btn-soft w-full" id="btn-invite">Пригласить</button>
+        <div class="invite" id="invite-box" hidden>
+          <button class="btn btn-soft w-full" data-invite="player">Ссылка для игрока</button>
+          <button class="btn btn-soft w-full" data-invite="dm">Ссылка для Мастера</button>
+          <button class="btn btn-soft w-full" data-invite="code">Код комнаты</button>
+          <button class="btn btn-soft w-full" data-invite="cab">Ссылка в кабинет</button>
         </div>
         <input id="link-out" class="link-out" readonly hidden>
-        <p class="hint" id="link-hint" hidden>Скопировано.</p>
-        <div class="row-2">
-          <button class="btn btn-soft" id="btn-room-code">Код комнаты</button>
-          <button class="btn btn-soft" id="btn-cab-link">Ссылка в кабинет</button>
-        </div>
-        <p class="hint">Игроку пошлите ссылку в кабинет: там он соберёт персонажа и войдёт к вам по коду комнаты.</p>
+        <p class="hint">Клик по строке — и она уже в буфере. Игроку пошлите ссылку в кабинет: там он соберёт персонажа и войдёт к вам по коду комнаты.</p>
         <div class="divider"></div>
         <h3 class="h-sm">Листы игроков</h3>
         <a class="btn btn-soft w-full" href="master.html" target="_blank" rel="noopener">Открыть листы персонажей</a>
@@ -318,6 +302,18 @@
         <button class="btn btn-soft btn-sm" id="walls-clear">Убрать все</button>
       </div>
 
+      <!-- Кисть тумана (только Мастер): настройки живут при самой кисти -->
+      <div class="draw-bar dm-only" id="fog-bar" hidden>
+        <div class="shapes">
+          <button class="shape is-active" data-fogmode="reveal">Кисть открывает</button>
+          <button class="shape" data-fogmode="hide">Кисть прячет</button>
+        </div>
+        <label class="field field-row slim"><span>Кисть, клеток</span><input type="number" id="fog-brush" min="1" max="12" step="1" value="1"></label>
+        <button class="btn btn-soft btn-sm" id="fog-reveal-all">Открыть всё</button>
+        <button class="btn btn-soft btn-sm" id="fog-hide-all">Закрыть всё</button>
+        <span class="hint">Alt или правая кнопка временно меняет режим на обратный. Дальность зрения существа — в его карточке.</span>
+      </div>
+
       <!-- Правка уже поставленного (только Мастер) -->
       <div class="draw-bar dm-only" id="edit-bar" hidden>
         <span class="edit-counts" id="edit-counts"></span>
@@ -346,37 +342,37 @@
     <!-- Правая панель -->
     <aside class="panel panel-right" id="panel-right">
       <div class="tabs tabs-sm">
-        <button class="tab is-active" data-rtab="chat">Чат</button>
-        <button class="tab" data-rtab="rolls">Броски</button>
+        <button class="tab is-active" data-rtab="chat">Лента</button>
         <button class="tab" data-rtab="init">Ход боя</button>
         <button class="tab" data-rtab="heroes">Герои</button>
         <button class="tab dm-only" data-rtab="pics">Картинки</button>
       </div>
 
       <section class="panel-body panel-flex" data-rpanel="chat">
-        <div class="feed-tools dm-only">
-          <button class="btn btn-sm btn-soft" id="chat-clear">Очистить чат</button>
+        <!-- разговор и броски идут одной лентой: фильтр только прячет лишнее -->
+        <div class="feed-tools">
+          <div class="feed-filter tabs tabs-sm">
+            <button class="tab is-active" data-feed="all">Всё</button>
+            <button class="tab" data-feed="talk">Разговор</button>
+            <button class="tab" data-feed="roll">Броски</button>
+          </div>
+          <button class="btn btn-sm btn-soft dm-only" id="chat-clear">Очистить</button>
         </div>
-        <div class="feed" id="chat-feed"></div>
+        <div class="feed" id="chat-feed" data-feed="all"></div>
         <form class="composer" id="chat-form">
           <input id="chat-input" placeholder="Сказать за столом…" maxlength="500" autocomplete="off">
           <button class="btn btn-primary btn-sm" type="submit">↵</button>
         </form>
       </section>
 
-      <section class="panel-body panel-flex" data-rpanel="rolls" hidden>
-        <div class="feed-tools dm-only">
-          <button class="btn btn-sm btn-soft" id="rolls-clear">Очистить журнал бросков</button>
-        </div>
-        <div class="feed" id="rolls-feed"></div>
-      </section>
-
       <section class="panel-body" data-rpanel="init" hidden>
-        <div class="row-2">
-          <button class="btn btn-soft btn-sm dm-only" id="init-roll-all">Бросить всем</button>
-          <button class="btn btn-soft btn-sm dm-only" id="init-next">Следующий ход →</button>
+        <div class="init-tools">
+          <div class="row-2">
+            <button class="btn btn-soft btn-sm dm-only" id="init-roll-all">Бросить всем</button>
+            <button class="btn btn-soft btn-sm dm-only" id="init-next">Следующий ход →</button>
+          </div>
+          <button class="btn btn-soft btn-sm w-full dm-only" id="init-end" hidden>Завершить бой у всех</button>
         </div>
-        <button class="btn btn-soft btn-sm w-full dm-only" id="init-end" hidden>Завершить бой у всех</button>
         <div class="round-line" id="round-line"></div>
         <div class="init-list" id="init-list"></div>
         <p class="hint">Здоровье и состояния — под именем существа. ⌖ — перейти к фигурке.</p>
@@ -438,6 +434,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=58"></script>
+<script type="module" src="js/main.js?v=59"></script>
 </body>
 </html>

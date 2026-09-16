@@ -413,7 +413,7 @@ function renderAll(s, action) {
     setVal('#grid-size', loc.grid.size); setVal('#grid-ox', loc.grid.ox);
     setVal('#grid-oy', loc.grid.oy); setVal('#grid-feet', loc.grid.feet);
     $('#grid-show').checked = loc.grid.show;
-    $('#fog-on').checked = loc.fogOn;
+    $('#btn-fog-on').classList.toggle('is-active', !!loc.fogOn);
   }
   app.board.render();
   updateShowcase(s);
@@ -507,16 +507,15 @@ function renderLibrary(s) {
     });
 }
 
+/** Разговор, служебные строки и броски идут одной лентой; фильтр прячет лишнее. */
 function renderChat(s) {
-  const feed = $('#chat-feed'), rolls = $('#rolls-feed');
-  feed.innerHTML = ''; rolls.innerHTML = '';
+  const feed = $('#chat-feed');
+  feed.innerHTML = '';
   s.chat.forEach((m) => {
     if (m.secret && !app.isDM) return;
-    const node = msgNode(m);
-    (m.kind === 'roll' || m.kind === 'use' ? rolls : feed).append(node);
+    feed.append(msgNode(m));
   });
   feed.scrollTop = feed.scrollHeight;
-  rolls.scrollTop = rolls.scrollHeight;
 }
 
 function msgNode(m) {
@@ -1129,23 +1128,25 @@ function openTokenCard(t, screenPos) {
   const row = el('div', 'row-2');
   const bInit = el('button', 'btn btn-soft btn-sm', inInit ? 'Убрать из боя' : 'В бой (d20)');
   bInit.addEventListener('click', () => { toggleInit(t.id); card.hidden = true; });
-  const bDel = el('button', 'btn btn-soft btn-sm', 'Удалить');
+  const bDel = el('button', 'btn btn-quiet btn-sm', 'Удалить');
   bDel.addEventListener('click', () => { app.store.dispatch({ t: 'token.remove', id: t.id }); card.hidden = true; });
   row.append(bInit, bDel);
   card.append(el('div', 'divider'), row);
 
   const lib = s.library[t.libId];
   if (lib) {
-    const bSave = el('button', 'btn btn-soft btn-sm w-full', 'Сохранить в базу');
-    bSave.title = `Записать имя, хиты и обзор в карточку «${lib.name}»`;
+    const bSave = el('button', 'btn btn-soft btn-sm w-full', 'Сохранить в лист существа');
+    bSave.title = `Записать всё — имя, хиты, КД, обзор, получаемый урон, спасброски и приёмы — в лист «${lib.name}». Новые фигурки будут появляться такими же.`;
     bSave.addEventListener('click', () => {
       const cur = app.store.get().tokens[t.id];
       if (!cur) return;
       libUpd(lib.id, {
         name: cur.name,
         stats: {
-          hp: { ...cur.hp }, vision: cur.vision, cells: cur.cells,
+          hp: { ...cur.hp }, ac: cur.ac, vision: cur.vision, cells: cur.cells,
           hpPublic: cur.hpPublic !== false, namePublic: cur.namePublic !== false,
+          resist: [...(cur.resist || [])], vuln: [...(cur.vuln || [])], immune: [...(cur.immune || [])],
+          saves: { ...(cur.saves || {}) }, moves: (cur.moves || []).map((m) => ({ ...m })),
         },
       });
       bSave.textContent = 'Сохранено ✓';
@@ -1165,7 +1166,7 @@ function placeCard(card, at) {
   const host = (card.offsetParent || document.body).getBoundingClientRect();
 
   // нижняя панель инструментов должна остаться нажимаемой — карточку выше неё
-  const bar = ['#draw-bar', '#wall-bar', '#edit-bar']
+  const bar = ['#draw-bar', '#fog-bar', '#wall-bar', '#edit-bar']
     .map((sel) => $(sel)).find((b) => b && !b.hidden);
   const bottom = Math.min(board.bottom - pad, bar ? bar.getBoundingClientRect().top - 8 : Infinity);
 
@@ -1764,6 +1765,8 @@ function wireUI() {
     $$('#toolbar .tool[data-tool]').forEach((x) => x.classList.toggle('is-active', x === b));
     app.board.setTool(b.dataset.tool);
     $('#draw-bar').hidden = b.dataset.tool !== 'draw';
+    const fb = $('#fog-bar');
+    if (fb) fb.hidden = b.dataset.tool !== 'fog';
     const wb = $('#wall-bar');
     if (wb) wb.hidden = b.dataset.tool !== 'wall';
     const eb = $('#edit-bar');
@@ -1828,6 +1831,16 @@ function wireUI() {
     $$('[data-rtab]').forEach((x) => x.classList.toggle('is-active', x === b));
     $$('[data-rpanel]').forEach((p) => { p.hidden = p.dataset.rpanel !== b.dataset.rtab; });
   }));
+
+  // фильтр ленты: прячем CSS-ом, чтобы не пересобирать её на каждое нажатие
+  $$('[data-feed]').forEach((b) => {
+    if (b.tagName !== 'BUTTON') return;
+    b.addEventListener('click', () => {
+      $$('.feed-filter .tab').forEach((x) => x.classList.toggle('is-active', x === b));
+      $('#chat-feed').dataset.feed = b.dataset.feed;
+      $('#chat-feed').scrollTop = $('#chat-feed').scrollHeight;
+    });
+  });
 
   // чат
   $('#chat-form').addEventListener('submit', (e) => {
@@ -2094,7 +2107,12 @@ function wireDM() {
   $('#grid-oy').addEventListener('input', (e) => patchLoc({ grid: { oy: Number(e.target.value) || 0 } }));
   $('#grid-feet').addEventListener('input', (e) => patchLoc({ grid: { feet: Math.max(1, Number(e.target.value) || 5) } }));
   $('#grid-show').addEventListener('change', (e) => patchLoc({ grid: { show: e.target.checked } }));
-  $('#fog-on').addEventListener('change', (e) => patchLoc({ fogOn: e.target.checked }));
+  // кнопка в тулбаре только включает и выключает; настройки кисти — при самой кисти
+  $('#btn-fog-on').addEventListener('click', () => {
+    const s = app.store.get();
+    const loc = s.locations[s.activeLoc];
+    if (loc) patchLoc({ fogOn: !loc.fogOn });
+  });
   $('#fog-brush').addEventListener('input', (e) => app.board.setFogBrush(Number(e.target.value) || 1));
   $$('[data-fogmode]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-fogmode]').forEach((x) => x.classList.toggle('is-active', x === b));
@@ -2157,15 +2175,15 @@ function wireDM() {
     app.store.dispatch({ t: 'roster.forget', keys });
   });
 
+  // чистим ровно то, что показывает фильтр
   $('#chat-clear').addEventListener('click', () => {
-    if (!confirm('Очистить чат у всех за столом? Журнал бросков останется.')) return;
-    app.store.dispatch({ t: 'chat.clear', kind: 'chat' });
-    say('Мастер очистил чат', 'system');
-  });
-  $('#rolls-clear').addEventListener('click', () => {
-    if (!confirm('Очистить журнал бросков у всех за столом? Чат останется.')) return;
-    app.store.dispatch({ t: 'chat.clear', kind: 'roll' });
-    say('Мастер очистил журнал бросков', 'system');
+    const вид = $('#chat-feed').dataset.feed;
+    const [kind, слово] = вид === 'roll' ? ['roll', 'журнал бросков']
+      : вид === 'talk' ? ['chat', 'разговор']
+        : ['all', 'всю ленту'];
+    if (!confirm(`Очистить ${слово} у всех за столом?`)) return;
+    app.store.dispatch({ t: 'chat.clear', kind });
+    say(`Мастер очистил ${слово}`, 'system');
   });
 
   $('#init-roll-all').addEventListener('click', () => {
@@ -2219,21 +2237,31 @@ function wireDM() {
     if (withDM) p.set('m', s.room.dmKey || '');
     return location.origin + location.pathname + '?' + p.toString();
   };
-  const showLink = (url) => {
-    const out = $('#link-out');
-    out.hidden = false; out.value = url; out.select();
-    navigator.clipboard?.writeText(url).then(
-      () => { $('#link-hint').hidden = false; },
-      () => { $('#link-hint').hidden = true; });
+  // ссылка уходит в буфер сама, на кнопке вспыхивает «Скопировано»;
+  // не вышло с буфером — показываем поле, чтобы можно было забрать руками
+  const ССЫЛКИ = {
+    player: () => inviteLink(false),
+    dm: () => inviteLink(true),
+    code: () => { const s = app.store.get(); return packRoom(s.room.name, s.room.playerKey || ''); },
+    cab: () => location.origin + location.pathname.replace(/[^/]*$/, '') + 'cabinet.html',
   };
-  $('#btn-link-player').addEventListener('click', () => showLink(inviteLink(false)));
-  $('#btn-link-dm').addEventListener('click', () => showLink(inviteLink(true)));
-  $('#btn-room-code').addEventListener('click', () => {
-    const s = app.store.get();
-    showLink(packRoom(s.room.name, s.room.playerKey || ''));
+  const copyInvite = (btn, url) => {
+    const было = btn.textContent;
+    const ок = () => {
+      btn.textContent = 'Скопировано ✓';
+      btn.classList.add('is-copied');
+      setTimeout(() => { btn.textContent = было; btn.classList.remove('is-copied'); }, 1400);
+    };
+    const мимо = () => { const out = $('#link-out'); out.hidden = false; out.value = url; out.select(); };
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(ок, мимо); else мимо();
+  };
+  $('#btn-invite').addEventListener('click', () => {
+    const box = $('#invite-box');
+    box.hidden = !box.hidden;
+    $('#btn-invite').classList.toggle('is-open', !box.hidden);
   });
-  $('#btn-cab-link').addEventListener('click', () => {
-    showLink(location.origin + location.pathname.replace(/[^/]*$/, '') + 'cabinet.html');
+  $$('#invite-box [data-invite]').forEach((b) => {
+    b.addEventListener('click', () => copyInvite(b, ССЫЛКИ[b.dataset.invite]()));
   });
 
   $('#btn-delete-room').addEventListener('click', deleteRoom);

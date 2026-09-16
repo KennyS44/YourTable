@@ -47,6 +47,9 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .btn-primary:hover{background:linear-gradient(180deg,#d6b26a,#b5924a)}
 .btn-ghost{background:transparent}
 .btn-soft{background:var(--panel-2)}
+/* Приглушённая кнопка: действие опасное, но не главное — не тянет взгляд */
+.btn-quiet{border-color:transparent; background:transparent; color:var(--muted)}
+.btn-quiet:hover{color:#e6a08c; border-color:#7d3f30; background:transparent}
 .btn-danger{border-color:#7d3f30; color:#e6a08c}
 .btn-danger:hover{background:#3a221c; border-color:var(--danger)}
 .btn-sm{min-height:36px; padding:0 var(--s3); font-size:14px}
@@ -134,6 +137,8 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .tool-undo{border-left:1px solid var(--line); border-radius:0 var(--r-sm) var(--r-sm) 0}
 .tool-undo:disabled{opacity:.3; cursor:default}
 .tool-undo:disabled:hover{color:var(--muted)}
+/* Туман — выключатель, а не режим: отбит от инструментов и стоит последним */
+.tool-fog{margin-left:var(--s3); border-left:1px solid var(--line); border-radius:0 var(--r-sm) var(--r-sm) 0}
 
 /* Короткое слово о случившемся: всплывает над полем и само тает */
 .toast{
@@ -236,6 +241,7 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .draw-bar .hint{flex:1 1 240px; max-width:420px; margin:0}
 .edit-counts{font-size:14px; color:var(--gold); white-space:nowrap}
 .draw-bar input[type=range]{width:90px; accent-color:var(--gold)}
+.draw-bar input[type=number]{width:72px}
 
 /* ── Списки, библиотека ──────────────────────────────────────────── */
 /* Складные блоки настроек — прижаты к низу столбца */
@@ -263,6 +269,16 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .list-item.is-active{border-color:var(--gold); background:var(--panel-2)}
 .list-item .name{flex:1; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .list-item .thumb{width:40px; height:32px; object-fit:cover; border-radius:4px; background:var(--panel-2)}
+/* Ход боя: кнопки не слипаются ни в ряду, ни между рядами */
+.init-tools{display:grid; gap:var(--s2); margin-bottom:var(--s4)}
+.init-tools .btn{padding:0 var(--s2); white-space:nowrap}
+
+/* Приглашения: одна кнопка, под ней — четыре ссылки, каждая копирует себя */
+.invite{display:grid; gap:var(--s2); margin-top:var(--s2); animation:rise .2s var(--ease) both}
+.invite .btn{justify-content:flex-start}
+.invite .btn.is-copied{color:var(--gold); border-color:var(--gold-dim)}
+#btn-invite.is-open{color:var(--gold); border-color:var(--gold-dim)}
+
 .link-out{
   width:100%; min-height:44px; margin-top:var(--s2); padding:0 var(--s3);
   border-radius:var(--r-sm); border:1px solid var(--line); background:var(--bg-2);
@@ -286,7 +302,13 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .lib-item.is-shown{border-color:var(--gold)}
 
 /* ── Чат и броски ────────────────────────────────────────────────── */
-.feed-tools{display:flex; justify-content:flex-end; padding-bottom:var(--s2)}
+.feed-tools{display:flex; align-items:center; gap:var(--s2); justify-content:space-between; padding-bottom:var(--s3)}
+.feed-filter{flex:1; min-width:0}
+.feed-filter .tab{padding:0 var(--s2); white-space:nowrap}
+/* Фильтр ленты только прячет: перерисовывать её на каждое нажатие незачем */
+.feed[data-feed=talk] .msg.roll,
+.feed[data-feed=talk] .msg.use{display:none}
+.feed[data-feed=roll] .msg:not(.roll):not(.use){display:none}
 .feed{flex:1; overflow:auto; display:flex; flex-direction:column; gap:var(--s2); padding-right:var(--s1)}
 .msg{background:var(--bg-2); border:1px solid var(--line-soft); border-radius:var(--r-sm); padding:var(--s2)}
 .msg .who{font-size:14px; color:var(--gold); margin-right:var(--s1)}
