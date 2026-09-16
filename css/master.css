@@ -1,0 +1,44 @@
+/* ── Страница Мастера: витрина листов игроков ── */
+
+/* ── Страница Мастера: персонажи игроков ── */
+.dm-stage{max-width:1200px; width:100%; margin:0 auto; padding:var(--s4)}
+.dm-lead{margin:var(--s2) 0 var(--s4)}
+.dm-add{
+  display:grid; grid-template-columns:1fr auto; gap:var(--s2); align-items:end; max-width:420px;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:var(--s3);
+}
+.dm-add .field{margin-bottom:0}
+.dm-add input{text-transform:uppercase; letter-spacing:.08em; font-family:var(--f-head)}
+.dm-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:var(--s3); margin-top:var(--s4);
+}
+.dm-card{
+  position:relative; height:160px; border:1px solid var(--line); border-radius:var(--r);
+  overflow:hidden; background:var(--panel-2); cursor:pointer;
+  transition:border-color .18s var(--ease), transform .18s var(--ease);
+}
+.dm-card:hover{border-color:var(--gold-dim); transform:translateY(-2px)}
+.dm-card.is-active{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-dim) inset}
+.dm-card::after{
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(20,19,16,.15) 40%, rgba(20,19,16,.9));
+}
+.dm-card-name{
+  position:absolute; left:var(--s3); right:var(--s3); bottom:var(--s2); z-index:2;
+  font-family:var(--f-head); font-size:16px; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.dm-card-sign{
+  position:absolute; inset:0; display:grid; place-items:center;
+  font-size:32px; color:var(--gold-dim); opacity:.5;
+}
+.dm-card-key{
+  position:absolute; left:var(--s3); bottom:36px; z-index:2;
+  font-size:14px; letter-spacing:.08em; color:var(--gold-dim);
+}
+.dm-empty{margin-top:var(--s4)}
+.sheet-head-row{
+  display:flex; align-items:center; justify-content:space-between; gap:var(--s3);
+  margin-bottom:var(--s3);
+}

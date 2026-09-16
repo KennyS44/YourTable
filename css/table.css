@@ -1,124 +1,8 @@
-/* ── Основа: приглушённый Journeyman ─────────────────────────────── */
-:root{
-  --bg:#171613;
-  --bg-2:#1e1c18;
-  --panel:#22201b;
-  --panel-2:#2a2721;
-  --line:#38332b;
-  --line-soft:#2f2b24;
-  --text:#ece6d9;
-  --muted:#a49a87;
-  --gold:#c9a45a;
-  --gold-dim:#8d7440;
-  --ink:#141310;
-  --danger:#b8604a;
-  --ok:#83a05f;
-
-  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px; --s8:32px;
-  --r:10px; --r-sm:6px;
-  --f-head:"Cinzel", Georgia, serif;
-  --f-body:"Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ease:cubic-bezier(.2,.7,.3,1);
-  --shadow:0 8px 28px rgba(0,0,0,.45);
-}
-
-*{box-sizing:border-box}
-[hidden]{display:none !important}
-html,body{height:100%}
-body{
-  margin:0; background:var(--bg); color:var(--text);
-  font-family:var(--f-body); font-size:16px; line-height:1.5;
-  -webkit-font-smoothing:antialiased; overflow:hidden;
-}
-h1,h2,h3{font-family:var(--f-head); font-weight:600; margin:0; letter-spacing:.01em}
-button,input,select{font-family:inherit; font-size:16px; color:inherit}
-em{color:var(--muted); font-style:normal; font-size:14px}
-
-/* ── Общие элементы ──────────────────────────────────────────────── */
-.btn{
-  display:inline-flex; align-items:center; justify-content:center; gap:var(--s2);
-  min-height:44px; padding:0 var(--s4); border-radius:var(--r-sm);
-  border:1px solid var(--line); background:var(--panel-2); color:var(--text);
-  cursor:pointer; transition:background .18s var(--ease), border-color .18s var(--ease), transform .12s var(--ease);
-}
-.btn:hover{background:#332f27; border-color:var(--gold-dim)}
-.btn:active{transform:translateY(1px)}
-.btn-primary{background:linear-gradient(180deg,#c9a45a,#a9863f); color:var(--ink); border-color:#8d7440; font-weight:600}
-.btn-primary:hover{background:linear-gradient(180deg,#d6b26a,#b5924a)}
-.btn-ghost{background:transparent}
-.btn-soft{background:var(--panel-2)}
-/* Приглушённая кнопка: действие опасное, но не главное — не тянет взгляд */
-.btn-quiet{border-color:transparent; background:transparent; color:var(--muted)}
-.btn-quiet:hover{color:#e6a08c; border-color:#7d3f30; background:transparent}
-.btn-danger{border-color:#7d3f30; color:#e6a08c}
-.btn-danger:hover{background:#3a221c; border-color:var(--danger)}
-.btn-sm{min-height:36px; padding:0 var(--s3); font-size:14px}
-.w-full{width:100%}
-.icon-btn{
-  width:36px; height:36px; min-width:36px; display:inline-flex; align-items:center; justify-content:center;
-  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--panel-2); color:var(--text); cursor:pointer;
-  transition:background .18s var(--ease);
-}
-.icon-btn:hover{background:#332f27}
-.row-2{display:grid; grid-template-columns:1fr 1fr; gap:var(--s2)}
-.divider{height:1px; background:var(--line-soft); margin:var(--s4) 0}
-.hint{color:var(--muted); font-size:14px; margin:var(--s2) 0 0}
-.h-sm{font-size:16px; color:var(--gold); margin-bottom:var(--s2)}
-.h-danger{color:#e6a08c}
-
-.field{display:flex; flex-direction:column; gap:var(--s1); margin-bottom:var(--s3)}
-.field > span{font-size:14px; color:var(--muted)}
-.field input, .sel{
-  min-height:44px; padding:0 var(--s3); border-radius:var(--r-sm);
-  border:1px solid var(--line); background:var(--bg-2); color:var(--text); width:100%;
-}
-.field input:focus, .sel:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
-.field-row{flex-direction:row; align-items:center; justify-content:space-between; gap:var(--s2)}
-.field-row input{max-width:110px}
-.field-row.slim{margin-bottom:0}
-.check{display:flex; align-items:center; gap:var(--s2); min-height:44px; font-size:14px; color:var(--muted); cursor:pointer}
-.check input{width:18px; height:18px; accent-color:var(--gold)}
-.file-btn{position:relative; cursor:pointer}
-
-.tabs{display:flex; gap:var(--s1); background:var(--bg-2); padding:var(--s1); border-radius:var(--r-sm); border:1px solid var(--line-soft)}
-.tab{
-  flex:1; min-height:40px; padding:0 var(--s1); border:0; border-radius:var(--r-sm); white-space:nowrap;
-  background:transparent; color:var(--muted); cursor:pointer; font-size:14px;
-  transition:background .18s var(--ease), color .18s var(--ease);
-}
-.tab:hover{color:var(--text)}
-.tab.is-active{background:var(--panel-2); color:var(--gold)}
-.tabs-sm .tab{min-height:36px}
-
-/* ── Вход ────────────────────────────────────────────────────────── */
-.gate{
-  position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:var(--s4);
-  background:radial-gradient(1200px 600px at 50% -10%, #2a2620, var(--bg));
-  overflow:auto;
-}
-.gate-card{
-  width:100%; max-width:420px; background:var(--panel); border:1px solid var(--line);
-  border-radius:var(--r); padding:var(--s6); box-shadow:var(--shadow);
-  animation:rise .45s var(--ease) both;
-}
-@keyframes rise{from{opacity:0; transform:translateY(12px)} to{opacity:1; transform:none}}
-.gate-title{font-size:32px; color:var(--gold); text-align:center}
-.gate-sub{color:var(--muted); text-align:center; font-size:14px; margin:var(--s2) 0 var(--s6)}
-.gate-form{margin-top:var(--s4)}
-.gate-form .btn{width:100%; margin-top:var(--s2)}
-.gate-note{color:var(--muted); font-size:14px; margin:var(--s4) 0 0; text-align:center}
-.gate-err{color:var(--danger); font-size:14px; margin:var(--s2) 0 0}
+/* ── Стол: поле, панели, лента, кубики ───────────────────────────────
+   Только index.html. Лист персонажа живёт отдельно, в sheet.css. */
 
 /* ── Каркас ──────────────────────────────────────────────────────── */
 .app{display:flex; flex-direction:column; height:100dvh; position:relative}
-.topbar{
-  display:flex; align-items:center; gap:var(--s3); padding:var(--s2) var(--s3);
-  background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap;
-}
-.topbar-left,.topbar-right{display:flex; align-items:center; gap:var(--s2); min-width:0}
-.topbar-right{margin-left:auto}
-.brand{font-family:var(--f-head); color:var(--gold); font-size:20px}
-.room-name{color:var(--muted); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:26vw}
 .badge{
   font-size:14px; padding:2px var(--s2); border-radius:999px;
   border:1px solid var(--gold-dim); color:var(--gold);
@@ -637,19 +521,6 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .hp-bar[data-level=low] .hp-fill{background:var(--gold)}
 .hp-bar[data-level=bad] .hp-fill{background:var(--danger)}
 
-/* Стойкость к урону: фишки сверху, под ними выбор вида и три кнопки */
-.guard-chips{display:flex; flex-wrap:wrap; gap:var(--s1); margin:4px 0}
-.guard-chip{
-  display:inline-flex; align-items:center; gap:4px; min-height:28px; padding:0 var(--s2);
-  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--bg-2);
-  color:var(--text); font-size:14px; cursor:pointer;
-}
-.guard-chip:hover{border-color:var(--danger); color:var(--danger)}
-.guard-resist{border-color:var(--gold-dim)}
-.guard-vuln{border-color:var(--danger)}
-.guard-immune{border-color:var(--line); color:var(--muted)}
-.guard-add{display:grid; grid-template-columns:1fr auto auto auto; gap:var(--s1); align-items:center}
-.guard-add .btn{min-width:40px}
 
 /* Спасброски: шесть окошек в два ряда — подпись над полем, как в листе */
 .saves-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s1); margin-top:4px}

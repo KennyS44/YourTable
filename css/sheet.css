@@ -1,0 +1,374 @@
+/* ── Лист персонажа ──────────────────────────────────────────────────
+   Один и тот же лист в трёх местах: кабинет, левая панель стола и витрина
+   Мастера. Поэтому файл отдельный, а не внутри кабинета. */
+
+/* ── Лист персонажа ── */
+.sheet-wrap{
+  margin-top:var(--s4); background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--r); padding:var(--s4);
+}
+/* Слева герб во всю высоту шапки, справа имя и поля в две строки */
+.sheet-head{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); align-items:start}
+.head-main{display:flex; flex-direction:column; gap:var(--s2); min-width:0}
+/* Уровень и вдохновение — узкие окошки, их колонки по содержимому, а не в равную долю */
+.head-grid{display:grid; grid-template-columns:auto auto repeat(3,1fr); gap:var(--s2); align-items:start}
+/* Карточки текут в три колонки и сами выравниваются по высоте */
+/* Три настоящих столбца, а не текстовые колонки: карточка остаётся там, куда
+   её положили, и раскрытая способность не гоняет соседей между столбцами. */
+.sheet-flow{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s3); margin-top:var(--s4); align-items:start}
+.sheet-col{display:flex; flex-direction:column; gap:var(--s3); min-width:0}
+.sheet-col .blk{margin:0}
+/* Описание способности растёт во всю высоту: потолок в 340px обрезал текст */
+.feat-body textarea{min-height:120px}
+.sheet-bottom{display:grid; grid-template-columns:1fr 1fr; gap:var(--s3); margin-top:var(--s3)}
+
+.blk{border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s3)}
+.blk-h{
+  font-size:14px; color:var(--gold); letter-spacing:.04em; text-transform:uppercase;
+  margin-bottom:var(--s2);
+}
+.blk textarea{
+  width:100%; resize:vertical; min-height:44px; padding:var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--panel);
+  color:var(--text); font-family:inherit; font-size:16px; line-height:1.5;
+}
+.blk textarea:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+
+.fld{display:flex; flex-direction:column; gap:2px; min-width:0}
+.fld-l{font-size:14px; color:var(--muted)}
+.fld input{
+  width:100%; min-height:40px; padding:0 var(--s2); border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--panel); color:var(--text); font-size:16px;
+}
+.fld input:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+.fld-name input{min-height:52px; font-family:var(--f-head); font-size:24px; color:var(--gold)}
+.fld-num input{text-align:center}
+.row-3{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s2); align-items:end}
+.row-4{display:grid; grid-template-columns:repeat(4,1fr); gap:var(--s2); align-items:end}
+
+/* Вдохновение и уровень только показываем: их выдаёт Мастер за столом */
+.insp-box{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
+.fld-lvl{max-width:88px}
+.insp-n,.lvl-n{
+  min-width:44px; height:40px; display:inline-flex; align-items:center; justify-content:center;
+  border-radius:var(--r-sm); border:1px solid var(--gold-dim); background:var(--panel);
+  font-family:var(--f-head); font-size:20px; color:var(--gold);
+}
+
+/* Герб класса: монета на две стороны, флип-кнопка над ней меняет сторону */
+.fld-cls{max-width:120px}
+.cls-box{display:flex; flex-direction:column; align-items:center; gap:4px}
+.cls-tools{display:flex; gap:4px}
+.cls-tool{width:26px; height:26px; min-width:26px; font-size:14px; border-radius:50%}
+.cls-tool:disabled{opacity:.35; cursor:default}
+.cls-tool:disabled:hover{background:var(--panel-2)}
+.cls-coin{width:84px; height:84px; perspective:600px}
+/* Наклон к курсору — отдельным слоем над переворотом, углы приходят из JS */
+.cls-tilt{
+  position:relative; width:100%; height:100%; transform-style:preserve-3d;
+  transform:rotateY(var(--tilt-y,0deg)) rotateX(var(--tilt-x,0deg));
+}
+.cls-coin-inner{
+  position:relative; width:100%; height:100%; transform-style:preserve-3d;
+  transition:transform .6s var(--ease);
+}
+.cls-coin-inner.is-flipped{transform:rotateY(180deg)}
+.cls-face{position:absolute; inset:0; backface-visibility:hidden}
+.cls-face svg{width:100%; height:100%; display:block}
+.cls-face-a{transform:translateZ(5px)}
+.cls-face-b{transform:rotateY(180deg) translateZ(5px)}
+/* Ребро монеты: стопка кружков между лицами */
+.cls-edge{position:absolute; inset:0; transform-style:preserve-3d}
+/* Ребро уже лица на пару пикселей: круглый контур рисует SVG, а не эта стопка */
+.coin-edge{
+  position:absolute; inset:3%; border-radius:50%;
+  background:linear-gradient(160deg,#e3c98f,#8d7440 55%,#5d4c29);
+}
+.cls-caption{
+  font-family:var(--f-head); font-size:12px; color:var(--gold); text-align:center;
+  letter-spacing:.02em; line-height:1.3;
+}
+
+/* Оверлей выбора класса: те же медальоны, что смотрели на превью */
+.cls-picker-overlay{
+  position:fixed; inset:0; background:rgba(10,9,7,.72); z-index:200;
+  display:flex; align-items:center; justify-content:center; padding:var(--s4);
+}
+.cls-picker{
+  width:100%; max-width:640px; max-height:88vh; overflow:auto;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+  padding:var(--s4); box-shadow:var(--shadow);
+}
+.cls-picker-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:var(--s4)}
+.cls-picker-head h3{font-family:var(--f-head); color:var(--gold); font-size:18px}
+.cls-picker-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:var(--s4) var(--s2)}
+.cls-pick{
+  display:flex; flex-direction:column; align-items:center; gap:var(--s2);
+  background:transparent; border:0; cursor:pointer; padding:var(--s2); border-radius:var(--r-sm);
+}
+.cls-pick:hover{background:var(--panel-2)}
+.cls-pick.is-current{background:var(--panel-2); outline:1px solid var(--gold-dim); outline-offset:-1px; border-radius:var(--r)}
+/* Медальон в выборе — такая же монета с ребром, наклон идёт из JS */
+.coin3d{display:block; width:100%; aspect-ratio:1; perspective:620px}
+.coin-body{
+  position:relative; display:block; width:100%; height:100%; transform-style:preserve-3d;
+  transform:rotateY(var(--tilt-y,0deg)) rotateX(var(--tilt-x,0deg));
+  filter:drop-shadow(0 8px 16px rgba(0,0,0,.5));
+}
+.coin-face{position:absolute; inset:0; transform:translateZ(5px)}
+.coin-face svg{width:100%; height:100%; display:block}
+.cls-pick span{font-size:13px; color:var(--text); text-align:center}
+@media (max-width:720px){ .cls-picker-grid{grid-template-columns:repeat(3, 1fr)} }
+@media (max-width:480px){ .cls-picker-grid{grid-template-columns:repeat(2, 1fr)} }
+
+/* Личность: черты, идеалы, привязанности и слабости — один блок, как на бумаге */
+.persona{display:grid; grid-template-columns:1fr 1fr; gap:var(--s2)}
+/* Нечётное последнее поле тянется на обе колонки, иначе рядом зияет дыра */
+.persona-cell:last-child:nth-child(odd){grid-column:1 / -1}
+.persona-cell{display:flex; flex-direction:column; gap:2px; min-width:0}
+.persona-cell textarea{
+  width:100%; resize:vertical; min-height:44px; padding:var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--panel);
+  color:var(--text); font-family:inherit; font-size:16px; line-height:1.5;
+}
+.persona-cell textarea:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+@media (max-width:520px){ .persona{grid-template-columns:1fr} }
+
+/* Способности: свёрнутая вкладка — картинка и название, внутри текст */
+.feats{display:flex; flex-direction:column; gap:var(--s2); margin-bottom:var(--s2)}
+.feat{border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel); overflow:hidden}
+.feat.is-open{border-color:var(--gold-dim)}
+.feat-tab{
+  display:flex; align-items:center; gap:var(--s2); width:100%; min-height:52px;
+  padding:var(--s2); border:0; background:transparent; color:var(--text); cursor:pointer; text-align:left;
+}
+.feat-tab:hover{background:var(--panel-2)}
+/* крестик стоит в самой строке, чтобы убрать запись, не раскрывая её */
+.feat-head{display:flex; align-items:center}
+.feat-head .feat-tab{flex:1 1 auto; min-width:0}
+/* правило .row-del стоит ниже, поэтому рамку снимаем через .feat-head */
+.feat-head .feat-del{
+  flex:0 0 auto; margin-right:var(--s2); border-color:transparent; background:transparent;
+  font-size:20px; line-height:1;
+}
+.feat-head .feat-del:hover{border-color:var(--danger)}
+.feat-pic{
+  width:40px; height:40px; flex-shrink:0; border-radius:var(--r-sm);
+  background:var(--bg-2) center/cover no-repeat; border:1px solid var(--line-soft);
+  display:inline-flex; align-items:center; justify-content:center; color:var(--gold-dim);
+}
+.feat-name{font-family:var(--f-head); font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.feat-body{padding:0 var(--s2) var(--s2); display:flex; flex-direction:column; gap:var(--s2)}
+.feat-body textarea,.feat-name-input{
+  width:100%; padding:var(--s2); border-radius:var(--r-sm); border:1px solid var(--line);
+  background:var(--bg-2); color:var(--text); font-family:inherit; font-size:16px; line-height:1.5;
+}
+.feat-body textarea{resize:vertical}
+.feat-acts{display:flex; gap:var(--s2); justify-content:flex-end}
+
+.row-del{
+  width:32px; min-height:36px; border-radius:var(--r-sm); border:1px solid var(--line);
+  background:var(--panel); color:var(--muted); cursor:pointer;
+}
+.row-del:hover{color:var(--danger); border-color:var(--danger)}
+
+.abilities{display:grid; grid-template-columns:repeat(2,1fr); gap:var(--s2)}
+.abil{
+  border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel);
+  padding:var(--s2); text-align:center;
+}
+.abil-l{font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.abil-mod{font-family:var(--f-head); font-size:24px; color:var(--gold); line-height:1.2}
+/* за столом модификатор — кнопка броска, потому и палец достаёт, и видно, что жмётся */
+.abil-roll{
+  display:block; width:100%; min-height:44px; margin:2px 0;
+  border:1px solid var(--line-soft); border-radius:var(--r-sm);
+  background:var(--bg-2); cursor:pointer; transition:border-color .16s var(--ease), background .16s var(--ease);
+}
+.abil-roll:hover{border-color:var(--gold-dim); background:var(--panel-2)}
+.abil-roll:active{background:var(--panel-2); transform:translateY(1px)}
+.abil-roll:focus-visible{outline:2px solid var(--gold-dim); outline-offset:1px}
+.abil-score{
+  width:100%; min-height:32px; margin-top:2px; text-align:center; font-size:14px;
+  border-radius:var(--r-sm); border:1px solid var(--line-soft); background:var(--bg-2); color:var(--text);
+}
+
+/* ── Приёмы: свёрнуто — только названия, развёрнуто — все числа ── */
+.moves{display:flex; flex-direction:column; gap:var(--s1)}
+.move-body{padding:0 var(--s2) var(--s2); display:flex; flex-direction:column; gap:var(--s2)}
+.move-fld{display:flex; flex-direction:column; gap:var(--s1)}
+.move-line{display:flex; align-items:center; gap:var(--s1); flex-wrap:wrap}
+.move-line[hidden]{display:none}
+/* панель за столом узкая: выпадающие списки тянутся во всю строку, а не по тексту */
+.move-line > .sel-sm{flex:1 1 140px; min-width:0}
+.move-unit{font-size:14px; color:var(--muted)}
+.move-size{display:inline-flex; align-items:center; gap:var(--s1); flex:0 0 auto}
+.move-size[hidden]{display:none}
+/* спасбросок: характеристика во всю ширину, под ней сложность и «при успехе» */
+.move-save{display:grid; grid-template-columns:auto 1fr; gap:var(--s1); align-items:center; width:100%}
+.move-save > .sel-sm:first-child{grid-column:1 / -1}
+.move-save[hidden]{display:none}
+.move-dice{display:flex; flex-direction:column; gap:var(--s1)}
+/* «4 д 8» держим одной строкой, вид урона уходит под неё во всю ширину */
+.move-dice .move-line{display:grid; grid-template-columns:56px auto 1fr; align-items:center}
+.move-dice .move-line > .sel-sm{flex:none}
+.move-dice .move-line > .sel-sm:last-child{grid-column:1 / -1}
+/* второй кусок урона — продолжение первого, отсюда знак «плюс» на поле */
+.move-dice-2{position:relative; padding-left:var(--s3)}
+.move-dice-2::before{content:"+"; position:absolute; left:0; top:8px; color:var(--gold-dim); font-size:16px}
+.sel-sm,.num-sm{
+  min-height:36px; padding:0 var(--s2); border-radius:var(--r-sm); font-size:14px;
+  border:1px solid var(--line); background:var(--bg-2); color:var(--text);
+}
+.num-sm{width:56px; text-align:center}
+/* галочка идёт последней строкой приёма, отбивка сверху отделяет её от полей */
+.move-conc{margin-top:var(--s1); color:var(--text)}
+/* «Применить» видно, не разворачивая приём: в бою важна каждая лишняя нажатие */
+.move-use{
+  flex:0 0 auto; align-self:center; min-height:36px; margin-right:var(--s1); padding:0 var(--s2);
+  border:1px solid var(--gold-dim); border-radius:var(--r-sm); background:var(--bg-2);
+  color:var(--gold); font-size:14px; cursor:pointer; white-space:nowrap;
+}
+.move-use:hover{background:var(--panel-2); border-color:var(--gold)}
+.num-sm[hidden]{display:none}
+.sel-sm:focus,.num-sm:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+
+/* ── Ключ персонажа ── */
+.key-box{
+  display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap; margin-top:var(--s3);
+  border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2); padding:var(--s2) var(--s3);
+}
+.key-val{
+  font-family:var(--f-head); font-size:20px; letter-spacing:.08em; color:var(--gold);
+  user-select:all; margin-right:auto;
+}
+/* Закрытый ключ приглушён: видно, что там что-то есть, но читать нечего */
+.key-val.is-hidden{color:var(--gold-dim); user-select:none}
+
+/* ── Лист глазами Мастера: правок нет, поля просто читаются ── */
+.sheet.is-ro input,.sheet.is-ro textarea{background:var(--bg-2); color:var(--text); cursor:default}
+.sheet.is-ro input:focus,.sheet.is-ro textarea:focus{outline:1px solid var(--line)}
+.feat-text{font-size:16px; line-height:1.5; padding:0 var(--s1) var(--s1); white-space:pre-wrap}
+
+/* ── Короткий лист игрока в левой панели стола ── */
+.sheet-lite{display:flex; flex-direction:column; gap:var(--s3)}
+.sheet-lite .blk{margin:0}
+.sheet-lite .blk,.sheet-lite .abil,.sheet-lite .fld{min-width:0}
+/* Имя и уровень — одна строка: подпись «Уровень» уходит влево от числа, и
+   окошко перестаёт быть башней, из-под которой имя съезжает вниз. */
+.lite-head{display:flex; align-items:center; justify-content:space-between; gap:var(--s3)}
+.sheet-lite .fld-lvl{flex-direction:row; align-items:center; gap:6px; width:auto}
+.sheet-lite .fld-lvl .fld-l{white-space:nowrap}
+.sheet-lite .lvl-n{min-width:36px; height:32px; font-size:20px}
+.lite-name{font-family:var(--f-head); font-size:20px; color:var(--gold); margin:0; min-width:0}
+/* Фигурка героя стоит в этой локации: имя получает метку и становится кнопкой
+   перехода — двойной щелчок ведёт камеру к ней. */
+.lite-name.is-onboard{cursor:zoom-in}
+.lite-name.is-onboard::before{
+  content:'⌖'; margin-right:6px; color:var(--gold-dim); font-size:16px;
+}
+.lite-name.is-onboard:hover::before{color:var(--gold)}
+.sheet-lite .fld-lvl{flex:0 0 auto}
+[data-lpanel="hero"]{display:flex; flex-direction:column; gap:var(--s3)}
+
+/* ── Защита и хиты: щит с КД и полоска здоровья ──────────────────────
+   Три одинаковых окошка не давали главного — «сколько осталось». Полоска
+   говорит это длиной и цветом, а числа остались её же подписями. */
+/* Фишки стойкости в листе: та же разметка, что в карточке существа */
+/* Фишки стойкости рисует и карточка существа у Мастера, и лист героя —
+   поэтому основа здесь, а под ней правки для листа. */
+/* Стойкость к урону: фишки сверху, под ними выбор вида и три кнопки */
+.guard-chips{display:flex; flex-wrap:wrap; gap:var(--s1); margin:4px 0}
+.guard-chip{
+  display:inline-flex; align-items:center; gap:4px; min-height:28px; padding:0 var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--bg-2);
+  color:var(--text); font-size:14px; cursor:pointer;
+}
+.guard-chip:hover{border-color:var(--danger); color:var(--danger)}
+.guard-resist{border-color:var(--gold-dim)}
+.guard-vuln{border-color:var(--danger)}
+.guard-immune{border-color:var(--line); color:var(--muted)}
+.guard-add{display:grid; grid-template-columns:1fr auto auto auto; gap:var(--s1); align-items:center}
+.guard-add .btn{min-width:40px}
+
+.guard-pick{display:flex; flex-direction:column; gap:var(--s2); margin-bottom:var(--s2)}
+.guard-pick .guard-chips{display:flex; flex-wrap:wrap; gap:var(--s1)}
+.guard-pick .guard-chip{
+  display:inline-flex; align-items:center; min-height:28px; padding:0 var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--bg-2);
+  color:var(--text); font-size:14px; cursor:pointer;
+}
+.guard-pick .guard-chip:hover{border-color:var(--danger); color:var(--danger)}
+.guard-pick .guard-resist{border-color:var(--gold-dim)}
+.guard-pick .guard-vuln{border-color:var(--danger)}
+.guard-pick .guard-add{display:grid; grid-template-columns:1fr auto auto; gap:var(--s1); align-items:center}
+.guard-pick .guard-add .btn{min-width:44px}
+.guard-wrap{display:flex; flex-direction:column; gap:var(--s1)}
+
+.vitals{display:flex; align-items:center; gap:var(--s3)}
+.vit-shield{position:relative; width:56px; height:64px; flex:0 0 auto}
+.vit-shield svg{position:absolute; inset:0; width:100%; height:100%}
+.vit-shield path{fill:var(--panel); stroke:var(--gold-dim); stroke-width:2}
+.vit-ac{
+  position:absolute; inset:0; width:100%; height:100%; padding:0 0 4px;
+  background:transparent; border:0; text-align:center;
+  font-family:var(--f-head); font-size:24px; color:var(--gold);
+}
+.vit-ac:focus{outline:2px solid var(--gold-dim); outline-offset:-6px; border-radius:var(--r-sm)}
+/* стрелки у числа съедают место и сбивают центровку */
+.vit-ac::-webkit-outer-spin-button,.vit-ac::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.vit-num::-webkit-outer-spin-button,.vit-num::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.vit-ac,.vit-num{-moz-appearance:textfield}
+
+.vit-hp{
+  position:relative; flex:1 1 auto; min-width:0; height:44px; border-radius:var(--r-sm);
+  border:1px solid var(--line); background:var(--bg-2); overflow:hidden;
+}
+.vit-fill{
+  position:absolute; inset:0 auto 0 0; background:var(--gold-dim);
+  transition:width .28s var(--ease), background-color .28s var(--ease);
+}
+.vit-hp[data-level="low"] .vit-fill{background:#a8762f}
+.vit-hp[data-level="bad"] .vit-fill{background:var(--danger)}
+.vit-nums{
+  position:relative; display:flex; align-items:center; justify-content:center; gap:4px;
+  height:100%; font-family:var(--f-head); font-size:20px; color:var(--text);
+  text-shadow:0 1px 2px rgba(20,19,16,.75);
+}
+.vit-num{
+  width:3ch; min-width:3ch; padding:0; background:transparent; border:0; text-align:center;
+  font-family:inherit; font-size:inherit; color:inherit;
+}
+.vit-num:hover{border-bottom:1px solid var(--gold-dim)}
+.vit-num:focus{outline:2px solid var(--gold); outline-offset:2px; border-radius:4px}
+.vit-slash{opacity:.7}
+
+/* ── Узкий экран ── */
+@media (max-width: 1200px){
+  /* Узко для трёх столбцов: длинный средний уходит вниз во всю ширину */
+  .sheet-flow{grid-template-columns:repeat(2,1fr)}
+  .sheet-flow .sheet-col:last-child{grid-column:1 / -1}
+}
+@media (max-width: 900px){
+  .sheet-flow{grid-template-columns:1fr}
+  .sheet-flow .sheet-col:last-child{grid-column:auto}
+  .sheet-bottom{grid-template-columns:1fr}
+  .sheet-head{grid-template-columns:1fr; justify-items:center}
+  .head-main{width:100%}
+  .head-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── Карточка персонажа: обложка и кнопки поверх ──────────────────────
+   Ленту карточек рисует кабинет, витрину — страница Мастера. Обе берут
+   эти правила, поэтому они здесь, а не в стилях кабинета. */
+.char-bg{
+  position:absolute; inset:0; background-size:cover; background-position:center;
+  background-color:var(--panel-2);
+}
+.char-bg-btn,.char-del{
+  position:absolute; top:var(--s2); z-index:2; min-height:28px; padding:0 var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:rgba(23,22,19,.78);
+  color:var(--muted); font-size:14px; cursor:pointer; display:inline-flex; align-items:center;
+}
+.char-del{right:var(--s2); width:28px; justify-content:center}
+.char-del:hover{color:var(--danger)}
