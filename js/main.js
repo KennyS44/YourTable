@@ -1927,11 +1927,34 @@ async function wireHeroSheet() {
     onUse: (m) => useMove(m, ch),
   });
   showLevel(app.store.get());
+  /* ── Связь листа с фигуркой на поле ───────────────────────────────
+     Игроку важно знать, что фигурка на доске — это он. Имя в листе горит,
+     когда его фигурка стоит в этой же локации, и по двойному щелчку камера
+     едет к ней. Фигурки нет — имя молчит и щелчок ничего не делает. */
+  const myHere = (s) => myTokens(s).find((t) => t.locId === s.activeLoc);
+  const name = $('#lite-sheet .lite-name');
+  if (name) {
+    name.addEventListener('dblclick', () => {
+      const t = myHere(app.store.get());
+      if (t) app.board.focusToken(t.id);
+    });
+  }
+  const showLink = (s) => {
+    const n = $('#lite-sheet .lite-name');
+    if (!n) return;
+    const тут = myHere(s);
+    const где = myTokens(s).length;
+    n.classList.toggle('is-onboard', !!тут);
+    n.title = тут ? 'Фигурка на поле — двойной щелчок переносит к ней камеру'
+      : где ? 'Фигурка стоит в другой локации' : 'Фигурки на поле пока нет';
+  };
+
   syncHpFromToken(app.store.get());
   pushTraitsToToken();
+  showLink(app.store.get());
   // фигурку ставит Мастер, и появиться она может позже: следим за столом и
   // дописываем в неё лист, как только она встала
-  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); pushTraitsToToken(); });
+  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); pushTraitsToToken(); showLink(s); });
 }
 
 function wireDM() {

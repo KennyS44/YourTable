@@ -388,6 +388,13 @@
 .sheet-lite .blk,.sheet-lite .abil,.sheet-lite .fld{min-width:0}
 .lite-head{display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s3)}
 .lite-name{font-family:var(--f-head); font-size:20px; color:var(--gold); margin:0; min-width:0}
+/* Фигурка героя стоит в этой локации: имя получает метку и становится кнопкой
+   перехода — двойной щелчок ведёт камеру к ней. */
+.lite-name.is-onboard{cursor:zoom-in}
+.lite-name.is-onboard::before{
+  content:'⌖'; margin-right:6px; color:var(--gold-dim); font-size:16px;
+}
+.lite-name.is-onboard:hover::before{color:var(--gold)}
 .sheet-lite .fld-lvl{flex:0 0 auto; width:72px}
 [data-lpanel="hero"]{display:flex; flex-direction:column; gap:var(--s3)}
 

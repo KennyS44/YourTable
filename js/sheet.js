@@ -89,8 +89,8 @@ export const SHEET_GUARDS = [
 
 /**
  * Стойкость героя: вид урона выбирается из списка, фишка снимается щелчком.
- * Рядом остаётся своё поле словами — оно живёт для истории персонажа, в счёт
- * урона не идёт, и об этом прямо сказано подписью.
+ * Текстовые поля рядом остаются для истории персонажа — в счёт урона идут
+ * только фишки.
  */
 export function guardPicker(s, onEdit, ro) {
   const box = el('div', 'guard-pick');
@@ -113,7 +113,6 @@ export function guardPicker(s, onEdit, ro) {
         чипы.append(c);
       });
     });
-    if (!чипы.children.length) чипы.append(el('span', 'hint', 'Весь урон проходит как есть.'));
   };
 
   box.append(чипы);
@@ -1003,10 +1002,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
     [abilBlk, defenseBlk, hpBlk, rest.gear],
     [atkBlk, featsBlk, block('Личность', pairGrid(PERSONA))],
     [rest.appearance, rest.langs,
-      block('Сопротивления и слабости',
-        guardPicker(s, onEdit, ro),
-        el('p', 'hint', 'В счёт урона идут только фишки. Текст ниже — для себя.'),
-        pairGrid(DEFENCE))],
+      block('Сопротивления и слабости', guardPicker(s, onEdit, ro), pairGrid(DEFENCE))],
   ];
   cols.forEach((items) => {
     const col = el('div', 'sheet-col');
@@ -1188,10 +1184,7 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   root.append(block('Способности', feats));
 
   root.append(bindArea('gear', 'Инвентарь', 5));
-  const защита = el('div', 'guard-wrap');
-  защита.append(guardPicker(s, onEdit, false),
-    el('p', 'hint', 'В счёт урона идут только фишки. Поля ниже — словами, для себя.'));
-  root.append(block('Сопротивления и слабости', защита));
+  root.append(block('Сопротивления и слабости', guardPicker(s, onEdit, false)));
   root.append(bindArea('flaws', 'Слабости', 3));
   root.append(bindArea('resist', 'Сопротивления', 3));
 }
