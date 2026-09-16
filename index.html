@@ -217,8 +217,14 @@
       <section class="panel-body dm-only" data-lpanel="library" hidden>
         <button class="btn btn-soft w-full" id="btn-prep">⚒ Подготовка существ</button>
         <div class="divider"></div>
-        <!-- вид новой иконки берётся из выбранной вкладки: отдельный список лишний -->
-        <label class="btn btn-primary w-full file-btn" id="lib-upload-btn">+ Иконки<input type="file" id="lib-upload" accept="image/*" multiple hidden></label>
+        <div class="row-2">
+          <label class="btn btn-soft file-btn">+ Иконки<input type="file" id="lib-upload" accept="image/*" multiple hidden></label>
+          <select id="lib-kind" class="sel">
+            <option value="pc">Персонаж</option>
+            <option value="npc">НПС</option>
+            <option value="enemy">Враг</option>
+          </select>
+        </div>
         <div class="lib-filter tabs tabs-sm">
           <button class="tab is-active" data-libfilter="all">Все</button>
           <button class="tab" data-libfilter="pc">Герои</button>
@@ -263,9 +269,6 @@
         <button class="btn btn-danger w-full" id="btn-delete-room">Удалить стол насовсем</button>
       </section>
     </aside>
-
-    <!-- Полоски-ручки: панель складывается, поле становится шире -->
-    <button class="panel-grip" id="grip-left" title="Свернуть панель">‹</button>
 
     <!-- Поле -->
     <div class="board-wrap" id="board-wrap">
@@ -341,8 +344,6 @@
         <p>Поле пусто. Мастер, создайте локацию и загрузите карту.</p>
       </div>
     </div>
-
-    <button class="panel-grip" id="grip-right" title="Свернуть панель">›</button>
 
     <!-- Правая панель -->
     <aside class="panel panel-right" id="panel-right">

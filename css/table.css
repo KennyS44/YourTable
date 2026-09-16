@@ -69,16 +69,6 @@
   display:flex; flex-direction:column; min-height:0; padding:var(--s3);
 }
 .panel-right{border-right:0; border-left:1px solid var(--line); width:320px; flex-basis:320px}
-/* Ручка между панелью и полем: нажал — панель сложилась, поле стало шире */
-.panel-grip{
-  flex:0 0 14px; width:14px; border:0; padding:0; cursor:pointer;
-  background:var(--bg-2); color:var(--muted); font-size:14px; line-height:1;
-  transition:background .18s var(--ease), color .18s var(--ease);
-}
-.panel-grip:hover{background:var(--panel-2); color:var(--gold)}
-body.no-left #panel-left,
-body.no-right #panel-right{display:none}
-
 .panel-body{padding-top:var(--s3); overflow:auto; min-height:0}
 .panel-flex{display:flex; flex-direction:column; flex:1}
 .panel-body.panel-flex{overflow:hidden}
