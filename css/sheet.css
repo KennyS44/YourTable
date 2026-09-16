@@ -11,7 +11,9 @@
 .sheet-head{display:grid; grid-template-columns:auto 1fr; gap:var(--s3); align-items:start}
 .head-main{display:flex; flex-direction:column; gap:var(--s2); min-width:0}
 /* Уровень и вдохновение — узкие окошки, их колонки по содержимому, а не в равную долю */
-.head-grid{display:grid; grid-template-columns:auto auto repeat(3,1fr); gap:var(--s2); align-items:start}
+.head-grid{display:grid; grid-template-columns:auto auto repeat(3,1fr); gap:var(--s3); align-items:start}
+/* Уровню и вдохновению нужна ширина их подписи: иначе они наезжают на соседа */
+.head-grid .fld-lvl{min-width:104px; max-width:none}
 /* Карточки текут в три колонки и сами выравниваются по высоте */
 /* Три настоящих столбца, а не текстовые колонки: карточка остаётся там, куда
    её положили, и раскрытая способность не гоняет соседей между столбцами. */

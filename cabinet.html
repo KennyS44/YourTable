@@ -82,28 +82,33 @@
       <p class="hint">Имя увидят за столом остальные игроки.</p>
 
       <div class="divider"></div>
-      <h3 class="h-sm">Выбранный персонаж</h3>
+      <!-- открытый лист и есть выбранный: отдельной кнопки «выбрать» не нужно -->
+      <h3 class="h-sm">За стол пойдёт</h3>
       <div class="pick-card" id="pick-card">
         <div class="pick-bg" id="pick-bg"></div>
         <span class="pick-name" id="pick-name">Персонаж не выбран</span>
       </div>
-      <button class="btn btn-soft w-full" id="btn-pick" disabled>Выбрать этого персонажа</button>
       <button class="btn btn-primary w-full" id="btn-go" disabled>Переместиться за стол</button>
-      <p class="hint">Сначала выберите персонажа, потом идите за стол и введите код от Мастера. Мастер получит карточку с этими хитами и обзором.</p>
     </aside>
 
     <section class="cab-main">
       <div class="ribbon-head">
         <h2 class="h-lg">Мои персонажи</h2>
+        <!-- главная кнопка одна; редкое — фон, экспорт, импорт — живёт под «⋯» -->
         <div class="ribbon-acts">
-          <label class="btn btn-soft btn-sm file-btn" id="btn-page-bg">🖼 Фон страницы
-            <input type="file" id="page-bg-file" accept="image/*" hidden>
-          </label>
-          <button class="btn btn-soft btn-sm" id="btn-export" disabled>⬇ Экспорт</button>
-          <label class="btn btn-soft btn-sm file-btn">⬆ Импорт
-            <input type="file" id="btn-import" accept="application/json" hidden>
-          </label>
-          <button class="btn btn-soft btn-sm" id="btn-new-char">+ Новый персонаж</button>
+          <div class="acts-menu">
+            <button class="btn btn-soft btn-sm" id="btn-more" title="Ещё действия">⋯</button>
+            <div class="acts-pop" id="acts-pop" hidden>
+              <label class="btn btn-soft btn-sm file-btn" id="btn-page-bg">🖼 Фон страницы
+                <input type="file" id="page-bg-file" accept="image/*" hidden>
+              </label>
+              <button class="btn btn-soft btn-sm" id="btn-export" disabled>⬇ Экспорт</button>
+              <label class="btn btn-soft btn-sm file-btn">⬆ Импорт
+                <input type="file" id="btn-import" accept="application/json" hidden>
+              </label>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-new-char">+ Новый персонаж</button>
         </div>
       </div>
       <div class="ribbon" id="ribbon"></div>

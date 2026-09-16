@@ -459,8 +459,8 @@ function renderLocations(s) {
       const v = prompt('Название локации', l.name);
       if (v) app.store.dispatch({ t: 'loc.update', id, patch: { name: v.slice(0, 40) } });
     });
-    const del = el('button', 'mini', '×');
-    del.title = 'Удалить';
+    const del = el('button', 'mini mini-del', '×');
+    del.title = 'Удалить локацию';
     del.addEventListener('click', (e) => {
       e.stopPropagation();
       if (confirm(`Удалить локацию «${l.name}» вместе с её токенами?`)) app.store.dispatch({ t: 'loc.remove', id });
@@ -970,24 +970,9 @@ function openTokenCard(t, screenPos) {
   }
 
   card.append(field('Имя', textInput(t.name, (v) => upd(t.id, { name: v }))));
-  // хиты сначала видно, а потом правится: полоска тянется вслед за числами
-  const bar = el('div', 'hp-bar');
-  const fill = el('i', 'hp-fill');
-  bar.append(fill);
-  const paintBar = () => {
-    const cur = app.store.get().tokens[t.id] || t;
-    const max = Math.max(1, cur.hp.max || 1);
-    const доля = Math.max(0, Math.min(1, (cur.hp.cur || 0) / max));
-    fill.style.width = (доля * 100) + '%';
-    bar.dataset.level = доля > 0.5 ? 'ok' : доля > 0.2 ? 'low' : 'bad';
-  };
-  const hpRow = pair(
-    numInput(t.hp.cur, (v) => { upd(t.id, { hp: { cur: v } }); paintBar(); }),
-    numInput(t.hp.max, (v) => { upd(t.id, { hp: { max: v } }); paintBar(); }));
-  const hp = el('div', 'field');
-  hp.append(el('span', '', 'Хиты (тек./макс.)'), bar, hpRow);
-  card.append(hp);
-  paintBar();
+  card.append(field('Хиты (тек./макс.)', pair(
+    numInput(t.hp.cur, (v) => upd(t.id, { hp: { cur: v } })),
+    numInput(t.hp.max, (v) => upd(t.id, { hp: { max: v } })))));
   // КД видит только Мастер: игроку незачем знать, во что он целится
   card.append(pair(
     field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))),
@@ -1298,6 +1283,27 @@ function wireUI() {
   $('#zoom-out').addEventListener('click', () => app.board.zoomBy(1 / 1.2));
   $('#zoom-fit').addEventListener('click', () => app.board.fit());
 
+  // складные панели: поле шире, когда список не нужен. Выбор переживает перезаход
+  const ПАМЯТЬ = 'dnd.panels';
+  const сложено = JSON.parse(localStorage.getItem(ПАМЯТЬ) || '{}');
+  [['left', '#grip-left', '‹', '›'], ['right', '#grip-right', '›', '‹']].forEach(([бок, сел, открыта, закрыта]) => {
+    const b = $(сел);
+    if (!b) return;
+    const cls = 'no-' + бок;
+    const показать = (сложена) => {
+      document.body.classList.toggle(cls, сложена);
+      b.textContent = сложена ? закрыта : открыта;
+      b.title = сложена ? 'Развернуть панель' : 'Свернуть панель';
+    };
+    показать(!!сложено[бок]);
+    b.addEventListener('click', () => {
+      const сложена = !document.body.classList.contains(cls);
+      показать(сложена);
+      сложено[бок] = сложена;
+      localStorage.setItem(ПАМЯТЬ, JSON.stringify(сложено));
+    });
+  });
+
   // вкладки правой панели
   $$('[data-rtab]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-rtab]').forEach((x) => x.classList.toggle('is-active', x === b));
@@ -1403,6 +1409,9 @@ async function wireHeroSheet() {
   const cab = JSON.parse(sessionStorage.getItem('dnd.cab') || 'null');
   const brought = JSON.parse(sessionStorage.getItem('dnd.char') || 'null');
   if (!cab || !brought) {
+    // показывать нечего — панель не занимает место, поле шире на треть экрана
+    $('#panel-left').hidden = true;
+    $('#grip-left').hidden = true;
     note('Лист открывается, если прийти за стол из личного кабинета: там живёт персонаж.');
     return;
   }
@@ -1549,11 +1558,18 @@ async function wireHeroSheet() {
 
 function wireDM() {
   if (!app.isDM) return;
+  // вкладка решает и что показать, и кем станет новая иконка: на кнопке это написано
+  const ВИД_НАЗВАНИЕ = { pc: 'Герои', npc: 'НПС', enemy: 'Враги' };
+  const назватьЗагрузку = () => {
+    $('#lib-upload-btn').firstChild.textContent = libFilter === 'all' ? '+ Иконки' : '+ ' + ВИД_НАЗВАНИЕ[libFilter];
+  };
   $$('[data-libfilter]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-libfilter]').forEach((x) => x.classList.toggle('is-active', x === b));
     libFilter = b.dataset.libfilter;
+    назватьЗагрузку();
     renderLibrary(app.store.get());
   }));
+  назватьЗагрузку();
 
   // страница подготовки: та же база существ, но во всю ширину и целиком
   $('#btn-prep').addEventListener('click', openPrep);
@@ -1625,7 +1641,8 @@ function wireDM() {
   });
 
   $('#lib-upload').addEventListener('change', async (e) => {
-    const kind = $('#lib-kind').value;
+    // на вкладке «Все» вид не выбран — заводим персонажа, как было по умолчанию
+    const kind = libFilter === 'all' ? 'pc' : libFilter;
     const assets = await storeFiles(e.target.files, 256);
     assets.forEach((a) => app.store.dispatch({
       t: 'lib.add', item: { id: uid('lib'), name: a.name, kind, assetId: a.id },

@@ -219,8 +219,10 @@ function renderCurrent() {
   $('#sheet-empty').hidden = !!ch;
   $('#btn-page-bg').hidden = !ch;
   applyPageBg();
-  $('#btn-pick').disabled = !ch;
   $('#btn-export').disabled = !ch;
+  // открытый лист и есть выбранный: за стол пойдёт тот, кого сейчас смотрят
+  cab.pickedId = cab.currentId;
+  renderPick();
   if (!ch) return;
   renderSheet($('#sheet'), ch, () => { save(ch); syncRibbonName(ch); }, {
     charKey: ch.key,
@@ -259,13 +261,13 @@ function wire() {
     sessionStorage.removeItem('dnd.cab');
     location.reload();
   });
-  // выбор только отмечает персонажа; за стол уводит отдельная кнопка
-  $('#btn-pick').addEventListener('click', () => {
-    const ch = cab.chars[cab.currentId];
-    if (!ch) return;
-    cab.pickedId = ch.id;
-    renderPick();
-    mark(`Выбран: ${ch.name}`);
+  // редкие действия — под «⋯»; клик мимо закрывает список
+  $('#btn-more').addEventListener('click', (e) => {
+    e.stopPropagation();
+    $('#acts-pop').hidden = !$('#acts-pop').hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if (!$('#acts-pop').hidden && !e.target.closest('.acts-menu')) $('#acts-pop').hidden = true;
   });
   $('#btn-go').addEventListener('click', () => {
     const ch = cab.chars[cab.pickedId];

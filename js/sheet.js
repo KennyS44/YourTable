@@ -787,10 +787,16 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
     });
     return node;
   };
+  // подсказка в пустом поле: чёрный прямоугольник сам по себе ничего не говорит
+  const HINTS = {
+    race: 'человек', alignment: 'законно-добрый', player: 'кто играет',
+    hitDice: '5к8', speed: '30',
+  };
   const textField = (label, key) => {
     const f = el('label', 'fld');
     const i = el('input');
     i.value = s[key] ?? '';
+    if (HINTS[key]) i.placeholder = HINTS[key];
     f.append(el('span', 'fld-l', label), bind(i, key));
     return f;
   };

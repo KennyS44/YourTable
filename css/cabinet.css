@@ -13,7 +13,16 @@
   background:linear-gradient(180deg, rgba(23,22,19,.1), rgba(23,22,19,.28));
 }
 .has-page-bg .cab-side,.has-page-bg .sheet-wrap,.has-page-bg .blk{backdrop-filter:blur(2px)}
-.ribbon-acts{display:flex; gap:var(--s2); flex-wrap:wrap}
+.ribbon-acts{display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center}
+/* Редкие действия прячутся под «⋯» и раскрываются столбиком поверх страницы */
+.acts-menu{position:relative}
+.acts-pop{
+  position:absolute; right:0; top:calc(100% + var(--s1)); z-index:5;
+  display:grid; gap:var(--s2); min-width:200px; padding:var(--s2);
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+  box-shadow:var(--shadow);
+}
+.acts-pop .btn{justify-content:flex-start}
 
 .cab-stage{display:grid; grid-template-columns:288px 1fr; gap:var(--s4); padding:var(--s4); align-items:start}
 .cab-side{

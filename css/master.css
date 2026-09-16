@@ -3,6 +3,13 @@
 /* ── Страница Мастера: персонажи игроков ── */
 .dm-stage{max-width:1200px; width:100%; margin:0 auto; padding:var(--s4)}
 .dm-lead{margin:var(--s2) 0 var(--s4)}
+/* Ни одного листа — страница пуста: собираем её посередине, как окно входа */
+body.is-empty .dm-stage{
+  max-width:520px; min-height:calc(100vh - 140px);
+  display:flex; flex-direction:column; justify-content:center; text-align:center;
+}
+body.is-empty .dm-add{max-width:none; text-align:left}
+body.is-empty .dm-grid{display:none}
 .dm-add{
   display:grid; grid-template-columns:1fr auto; gap:var(--s2); align-items:end; max-width:420px;
   background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:var(--s3);

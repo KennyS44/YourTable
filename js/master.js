@@ -81,6 +81,8 @@ function renderGrid() {
   grid.innerHTML = '';
   const keys = [...cards.keys()];
   $('#empty').hidden = keys.length > 0;
+  // пока листов нет, страница пуста: собираем ввод ключа посередине, как вход
+  document.body.classList.toggle('is-empty', keys.length === 0);
 
   keys.forEach((key) => {
     const { data } = cards.get(key);

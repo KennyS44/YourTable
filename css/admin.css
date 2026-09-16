@@ -1,6 +1,9 @@
 /* ── Административная комната ── */
 
-/* ── Административная комната ── */
+/* Длинное название не должно ломаться надвое: карточка входа шире, шрифт мельче */
+.gate-card{max-width:460px}
+.gate-title{font-size:24px}
+
 .adm-stage{max-width:960px; width:100%; margin:0 auto; padding:var(--s4)}
 .adm-tabs{max-width:360px; margin-bottom:var(--s4)}
 .adm-head{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3); margin-bottom:var(--s3)}

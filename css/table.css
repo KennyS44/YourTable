@@ -69,6 +69,16 @@
   display:flex; flex-direction:column; min-height:0; padding:var(--s3);
 }
 .panel-right{border-right:0; border-left:1px solid var(--line); width:320px; flex-basis:320px}
+/* Ручка между панелью и полем: нажал — панель сложилась, поле стало шире */
+.panel-grip{
+  flex:0 0 14px; width:14px; border:0; padding:0; cursor:pointer;
+  background:var(--bg-2); color:var(--muted); font-size:14px; line-height:1;
+  transition:background .18s var(--ease), color .18s var(--ease);
+}
+.panel-grip:hover{background:var(--panel-2); color:var(--gold)}
+body.no-left #panel-left,
+body.no-right #panel-right{display:none}
+
 .panel-body{padding-top:var(--s3); overflow:auto; min-height:0}
 .panel-flex{display:flex; flex-direction:column; flex:1}
 .panel-body.panel-flex{overflow:hidden}
@@ -155,7 +165,12 @@
 .list-item:hover{border-color:var(--gold-dim)}
 .list-item.is-active{border-color:var(--gold); background:var(--panel-2)}
 .list-item .name{flex:1; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.list-item .thumb{width:40px; height:32px; object-fit:cover; border-radius:4px; background:var(--panel-2)}
+.list-item .thumb{width:48px; height:34px; object-fit:cover; border-radius:4px; background:var(--panel-2)}
+/* Кнопки строки крупнее, а удаление отбито, чтобы не попасть в него мимо */
+.list-item .mini{width:28px; height:28px; border-radius:var(--r-sm)}
+.list-item .mini:hover{background:var(--panel-2)}
+.list-item .mini-del{margin-left:var(--s2)}
+.list-item .mini-del:hover{color:var(--danger)}
 /* Ход боя: кнопки не слипаются ни в ряду, ни между рядами */
 .init-tools{display:grid; gap:var(--s2); margin-bottom:var(--s4)}
 .init-tools .btn{padding:0 var(--s2); white-space:nowrap}
@@ -515,11 +530,6 @@
 .card-acts{display:flex; align-items:center; gap:var(--s2); margin-top:var(--s2)}
 .card-acts .btn{flex:1 1 auto; white-space:nowrap}
 .card-acts .btn-quiet{flex:0 0 auto}
-/* Хиты видно раньше, чем читаешь числа */
-.hp-bar{height:8px; border-radius:999px; background:var(--bg-2); border:1px solid var(--line-soft); overflow:hidden; margin:4px 0}
-.hp-fill{display:block; height:100%; background:var(--ok); transition:width .25s var(--ease)}
-.hp-bar[data-level=low] .hp-fill{background:var(--gold)}
-.hp-bar[data-level=bad] .hp-fill{background:var(--danger)}
 
 
 /* Спасброски: шесть окошек в два ряда — подпись над полем, как в листе */
