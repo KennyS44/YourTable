@@ -7,7 +7,7 @@ import { createBoard } from './board.js';
 import { DICE, roll } from './dice.js';
 import { showRoll } from './dice3d.js';
 import { packRoom } from './roomcode.js';
-import { fixSheet, renderSheetLite, ABILITIES, mod as sheetMod } from './sheet.js';
+import { fixSheet, renderSheetLite, ABILITIES, DMG_TYPES, mod as sheetMod } from './sheet.js';
 import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
 import { fileName } from './translit.js';
@@ -564,7 +564,10 @@ function useBody(u) {
     u.landed.forEach((l) => {
       const знак = l.delta > 0 ? '+' : '−';
       const остаток = (app.isDM || l.pub) ? `, осталось ${l.left} из ${l.max}` : '';
-      строки.push(`<span class="${l.delta > 0 ? 'use-hit' : 'use-miss'}">${esc(l.name)}: ${знак}${Math.abs(l.delta)}</span>`
+      // ноль бывает у неуязвимого: «−0» читается как опечатка, пишем словами
+      const число = l.delta === 0 ? 'урон не прошёл' : `${знак}${Math.abs(l.delta)}`;
+      строки.push(`<span class="${l.delta > 0 ? 'use-hit' : 'use-miss'}">${esc(l.name)}: ${число}</span>`
+        + (l.why ? `<span class="use-dim"> (${esc(l.why)})</span>` : '')
         + `<span class="use-dim">${остаток}</span>`
         + (l.down ? '<span class="use-miss"> — свалился</span>' : ''));
     });
@@ -936,6 +939,9 @@ function openLibCard(it, ev) {
     numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
   card.append(field('Размер, клеток',
     numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
+  card.append(guardField(
+    () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) }),
+    (patch) => libUpd(it.id, { stats: patch })));
   card.append(checkRow('Имя видно игрокам', st.namePublic !== false,
     (on) => libUpd(it.id, { stats: { namePublic: on } })));
   card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
@@ -1012,6 +1018,9 @@ function openTokenCard(t, screenPos) {
   card.append(field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))));
   card.append(field('Дальность зрения, футов (0 — без обзора)',
     numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
+  card.append(guardField(
+    () => app.store.get().tokens[t.id] || t,
+    (patch) => upd(t.id, patch)));
   card.append(checkRow('Имя видно игрокам', t.namePublic !== false,
     (on) => upd(t.id, { namePublic: on })));
   card.append(checkRow('Полоска хитов видна игрокам', t.hpPublic !== false,
@@ -1287,6 +1296,66 @@ function field(label, input) {
   return f;
 }
 function pair(a, b) { const d = el('div', 'row-2'); d.append(a, b); return d; }
+/**
+ * Стойкость к урону в карточке существа: выбрали вид урона и нажали, как он
+ * берёт. Выбранное живёт фишками — щёлкнул по фишке, и она ушла.
+ * Три списка вместо одного словаря: массив в правке заменяется целиком, и
+ * убрать вид урона получается без возни с удалением ключей.
+ */
+const GUARD_KINDS = [['resist', '½', 'половина урона'], ['vuln', '×2', 'двойной урон'], ['immune', '0', 'не берёт вовсе']];
+
+function guardField(get, set) {
+  const box = el('div', 'field');
+  box.append(el('span', 'fld-l', 'Стойкость к урону'));
+
+  const чипы = el('div', 'guard-chips');
+  const draw = () => {
+    чипы.innerHTML = '';
+    GUARD_KINDS.forEach(([key, знак, подпись]) => {
+      (get()[key] || []).forEach((тип) => {
+        const c = el('button', 'guard-chip guard-' + key, `${тип} ${знак}`);
+        c.type = 'button';
+        c.title = `${подпись} — щёлкните, чтобы убрать`;
+        // перерисовка отрывает кнопку от документа, и общий обработчик снаружи
+        // считает клик «мимо карточки» и закрывает её — до него не доводим
+        c.addEventListener('click', (e) => {
+          e.stopPropagation();
+          set({ [key]: (get()[key] || []).filter((x) => x !== тип) });
+          draw();
+        });
+        чипы.append(c);
+      });
+    });
+    if (!чипы.children.length) чипы.append(el('span', 'hint', 'Всё берёт как есть.'));
+  };
+
+  const row = el('div', 'guard-add');
+  const sel = el('select', 'sel sel-sm');
+  DMG_TYPES.forEach((t) => sel.append(new Option(t, t)));
+  row.append(sel);
+  GUARD_KINDS.forEach(([key, знак, подпись]) => {
+    const b = el('button', 'btn btn-soft btn-sm', знак);
+    b.type = 'button';
+    b.title = подпись;
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const тип = sel.value;
+      const cur = get();
+      // вид урона берут одним способом: назначили новый — старый снимаем
+      const patch = {};
+      GUARD_KINDS.forEach(([k]) => { patch[k] = (cur[k] || []).filter((x) => x !== тип); });
+      patch[key] = [...patch[key], тип];
+      set(patch);
+      draw();
+    });
+    row.append(b);
+  });
+
+  draw();
+  box.append(чипы, row);
+  return box;
+}
+
 function checkRow(label, checked, onChange) {
   const l = el('label', 'check');
   const i = el('input'); i.type = 'checkbox'; i.checked = checked;
@@ -1322,6 +1391,7 @@ function dropToken(libId, worldPos) {
     locId: s.activeLoc, x: c.x, y: c.y, assetId: it.assetId, libId: it.id, name: it.name, kind: it.kind,
     cells: st.cells, vision: st.vision, hp: { ...st.hp }, ac: st.ac,
     hpPublic: st.hpPublic, namePublic: st.namePublic,
+    resist: [...(st.resist || [])], vuln: [...(st.vuln || [])], immune: [...(st.immune || [])],
     // персонаж из кабинета принадлежит своему игроку — привязываем сразу
     ownerId: it.owner ? it.owner.id : null,
     ownerName: it.owner ? it.owner.name : null,
@@ -1433,34 +1503,52 @@ function resolveMove(m, ch, targets) {
     headline = use.dmg && { sides: use.dmg.parts[0].d, mod: 0, dice: use.dmg.parts.flatMap((p) => p.dice), total: use.dmg.total, formula: dmgFormula(use.dmg) };
   }
 
-  if (use.dmg) use.landed = applyToHp(задетые, use.dmg.total, m.effect);
+  if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect);
   say('', 'use', { use });
   if (headline) showRoll($('#dice-stage'), headline, `${app.me.name}: ${use.name}`);
+}
+
+/**
+ * Стойкость существа к виду урона: половина, вдвое или не берёт вовсе.
+ * Считаем по каждому куску отдельно — «1д8 рубящий + 2д6 огонь» по существу,
+ * которое боится огня, но держит сталь, даёт разные числа с разных костей.
+ * Половину округляем вниз, как в правилах.
+ */
+function hitAfterGuard(t, parts) {
+  let total = 0;
+  const пометки = new Set();
+  parts.forEach((p) => {
+    const тип = p.type || '';
+    if (тип && (t.immune || []).includes(тип)) { пометки.add('не берёт'); return; }
+    if (тип && (t.vuln || []).includes(тип)) { total += p.sum * 2; пометки.add('уязвим'); return; }
+    if (тип && (t.resist || []).includes(тип)) { total += Math.floor(p.sum / 2); пометки.add('стойкий'); return; }
+    total += p.sum;
+  });
+  return { total, why: [...пометки].join(', ') };
 }
 
 /**
  * Урон и лечение садятся сами: посчитали — сразу сняли или вернули хиты.
  * Правит тот, кто применил приём: действие уходит в общий поток, и остальные
  * увидят уже готовый результат, а не посчитают его заново.
- *
- * Сопротивлений и уязвимостей у фигурок пока нет, поэтому число идёт как есть;
- * когда они появятся, делить надо здесь.
  */
-function applyToHp(targets, total, effect) {
-  if (!(total > 0) || effect === 'buff' || effect === 'debuff') return null;
+function applyToHp(targets, dmg, effect) {
+  if (!dmg || !(dmg.total > 0) || effect === 'buff' || effect === 'debuff') return null;
   const s = app.store.get();
   const лечим = effect === 'heal';
   const out = [];
   targets.forEach((t0) => {
     const t = s.tokens[t0.id];
     if (!t || !(t.hp && t.hp.max > 0)) return;      // без максимума хитов считать нечего
+    // лечение стойкостью не режут: она про урон
+    const { total, why } = лечим ? { total: dmg.total, why: '' } : hitAfterGuard(t, dmg.parts);
     const было = Number(t.hp.cur) || 0;
     const стало = Math.max(0, Math.min(t.hp.max, было + (лечим ? total : -total)));
-    if (стало === было) return;
+    if (стало === было && !why) return;
     app.store.dispatch({ t: 'token.update', id: t.id, patch: { hp: { cur: стало } } });
     out.push({
-      name: tokenName(t), delta: стало - было, left: стало, max: t.hp.max,
-      down: стало === 0, pub: t.hpPublic !== false,   // чужой остаток виден не всем
+      name: tokenName(t), delta: стало - было, left: стало, max: t.hp.max, why,
+      down: стало === 0 && !лечим, pub: t.hpPublic !== false,   // чужой остаток виден не всем
     });
   });
   return out.length ? out : null;

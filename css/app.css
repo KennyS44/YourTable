@@ -585,6 +585,20 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .token-card .close{position:absolute; top:var(--s1); right:var(--s1)}
 .token-card .row-2,.token-card > .btn{margin-top:var(--s2)}
 
+/* Стойкость к урону: фишки сверху, под ними выбор вида и три кнопки */
+.guard-chips{display:flex; flex-wrap:wrap; gap:var(--s1); margin:4px 0}
+.guard-chip{
+  display:inline-flex; align-items:center; gap:4px; min-height:28px; padding:0 var(--s2);
+  border-radius:var(--r-sm); border:1px solid var(--line); background:var(--bg-2);
+  color:var(--text); font-size:14px; cursor:pointer;
+}
+.guard-chip:hover{border-color:var(--danger); color:var(--danger)}
+.guard-resist{border-color:var(--gold-dim)}
+.guard-vuln{border-color:var(--danger)}
+.guard-immune{border-color:var(--line); color:var(--muted)}
+.guard-add{display:grid; grid-template-columns:1fr auto auto auto; gap:var(--s1); align-items:center}
+.guard-add .btn{min-width:40px}
+
 .only-mobile{display:none}
 
 /* ── Телефон ─────────────────────────────────────────────────────── */

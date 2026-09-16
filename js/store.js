@@ -76,6 +76,10 @@ export function normalize(raw) {
     t.vision = t.vision || 0;
     t.cells = t.cells || 1;
     t.ac = Number(t.ac) || 10;
+    // стойкость по видам урона: половина, вдвое и «не берёт вовсе»
+    t.resist = t.resist || [];
+    t.vuln = t.vuln || [];
+    t.immune = t.immune || [];
   });
   // Карточки существ: имя, хиты и обзор живут в базе, а не только на фигурке
   Object.values(s.library).forEach((it) => { it.stats = { ...defaultStats(it.kind), ...(it.stats || {}) }; });
@@ -112,6 +116,7 @@ export function defaultStats(kind) {
     cells: 1,
     hpPublic: kind === 'pc',
     namePublic: kind === 'pc',
+    resist: [], vuln: [], immune: [],   // виды урона, которые берут иначе
   };
 }
 
@@ -121,6 +126,7 @@ export function newToken(patch) {
     assetId: null, libId: null, name: 'Существо', kind: 'npc',
     ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, ac: 10,
     hpPublic: true, namePublic: true, statuses: [],
+    resist: [], vuln: [], immune: [],
     vision: 0, ...patch,
   };
 }
