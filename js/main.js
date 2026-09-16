@@ -1299,16 +1299,21 @@ function field(label, input) {
 }
 function pair(a, b) { const d = el('div', 'row-2'); d.append(a, b); return d; }
 /**
- * Стойкость к урону в карточке существа: выбрали вид урона и нажали, как он
- * берёт. Выбранное живёт фишками — щёлкнул по фишке, и она ушла.
+ * Получаемый урон в карточке существа: выбрали вид урона и нажали множитель.
+ * Подписи именно множителями — «½» под заголовком про стойкость читалось
+ * наоборот. Выбранное живёт фишками: щёлкнул по фишке, и она ушла.
  * Три списка вместо одного словаря: массив в правке заменяется целиком, и
  * убрать вид урона получается без возни с удалением ключей.
  */
-const GUARD_KINDS = [['resist', '½', 'половина урона'], ['vuln', '×2', 'двойной урон'], ['immune', '0', 'не берёт вовсе']];
+const GUARD_KINDS = [
+  ['resist', '×½', 'получает половину урона'],
+  ['vuln', '×2', 'получает двойной урон'],
+  ['immune', '×0', 'не получает урона вовсе'],
+];
 
 function guardField(get, set) {
   const box = el('div', 'field');
-  box.append(el('span', 'fld-l', 'Стойкость к урону'));
+  box.append(el('span', 'fld-l', 'Получаемый урон'));
 
   const чипы = el('div', 'guard-chips');
   const draw = () => {
@@ -1316,6 +1321,7 @@ function guardField(get, set) {
     GUARD_KINDS.forEach(([key, знак, подпись]) => {
       (get()[key] || []).forEach((тип) => {
         const c = el('button', 'guard-chip guard-' + key, `${тип} ${знак}`);
+        c.dataset.kind = key;
         c.type = 'button';
         c.title = `${подпись} — щёлкните, чтобы убрать`;
         // перерисовка отрывает кнопку от документа, и общий обработчик снаружи
@@ -1328,7 +1334,7 @@ function guardField(get, set) {
         чипы.append(c);
       });
     });
-    if (!чипы.children.length) чипы.append(el('span', 'hint', 'Всё берёт как есть.'));
+    if (!чипы.children.length) чипы.append(el('span', 'hint', 'Весь урон проходит как есть.'));
   };
 
   const row = el('div', 'guard-add');
@@ -1537,9 +1543,9 @@ function hitAfterGuard(t, parts) {
   const пометки = new Set();
   parts.forEach((p) => {
     const тип = p.type || '';
-    if (тип && (t.immune || []).includes(тип)) { пометки.add('не берёт'); return; }
-    if (тип && (t.vuln || []).includes(тип)) { total += p.sum * 2; пометки.add('уязвим'); return; }
-    if (тип && (t.resist || []).includes(тип)) { total += Math.floor(p.sum / 2); пометки.add('стойкий'); return; }
+    if (тип && (t.immune || []).includes(тип)) { пометки.add(`${тип} ×0`); return; }
+    if (тип && (t.vuln || []).includes(тип)) { total += p.sum * 2; пометки.add(`${тип} ×2`); return; }
+    if (тип && (t.resist || []).includes(тип)) { total += Math.floor(p.sum / 2); пометки.add(`${тип} ×½`); return; }
     total += p.sum;
   });
   return { total, why: [...пометки].join(', ') };
