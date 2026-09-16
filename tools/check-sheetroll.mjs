@@ -68,7 +68,7 @@ await pl.fill('#wait-form [name=code]', код);
 await pl.click('#wait-form button[type=submit]');
 await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });
 await pl.waitForTimeout(3000);
-await pl.click('[data-ltab=hero]');
+// вкладки «Персонаж» больше нет: панель игрока показана сразу
 await pl.waitForSelector('#lite-sheet .abil-roll', { timeout: 10000 });
 
 /* 2. За столом каждый модификатор — кнопка, и палец до неё достаёт */

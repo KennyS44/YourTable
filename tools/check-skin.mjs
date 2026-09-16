@@ -2,9 +2,12 @@
 import { chromium } from 'playwright-chromium';
 import { roomFingerprint } from '../js/sync-firebase.js';
 import { FIREBASE } from '../js/firebase-config.js';
+import { userPath } from '../js/cabinet-store.js';
 
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:20300/index.html';
 const ROOM = 'Вид ' + process.pid, KEY = 'k' + process.pid, DMKEY = 'm' + process.pid;
+const LOGIN = 'vid' + process.pid, PASS = 'p' + process.pid;
+const стр = (n) => BASE.replace(/[^/]*$/, '') + n;
 const q = (o) => new URLSearchParams(o).toString();
 const R = {}; const errors = [];
 const watch = (p, t) => {
@@ -66,13 +69,37 @@ await dm.waitForTimeout(500);
 R.дверь.неОткрыласьОтПеретаскивания = !(await дверь());
 await dm.screenshot({ path: 'tools/shot-skin-walls.png' });
 
-/* ВИД: самоцвет и строки героев */
+/* ВИД: самоцвет и строки героев.
+   За стол теперь пускают только с персонажем из кабинета — ведём игрока
+   тем же путём, каким ходит живой. */
+await dm.click('[data-ltab=room]');
+await dm.click('#btn-room-code');
+await dm.waitForTimeout(300);
+const код = await dm.$eval('#code-out, #link-out', (i) => i.value);
+await dm.click('[data-ltab=locations]');
+
+await fetch(`${FIREBASE.databaseURL}/rooms/cab-${userPath(LOGIN, PASS)}/profile.json`,
+  { method: 'PUT', body: JSON.stringify({ login: LOGIN, name: 'Торин', at: Date.now() }) });
+
 const pl = await (await browser.newContext({ viewport: { width: 1300, height: 850 } })).newPage(); watch(pl, 'PL');
-await pl.goto(`${BASE}?${q({ r: ROOM, k: KEY })}`);
-await pl.fill('#join-form [name=name]', 'Торин');
-await pl.click('#join-form button[type=submit]');
-await pl.waitForSelector('#app:not([hidden])', { timeout: 20000 });
-await pl.waitForTimeout(2500);
+await pl.goto(стр('cabinet.html'));
+await pl.fill('#login-form [name=login]', LOGIN);
+await pl.fill('#login-form [name=pass]', PASS);
+await pl.click('#login-form button[type=submit]');
+await pl.waitForSelector('#cab:not([hidden])', { timeout: 20000 });
+await pl.click('#btn-new-char');
+await pl.waitForSelector('.char-card.is-active', { timeout: 10000 });
+await pl.waitForTimeout(600);
+await pl.fill('.char-card.is-active .char-name', 'Торин Дубощит');
+await pl.waitForTimeout(1200);
+await pl.click('#btn-pick');
+await pl.waitForTimeout(500);
+await pl.click('#btn-go');
+await pl.waitForSelector('#wait:not([hidden])', { timeout: 10000 });
+await pl.fill('#wait-form [name=code]', код);
+await pl.click('#wait-form button[type=submit]');
+await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });
+await pl.waitForTimeout(3000);
 await dm.click('[data-rtab="heroes"]');
 await dm.waitForTimeout(300);
 await dm.evaluate(() => [...document.querySelectorAll('#heroes-list .hero-btn')].at(-1).click());

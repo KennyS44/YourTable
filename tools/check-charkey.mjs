@@ -37,15 +37,31 @@ await pl.click('#btn-new-char');
 await pl.waitForSelector('.char-card.is-active', { timeout: 10000 });
 await pl.waitForTimeout(600);
 await pl.fill('.char-card.is-active .char-name', 'Лютик Бард');
-const ключ = await pl.$eval('#sheet .key-val', (e) => e.textContent);
-R.ключ = { значение: ключ, вид: /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(ключ) };
+// ключ теперь спрятан под точками: сперва смотрим маску, потом раскрываем
+const маска = await pl.$eval('#sheet .key-val', (e) => e.textContent);
+await pl.evaluate(() => {
+  [...document.querySelectorAll('#sheet .key-box button')].find((b) => b.textContent === 'Показать').click();
+});
+await pl.waitForTimeout(200);
+const ключ = (await pl.$eval('#sheet .key-val', (e) => e.textContent)).trim();
+R.ключ = {
+  подТочками: маска,
+  раскрытый: ключ,
+  вид: /^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(ключ),
+};
 
 /* заполняем то, что Мастеру и интересно: сопротивления и способность */
 const текст = async (заголовок, значение) => {
+  // часть полей переехала внутрь общих блоков («Сопротивления и слабости»),
+  // поэтому ищем и по заголовку блока, и по подписи самого поля
   const ok = await pl.evaluate(([t, v]) => {
-    const b = [...document.querySelectorAll('#sheet .blk')].find((x) => x.querySelector('.blk-h')?.textContent === t);
-    if (!b) return false;
-    const a = b.querySelector('textarea');
+    const поЗаголовку = [...document.querySelectorAll('#sheet .blk')]
+      .find((x) => x.querySelector('.blk-h')?.textContent === t);
+    const поПодписи = [...document.querySelectorAll('#sheet .fld-l')]
+      .find((l) => l.textContent === t);
+    const a = поЗаголовку ? поЗаголовку.querySelector('textarea')
+      : (поПодписи && поПодписи.parentElement.querySelector('textarea'));
+    if (!a) return false;
     a.value = v; a.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   }, [заголовок, значение]);
@@ -89,11 +105,14 @@ await dm.waitForSelector('#sheet .abil', { timeout: 10000 });
 R.листУМастера = await dm.evaluate(() => {
   const blk = (t) => [...document.querySelectorAll('#sheet .blk')]
     .find((b) => b.querySelector('.blk-h')?.textContent === t)?.querySelector('textarea')?.value;
+  // «Сопротивления» и «Слабости» стоят внутри общего блока — ищем по подписи
+  const поле = (t) => [...document.querySelectorAll('#sheet .fld-l')]
+    .find((l) => l.textContent === t)?.parentElement.querySelector('textarea')?.value;
   const поля = [...document.querySelectorAll('#sheet input, #sheet textarea')];
   return {
     имя: document.querySelector('#open-name').textContent,
-    сопротивления: blk('Сопротивления'),
-    слабости: blk('Слабости'),
+    сопротивления: поле('Сопротивления'),
+    слабости: поле('Слабости'),
     снаряжение: blk('Снаряжение'),
     способность: document.querySelector('#sheet .feat-name')?.textContent,
     всеПоляТолькоЧтение: поля.length > 0 && поля.every((n) => n.readOnly),
@@ -113,9 +132,10 @@ R.способностьУМастера = await dm.evaluate(() => ({
 /* ── Игрок правит лист — у Мастера он обновляется сам ── */
 await текст('Сопротивления', 'Огонь, яд, холод');
 await pl.waitForTimeout(2000);
-await dm.waitForFunction(() => [...document.querySelectorAll('#sheet .blk')]
-  .find((b) => b.querySelector('.blk-h')?.textContent === 'Сопротивления')?.querySelector('textarea')?.value === 'Огонь, яд, холод',
-null, { timeout: 20000 });
+await dm.waitForFunction(() => {
+  const l = [...document.querySelectorAll('#sheet .fld-l')].find((x) => x.textContent === 'Сопротивления');
+  return l && l.parentElement.querySelector('textarea')?.value === 'Огонь, яд, холод';
+}, null, { timeout: 20000 });
 R.живоеОбновление = 'дошло';
 
 /* ── Тот же лист в левой панели за столом ── */
@@ -151,7 +171,9 @@ R.листВПанели = await pl.evaluate(() => {
     панельОткрыта: !document.querySelector('[data-lpanel=hero]').hidden,
     имя: document.querySelector('#lite-sheet .lite-name')?.textContent,
     характеристик: document.querySelectorAll('#lite-sheet .abil').length,
-    поля: ['Характеристики', 'Защита и хиты', 'Способности', 'Инвентарь', 'Слабости', 'Сопротивления'].filter((t) => blk(t)),
+    поля: ['Характеристики', 'Защита и хиты', 'Атаки и заклинания', 'Способности', 'Инвентарь', 'Слабости', 'Сопротивления'].filter((t) => blk(t)),
+    щитСКД: document.querySelector('#lite-sheet .vit-ac')?.value,
+    полоскаХитов: !!document.querySelector('#lite-sheet .vit-hp .vit-fill'),
     инвентарь: blk('Инвентарь')?.querySelector('textarea').value,
     сопротивления: blk('Сопротивления')?.querySelector('textarea').value,
     способность: document.querySelector('#lite-sheet .feat-name')?.textContent,
@@ -164,8 +186,8 @@ await pl.evaluate(() => {
     .find((x) => x.querySelector('.blk-h')?.textContent === 'Инвентарь');
   const a = b.querySelector('textarea');
   a.value = 'Лютня, кинжал, зелье'; a.dispatchEvent(new Event('input', { bubbles: true }));
-  const ac = [...document.querySelectorAll('#lite-sheet .fld')]
-    .find((x) => x.querySelector('.fld-l').textContent === 'КД').querySelector('input');
+  // КД за столом — не поле с подписью, а число внутри щита
+  const ac = document.querySelector('#lite-sheet .vit-ac');
   ac.value = 15; ac.dispatchEvent(new Event('input', { bubbles: true }));
 });
 await pl.waitForTimeout(2500);
