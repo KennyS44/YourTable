@@ -81,6 +81,7 @@ export function normalize(raw) {
     t.vuln = t.vuln || [];
     t.immune = t.immune || [];
     t.saves = { ...emptySaves(), ...(t.saves || {}) };   // прибавки к спасброскам
+    t.moves = t.moves || [];                             // свои приёмы существа
   });
   // Карточки существ: имя, хиты и обзор живут в базе, а не только на фигурке
   Object.values(s.library).forEach((it) => { it.stats = { ...defaultStats(it.kind), ...(it.stats || {}) }; });
@@ -130,6 +131,7 @@ export function defaultStats(kind) {
     namePublic: kind === 'pc',
     resist: [], vuln: [], immune: [],   // виды урона, которые берут иначе
     saves: emptySaves(),
+    moves: [],                          // чем существо бьёт: те же приёмы, что у героя
   };
 }
 
@@ -139,7 +141,7 @@ export function newToken(patch) {
     assetId: null, libId: null, name: 'Существо', kind: 'npc',
     ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, ac: 10,
     hpPublic: true, namePublic: true, statuses: [],
-    resist: [], vuln: [], immune: [], saves: emptySaves(),
+    resist: [], vuln: [], immune: [], saves: emptySaves(), moves: [],
     vision: 0, ...patch,
   };
 }

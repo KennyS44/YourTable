@@ -572,8 +572,11 @@ function rowDel(name, onYes) {
  *
  * ctx.onChange зовём, когда поменялось имя или вид: соседний список
  * способностей смотрит в тот же массив и должен перерисоваться.
+ *
+ * Тем же списком живут приёмы врага в карточке существа: там вместо листа
+ * подставляют обёртку с полем feats, и правка уходит в базу существ.
  */
-function moveList(s, onEdit, ctx = {}) {
+export function moveList(s, onEdit, ctx = {}) {
   const ro = !!ctx.readOnly;
   const host = el('div', 'moves');
   let open = null;

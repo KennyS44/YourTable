@@ -9,7 +9,7 @@ import { showRoll } from './dice3d.js';
 import { packRoom } from './roomcode.js';
 import {
   fixSheet, renderSheetLite, ABILITIES, DMG_TYPES,
-  savesFromSheet, mod as sheetMod,
+  savesFromSheet, moveList, fixMove, mod as sheetMod,
 } from './sheet.js';
 import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
@@ -543,7 +543,8 @@ function msgNode(m) {
  */
 function useBody(u) {
   if (!u) return '';
-  const строки = [`<b class="roll-what">${esc(u.name)}</b> → ${esc(u.targets.join(', '))}`];
+  const кто = u.by ? `${esc(u.by)} — ` : '';
+  const строки = [`${кто}<b class="roll-what">${esc(u.name)}</b> → ${esc(u.targets.join(', '))}`];
   if (u.attack) {
     const a = u.attack;
     // при двух костях видно, какая пошла в счёт: [17, 4] → взяли 17
@@ -963,6 +964,7 @@ function openLibCard(it, ev) {
     const статы = () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) });
     card.append(guardField(статы, (patch) => libUpd(it.id, { stats: patch })));
     card.append(savesField(статы, (patch) => libUpd(it.id, { stats: patch })));
+    card.append(movesField(статы, (patch) => libUpd(it.id, { stats: patch }), null));
   }
   card.append(checkRow('Имя видно игрокам', st.namePublic !== false,
     (on) => libUpd(it.id, { stats: { namePublic: on } })));
@@ -1045,6 +1047,7 @@ function openTokenCard(t, screenPos) {
     const живой = () => app.store.get().tokens[t.id] || t;
     card.append(guardField(живой, (patch) => upd(t.id, patch)));
     card.append(savesField(живой, (patch) => upd(t.id, patch)));
+    card.append(movesField(живой, (patch) => upd(t.id, patch), t));
   }
   card.append(checkRow('Имя видно игрокам', t.namePublic !== false,
     (on) => upd(t.id, { namePublic: on })));
@@ -1412,6 +1415,25 @@ function savesField(get, set) {
   return box;
 }
 
+/**
+ * Приёмы существа — тот же список, что в листе героя. Правятся в карточке, а
+ * «Применить» бьёт от имени этой фигурки: конус пускается от неё, и в ленте
+ * стоит её имя, а не имя Мастера.
+ *
+ * from — фигурка на поле; в базе существ её нет, там приём только настраивают.
+ */
+function movesField(get, set, from) {
+  const box = el('div', 'field');
+  box.append(el('span', 'fld-l', from ? 'Приёмы' : 'Приёмы (достанутся каждой фигурке)'));
+  const обёртка = { feats: (get().moves || []).map(fixMove) };
+  const сохранить = () => set({ moves: обёртка.feats });
+  const список = moveList(обёртка, сохранить, {
+    onUse: from ? (m, anchor) => useMove(m, null, anchor, from) : null,
+  });
+  box.append(список.host, список.addBtn);
+  return box;
+}
+
 function checkRow(label, checked, onChange) {
   const l = el('label', 'check');
   const i = el('input'); i.type = 'checkbox'; i.checked = checked;
@@ -1448,7 +1470,7 @@ function dropToken(libId, worldPos) {
     cells: st.cells, vision: st.vision, hp: { ...st.hp }, ac: st.ac,
     hpPublic: st.hpPublic, namePublic: st.namePublic,
     resist: [...(st.resist || [])], vuln: [...(st.vuln || [])], immune: [...(st.immune || [])],
-    saves: { ...(st.saves || {}) },
+    saves: { ...(st.saves || {}) }, moves: (st.moves || []).map(fixMove),
     // персонаж из кабинета принадлежит своему игроку — привязываем сразу
     ownerId: it.owner ? it.owner.id : null,
     ownerName: it.owner ? it.owner.name : null,
@@ -1545,15 +1567,16 @@ function askAdv(anchor, onPick) {
   setTimeout(() => document.addEventListener('click', away, true), 0);
 }
 
-function useMove(m, ch, anchor) {
-  const дальше = (adv) => aimMove(m, ch, adv);
+function useMove(m, ch, anchor, from = null) {
+  const дальше = (adv) => aimMove(m, ch, adv, from);
   if (m.guard === 'ac' && anchor) askAdv(anchor, дальше);
   else дальше(null);
 }
 
-function aimMove(m, ch, adv) {
+function aimMove(m, ch, adv, from = null) {
   const s = app.store.get();
-  const mine = Object.values(s.tokens)
+  // от кого летит: у героя это его фигурка, у врага — та, из чьей карточки жмут
+  const mine = from || Object.values(s.tokens)
     .find((t) => t.locId === s.activeLoc && nameKey(t.ownerName) === nameKey(app.me.name));
   if (m.aim === 'cone' && !mine) return toast('Конус пускают от своей фигурки, а её нет на поле');
   if (m.aim !== 'one' && !(m.size > 0)) return toast('У приёма не задан размер в футах');
@@ -1562,14 +1585,15 @@ function aimMove(m, ch, adv) {
     kind: m.aim,
     feet: m.size,
     from: mine ? { x: mine.x, y: mine.y } : { x: 0, y: 0 },
-    onPick: ({ targets }) => resolveMove(m, ch, targets, adv),
+    onPick: ({ targets }) => resolveMove(m, ch, targets, adv, mine && from ? tokenName(from) : null),
   });
 }
 
-function resolveMove(m, ch, targets, adv = null) {
+function resolveMove(m, ch, targets, adv = null, byName = null) {
   if (!targets.length) return toast('Никого не задело');
   const use = {
     name: m.name || 'Приём',
+    by: byName,                               // бьёт существо, а не сам Мастер
     conc: !!m.conc,
     targets: targets.map((t) => tokenName(t)),
   };
@@ -1611,7 +1635,7 @@ function resolveMove(m, ch, targets, adv = null) {
 
   if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect, спасброски, m.onSave);
   say('', 'use', { use });
-  if (headline) showRoll($('#dice-stage'), headline, `${app.me.name}: ${use.name}`);
+  if (headline) showRoll($('#dice-stage'), headline, `${byName || app.me.name}: ${use.name}`);
 }
 
 /**
