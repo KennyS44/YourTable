@@ -923,6 +923,79 @@ const libUpd = (id, patch) => app.store.dispatch({ t: 'lib.update', id, patch })
  * Карточка существа в базе. Хиты, обзор и видимость имени живут здесь, а не
  * только на фигурке: удалили фигурку — настройки никуда не делись.
  */
+/**
+ * Поля существа в базе: одни и те же в карточке у поля и на странице
+ * подготовки. redraw зовём, когда сменился вид: у героя нет ни стойкости,
+ * ни спасбросков, ни своих приёмов, и лишние поля должны уйти сразу.
+ */
+function libFields(host, it, redraw) {
+  host.append(field('Имя', textInput(it.name, (v) => libUpd(it.id, { name: v }))));
+
+  const kindSel = el('select', 'sel');
+  [['pc', 'Персонаж'], ['npc', 'НПС'], ['enemy', 'Враг']].forEach(([v, label]) => {
+    const o = new Option(label, v);
+    if (it.kind === v) o.selected = true;
+    kindSel.append(o);
+  });
+  kindSel.addEventListener('change', () => { libUpd(it.id, { kind: kindSel.value }); redraw(); });
+  host.append(field('Вид', kindSel));
+
+  const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
+  host.append(field('Хиты (тек./макс.)', pair(
+    numInput(st.hp.cur, (v) => libUpd(it.id, { stats: { hp: { cur: v } } })),
+    numInput(st.hp.max, (v) => libUpd(it.id, { stats: { hp: { max: v } } })))));
+  host.append(field('КД', numInput(st.ac, (v) => libUpd(it.id, { stats: { ac: Math.max(0, v) } }))));
+  host.append(field('Дальность зрения, футов (0 — без обзора)',
+    numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
+  host.append(field('Размер, клеток',
+    numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
+  // Герой приносит своё: стойкость к урону и спасброски у него в листе, а не
+  // в базе иконок. Поэтому эти поля — только у НПС и врагов.
+  if (it.kind !== 'pc') {
+    const статы = () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) });
+    host.append(guardField(статы, (patch) => libUpd(it.id, { stats: patch })));
+    host.append(savesField(статы, (patch) => libUpd(it.id, { stats: patch })));
+    host.append(movesField(статы, (patch) => libUpd(it.id, { stats: patch }), null));
+  }
+  host.append(checkRow('Имя видно игрокам', st.namePublic !== false,
+    (on) => libUpd(it.id, { stats: { namePublic: on } })));
+  host.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
+    (on) => libUpd(it.id, { stats: { hpPublic: on } })));
+}
+
+/* ── Подготовка существ ───────────────────────────────────────────────
+   Все существа комнаты на одной странице: карточки в колонки, у каждой те же
+   поля, что и в маленькой карточке у поля. Чинить гоблину урон посреди боя
+   удобно в карточке, а расписать десяток врагов — здесь. */
+
+let prepFilter = 'all';
+
+function renderPrep() {
+  const grid = $('#prep-grid');
+  if (!grid || $('#prep').hidden) return;
+  const s = app.store.get();
+  const список = Object.values(s.library).filter((it) => prepFilter === 'all' || it.kind === prepFilter);
+  grid.innerHTML = '';
+  $('#prep-empty').hidden = !!список.length;
+  список.forEach((it) => {
+    const card = el('div', 'prep-card');
+    const head = el('div', 'prep-card-head');
+    const pic = el('span', 'feat-pic');
+    assetUrl(it.assetId).then((u) => { if (u) pic.style.backgroundImage = `url("${u}")`; });
+    const кого = { pc: 'Персонаж', npc: 'НПС', enemy: 'Враг' }[it.kind] || 'Существо';
+    head.append(pic, el('span', 'prep-name', it.name || 'Без имени'), el('span', 'use-dim', кого));
+    card.append(head);
+    // перерисовываем страницу целиком: сменился вид — поменялся и состав полей
+    libFields(card, it, renderPrep);
+    grid.append(card);
+  });
+}
+
+function openPrep() {
+  $('#prep').hidden = false;
+  renderPrep();
+}
+
 function openLibCard(it, ev) {
   const card = $('#token-card');
   card.innerHTML = '';
@@ -932,44 +1005,7 @@ function openLibCard(it, ev) {
   close.addEventListener('click', () => { card.hidden = true; });
   card.append(close, el('h4', '', 'Карточка в базе'));
 
-  card.append(field('Имя', textInput(it.name, (v) => libUpd(it.id, { name: v }))));
-
-  const kindSel = el('select', 'sel');
-  [['pc', 'Персонаж'], ['npc', 'НПС'], ['enemy', 'Враг']].forEach(([v, label]) => {
-    const o = new Option(label, v);
-    if (it.kind === v) o.selected = true;
-    kindSel.append(o);
-  });
-  kindSel.addEventListener('change', () => {
-    libUpd(it.id, { kind: kindSel.value });
-    // у героя своих спасбросков и стойкости в базе нет — перерисуем карточку,
-    // чтобы лишние поля ушли сразу, а не при следующем открытии
-    const свежий = app.store.get().library[it.id];
-    if (свежий) openLibCard(свежий, ev);
-  });
-  card.append(field('Вид', kindSel));
-
-  const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
-  card.append(field('Хиты (тек./макс.)', pair(
-    numInput(st.hp.cur, (v) => libUpd(it.id, { stats: { hp: { cur: v } } })),
-    numInput(st.hp.max, (v) => libUpd(it.id, { stats: { hp: { max: v } } })))));
-  card.append(field('КД', numInput(st.ac, (v) => libUpd(it.id, { stats: { ac: Math.max(0, v) } }))));
-  card.append(field('Дальность зрения, футов (0 — без обзора)',
-    numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
-  card.append(field('Размер, клеток',
-    numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
-  // Герой приносит своё: стойкость к урону и спасброски у него в листе, а не
-  // в базе иконок. Поэтому эти поля — только у НПС и врагов.
-  if (it.kind !== 'pc') {
-    const статы = () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) });
-    card.append(guardField(статы, (patch) => libUpd(it.id, { stats: patch })));
-    card.append(savesField(статы, (patch) => libUpd(it.id, { stats: patch })));
-    card.append(movesField(статы, (patch) => libUpd(it.id, { stats: patch }), null));
-  }
-  card.append(checkRow('Имя видно игрокам', st.namePublic !== false,
-    (on) => libUpd(it.id, { stats: { namePublic: on } })));
-  card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
-    (on) => libUpd(it.id, { stats: { hpPublic: on } })));
+  libFields(card, it, () => openLibCard(app.store.get().library[it.id] || it, ev));
   card.append(el('p', 'hint', it.owner
     ? `Персонаж игрока ${it.owner.name}: его фигурки сразу достаются ему.`
     : 'Эти настройки получит каждая новая фигурка с этой иконкой.'));
@@ -2027,6 +2063,15 @@ function wireDM() {
     $$('[data-libfilter]').forEach((x) => x.classList.toggle('is-active', x === b));
     libFilter = b.dataset.libfilter;
     renderLibrary(app.store.get());
+  }));
+
+  // страница подготовки: та же база существ, но во всю ширину и целиком
+  $('#btn-prep').addEventListener('click', openPrep);
+  $('#btn-prep-close').addEventListener('click', () => { $('#prep').hidden = true; });
+  $$('[data-prepfilter]').forEach((b) => b.addEventListener('click', () => {
+    $$('[data-prepfilter]').forEach((x) => x.classList.toggle('is-active', x === b));
+    prepFilter = b.dataset.prepfilter;
+    renderPrep();
   }));
 
   $('#btn-add-location').addEventListener('click', () => {

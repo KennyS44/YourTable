@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=57">
+<link rel="stylesheet" href="css/app.css?v=58">
 <!-- лист персонажа игрока в левой панели живёт по тем же правилам, что и в кабинете -->
-<link rel="stylesheet" href="css/cabinet.css?v=57">
+<link rel="stylesheet" href="css/cabinet.css?v=58">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -22,23 +22,23 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=57",
-    "./js/sync.js":           "./js/sync.js?v=57",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=57",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=57",
-    "./js/store.js":          "./js/store.js?v=57",
-    "./js/history.js":        "./js/history.js?v=57",
-    "./js/board.js":          "./js/board.js?v=57",
-    "./js/dice.js":           "./js/dice.js?v=57",
-    "./js/dice3d.js":         "./js/dice3d.js?v=57",
-    "./js/roomcode.js":       "./js/roomcode.js?v=57",
-    "./js/registry.js":       "./js/registry.js?v=57",
-    "./js/translit.js":       "./js/translit.js?v=57",
-    "./js/sheet.js":          "./js/sheet.js?v=57",
-    "./js/classes.js":        "./js/classes.js?v=57",
-    "./js/charlink.js":       "./js/charlink.js?v=57",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=57",
-    "./js/idb.js":            "./js/idb.js?v=57"
+    "./js/main.js":           "./js/main.js?v=58",
+    "./js/sync.js":           "./js/sync.js?v=58",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=58",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=58",
+    "./js/store.js":          "./js/store.js?v=58",
+    "./js/history.js":        "./js/history.js?v=58",
+    "./js/board.js":          "./js/board.js?v=58",
+    "./js/dice.js":           "./js/dice.js?v=58",
+    "./js/dice3d.js":         "./js/dice3d.js?v=58",
+    "./js/roomcode.js":       "./js/roomcode.js?v=58",
+    "./js/registry.js":       "./js/registry.js?v=58",
+    "./js/translit.js":       "./js/translit.js?v=58",
+    "./js/sheet.js":          "./js/sheet.js?v=58",
+    "./js/classes.js":        "./js/classes.js?v=58",
+    "./js/charlink.js":       "./js/charlink.js?v=58",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=58",
+    "./js/idb.js":            "./js/idb.js?v=58"
   }
 }
 </script>
@@ -236,6 +236,7 @@
           <button class="tab" data-libfilter="enemy">Враги</button>
         </div>
         <div class="lib-grid" id="lib-grid"></div>
+        <button class="btn btn-soft w-full" id="btn-prep">⚒ Подготовка существ</button>
         <p class="hint">Перетащите иконку на поле или кликните дважды. ✎ — карточка существа: имя, хиты, КД и дальность зрения сохранятся в базе и вернутся с новой фигуркой.</p>
       </section>
 
@@ -420,8 +421,24 @@
 
   <!-- Карточка токена -->
   <div class="token-card" id="token-card" hidden></div>
+
+  <!-- Подготовка существ: все НПС и враги комнаты на одной странице -->
+  <div class="prep dm-only" id="prep" hidden>
+    <div class="prep-head">
+      <h2 class="h-lg">Подготовка существ</h2>
+      <div class="lib-filter tabs tabs-sm" id="prep-filter">
+        <button class="tab is-active" data-prepfilter="all">Все</button>
+        <button class="tab" data-prepfilter="npc">НПС</button>
+        <button class="tab" data-prepfilter="enemy">Враги</button>
+        <button class="tab" data-prepfilter="pc">Герои</button>
+      </div>
+      <button class="btn btn-ghost" id="btn-prep-close">Вернуться за стол</button>
+    </div>
+    <div class="prep-grid" id="prep-grid"></div>
+    <p class="hint prep-empty" id="prep-empty" hidden>В базе пока пусто. Загрузите иконки во вкладке «Иконки».</p>
+  </div>
 </div>
 
-<script type="module" src="js/main.js?v=57"></script>
+<script type="module" src="js/main.js?v=58"></script>
 </body>
 </html>
