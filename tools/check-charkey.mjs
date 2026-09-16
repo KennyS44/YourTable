@@ -155,9 +155,14 @@ await pl.waitForTimeout(400);
 await pl.click('#btn-go');
 await pl.waitForSelector('#wait:not([hidden])', { timeout: 10000 });
 await мастерСтола.click('[data-ltab=room]');
-await мастерСтола.click('#btn-room-code');
-await мастерСтола.waitForTimeout(300);
-const код = await мастерСтола.$eval('#code-out, #link-out', (i) => i.value);
+// код комнаты больше не лежит в поле: собираем его из состояния, как это
+// делает кнопка «Пригласить»
+const код = await мастерСтола.evaluate(() => {
+  const s = window.__state();
+  const json = JSON.stringify([String(s.room.name || ''), String(s.room.playerKey || '')]);
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(json)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+});
 await pl.fill('#wait-form [name=code]', код);
 await pl.click('#wait-form button[type=submit]');
 await pl.waitForSelector('#app:not([hidden])', { timeout: 25000 });

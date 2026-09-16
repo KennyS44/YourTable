@@ -30,9 +30,14 @@ await dm.waitForSelector('#app:not([hidden])', { timeout: 20000 });
 await dm.click('#btn-add-location');
 await dm.waitForTimeout(1200);
 await dm.click('[data-ltab=room]');
-await dm.click('#btn-room-code');
-await dm.waitForTimeout(300);
-const код = await dm.$eval('#code-out, #link-out', (i) => i.value);
+// код комнаты больше не лежит в поле: собираем его из состояния, как это
+// делает кнопка «Пригласить»
+const код = await dm.evaluate(() => {
+  const s = window.__state();
+  const json = JSON.stringify([String(s.room.name || ''), String(s.room.playerKey || '')]);
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(json)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+});
 R.кодКомнаты = { длина: код.length, естьПробелы: /\s/.test(код) };
 
 /* Кабинет заводит только Мастер из админки — здесь делаем это напрямую в базе */

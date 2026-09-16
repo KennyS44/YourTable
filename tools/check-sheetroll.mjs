@@ -10,7 +10,7 @@ const LOGIN = 'rol' + process.pid, PASS = 'p' + process.pid;
 const ROOM = 'Броски ' + process.pid, KEY = 'k' + process.pid, DMKEY = 'm' + process.pid;
 const q = (o) => new URLSearchParams(o).toString();
 const R = {}; const errors = [];
-process.on('uncaughtException', (e) => { R.упало = e.message.split('\n')[0]; R.ошибки = errors; console.log(JSON.stringify(R, null, 2)); process.exit(1); });
+process.on('uncaughtException', (e) => { R.упало = e.message.split('\n').slice(0,4).join(' | '); R.ошибки = errors; console.log(JSON.stringify(R, null, 2)); process.exit(1); });
 const watch = (p, t) => {
   p.on('console', (m) => m.type() === 'error' && errors.push(t + ': ' + m.text()));
   p.on('pageerror', (e) => errors.push(t + ': ' + e.message));
@@ -30,9 +30,14 @@ await dm.waitForSelector('#app:not([hidden])', { timeout: 20000 });
 await dm.click('#btn-add-location');
 await dm.waitForTimeout(1200);
 await dm.click('[data-ltab=room]');
-await dm.click('#btn-room-code');
-await dm.waitForTimeout(300);
-const код = await dm.$eval('#code-out, #link-out', (i) => i.value);
+// код комнаты больше не лежит в поле: собираем его из состояния, как это
+// делает кнопка «Пригласить»
+const код = await dm.evaluate(() => {
+  const s = window.__state();
+  const json = JSON.stringify([String(s.room.name || ''), String(s.room.playerKey || '')]);
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(json)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+});
 
 /* ── Игрок с персонажем ── */
 await fetch(`${FIREBASE.databaseURL}/rooms/cab-${userPath(LOGIN, PASS)}/profile.json`,
@@ -81,11 +86,12 @@ R.заСтолом = await pl.$$eval('#lite-sheet .abil-roll', (n) => ({
 const ждатьБросок = async (p) => {
   await p.waitForFunction(() => !document.querySelector('.die-throw'), null, { timeout: 20000 });
 };
-const лента = (p) => p.$$eval('#rolls-feed .msg', (n) => n.map((m) => m.textContent.replace(/\s+/g, ' ').trim()));
+// лента теперь одна: броски отбираем по классу, а не по отдельному списку
+const лента = (p) => p.$$eval('#chat-feed .msg.roll', (n) => n.map((m) => m.textContent.replace(/\s+/g, ' ').trim()));
 
 /* 3. Нажатие по модификатору сразу кидает d20+3 — выбирать больше нечего */
-await pl.click('[data-rtab=rolls]');
-await dm.click('[data-rtab=rolls]');
+await pl.click('[data-feed=roll]');
+await dm.click('[data-feed=roll]');
 const ловкостьБтн = pl.locator('#lite-sheet .abil').nth(1).locator('.abil-roll');
 R.модификаторЛовкости = await ловкостьБтн.textContent();
 await ловкостьБтн.click();

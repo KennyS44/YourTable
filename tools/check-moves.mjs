@@ -43,9 +43,14 @@ await dm.evaluate(() => {
 });
 await dm.waitForTimeout(600);
 await dm.click('[data-ltab=room]');
-await dm.click('#btn-room-code');
-await dm.waitForTimeout(300);
-const код = await dm.$eval('#code-out, #link-out', (i) => i.value);
+// код комнаты больше не лежит в поле: собираем его из состояния, как это
+// делает кнопка «Пригласить»
+const код = await dm.evaluate(() => {
+  const s = window.__state();
+  const json = JSON.stringify([String(s.room.name || ''), String(s.room.playerKey || '')]);
+  const b64 = btoa(String.fromCharCode(...new TextEncoder().encode(json)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+});
 
 /* ── Кабинет: заводим, если его ещё нет ── */
 const path = userPath(LOGIN, PASS);

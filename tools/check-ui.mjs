@@ -154,10 +154,10 @@ R.толькоФигурки = {
   фигуркаСдвинулась: await dm.evaluate((a) => Object.values(window.__state().tokens)[0].x !== a, tokBefore),
 };
 
-/* 5. очистка чата и журнала бросков — по отдельности и у всех */
+/* 5. очистка: лента одна, чистится то, что показывает фильтр */
 const счёт = (page) => page.evaluate(() => ({
-  чат: document.querySelectorAll('#chat-feed .msg').length,
-  броски: document.querySelectorAll('#rolls-feed .msg').length,
+  чат: document.querySelectorAll('#chat-feed .msg:not(.roll):not(.use)').length,
+  броски: document.querySelectorAll('#chat-feed .msg.roll, #chat-feed .msg.use').length,
 }));
 await pl.fill('#chat-input', 'слово игрока');
 await pl.press('#chat-input', 'Enter');
@@ -166,18 +166,23 @@ await pl.click('#dice-buttons .die-btn:nth-child(6)');
 await dm.waitForTimeout(2500);
 R.очистка = { доОчистки: await счёт(pl) };
 
+// фильтр живёт во вкладке «Лента» — сперва открываем её
+await dm.click('[data-rtab="chat"]');
 dm.once('dialog', (d) => d.accept());
-await dm.click('[data-rtab="rolls"]');
-await dm.click('#rolls-clear');
+await dm.click('[data-feed="roll"]');
+await dm.click('#chat-clear');
 await pl.waitForTimeout(2500);
 R.очистка.послеОчисткиБросков = await счёт(pl);
 
 dm.once('dialog', (d) => d.accept());
-await dm.click('[data-rtab="chat"]');
+await dm.click('[data-feed="talk"]');
 await dm.click('#chat-clear');
 await pl.waitForTimeout(2500);
 R.очистка.послеОчисткиЧата = await счёт(pl);
-R.очистка.кнопкиУИгрокаНет = await pl.evaluate(() => !document.querySelector('#chat-clear') && !document.querySelector('#rolls-clear'));
+R.очистка.кнопкиУИгрокаНет = await pl.evaluate(() => {
+  const b = document.querySelector('#chat-clear');
+  return !b || !b.offsetParent;          // у игрока кнопка скрыта как dm-only
+});
 
 /* 6. скрытая полоска хитов у врага */
 await dm.evaluate(() => {
