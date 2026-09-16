@@ -14,9 +14,13 @@ import {
 import { publishChar } from './charlink.js';
 import { dbPut, noteRoom } from './registry.js';
 import { fileName } from './translit.js';
-
-const $ = (sel, root = document) => root.querySelector(sel);
-const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+import {
+  $, $$, el, esc, field, pair, numInput, textInput, checkRow, toast, placeCard,
+} from './ui.js';
+import { app, upd, libUpd, nameKey, tokenName } from './app-state.js';
+import { renderChat, say, rollCaption } from './chat.js';
+import { moveTokenToLocation, enterPortal, openZoneCard, renderEditCounts } from './zones.js';
+import { useMove, rollAbility, applyToHp } from './moves-use.js';
 
 const COLORS = ['#c9a45a', '#ece6d9', '#b8604a', '#83a05f', '#7fa8c9', '#a678b8', '#e0a05a', '#6f6a5e'];
 const SHAPES = [
@@ -24,8 +28,6 @@ const SHAPES = [
   { id: 'arrow', label: 'Стрелка' }, { id: 'rect', label: 'Прямоуг.' }, { id: 'circle', label: 'Круг' },
   { id: 'cone', label: 'Конус' }, { id: 'eraser', label: 'Ластик' },
 ];
-
-const app = {};   // me, sync, store, board, isDM
 
 /* ───────────────────────── Вход ───────────────────────── */
 
@@ -37,7 +39,6 @@ function myId() {
   return id;
 }
 /** Человек за столом узнаётся по имени — оно переживает перезаход и смену устройства. */
-export const nameKey = (n) => String(n || '').trim().toLowerCase();
 const slug = (s) => s.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\wа-яё-]/gi, '').slice(0, 40);
 
 /* Вход по ссылке-приглашению: ?r=комната&k=ключ (игрок) + &m=ключ (Мастер). */
@@ -507,113 +508,6 @@ function renderLibrary(s) {
     });
 }
 
-// Что сейчас лежит в ленте, по порядку. Кроме renderChat в ленту никто не пишет.
-let chatIds = [];
-
-/**
- * Разговор, служебные строки и броски идут одной лентой; фильтр прячет лишнее.
- *
- * Лента дописывается, а не пересобирается заново. Перерисовка панелей идёт на
- * каждое действие за столом, и полная сборка трёхсот сообщений стоила 53 мс —
- * даже когда действие чата не касалось вовсе. Теперь общее начало остаётся на
- * месте, а трогаются только ушедшие сверху и пришедшие снизу.
- */
-function renderChat(s) {
-  const feed = $('#chat-feed');
-  const нужны = s.chat.filter((m) => !m.secret || app.isDM);
-  const ids = нужны.map((m) => m.id);
-
-  // у чата есть потолок: самые старые сообщения уходят с начала
-  const место = ids.length && chatIds.length ? chatIds.indexOf(ids[0]) : 0;
-  const срез = место > 0 ? место : 0;
-  const хвост = chatIds.slice(срез);
-  const продолжение = хвост.length <= ids.length && хвост.every((id, i) => id === ids[i]);
-
-  // мерим до правки: если игрок отлистал ленту назад, не дёргаем его вниз
-  const уНиза = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 40;
-
-  if (!продолжение) {
-    feed.innerHTML = '';
-    нужны.forEach((m) => feed.append(msgNode(m)));
-  } else {
-    for (let i = 0; i < срез && feed.firstChild; i++) feed.firstChild.remove();
-    for (let i = хвост.length; i < нужны.length; i++) feed.append(msgNode(нужны[i]));
-  }
-  const добавили = !продолжение || нужны.length > хвост.length;
-  chatIds = ids;
-  if (добавили && уНиза) feed.scrollTop = feed.scrollHeight;
-}
-
-function msgNode(m) {
-  const d = el('div', `msg ${m.kind}${m.secret ? ' secret' : ''}`);
-  const time = new Date(m.ts).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
-  if (m.kind === 'roll') {
-    d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span>
-      <div class="body">${m.secret ? '🤫 ' : ''}${m.roll.label ? `<span class="roll-what">${esc(m.roll.label)}</span> ` : ''}${esc(m.roll.formula)} → <span class="total">${m.roll.total}</span>
-      <span style="color:var(--muted);font-size:14px"> [${m.roll.dice.join(', ')}]${m.roll.mod ? ` ${m.roll.mod > 0 ? '+' : ''}${m.roll.mod}` : ''}</span></div>`;
-  } else if (m.kind === 'use') {
-    d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span>`
-      + `<div class="body">${useBody(m.use)}</div>`;
-  } else if (m.kind === 'system') {
-    d.innerHTML = `<div class="body">${esc(m.text)}</div>`;
-  } else {
-    d.innerHTML = `<span class="time">${time}</span><span class="who">${esc(m.name)}</span><div class="body">${esc(m.text)}</div>`;
-  }
-  return d;
-}
-
-/**
- * Применённый приём в ленте. КД цели — число Мастера: столу показываем только
- * «пробил броню» или «не пробил», а само КД видит лишь Мастер.
- */
-function useBody(u) {
-  if (!u) return '';
-  const кто = u.by ? `${esc(u.by)} — ` : '';
-  const строки = [`${кто}<b class="roll-what">${esc(u.name)}</b> → ${esc(u.targets.join(', '))}`];
-  if (u.attack) {
-    const a = u.attack;
-    // при двух костях видно, какая пошла в счёт: [17, 4] → взяли 17
-    const кости = a.adv ? `[${a.dice.join(', ')}] → взяли ${a.kept}` : `[${a.dice.join(', ')}]`;
-    строки.push(`атака ${esc(a.formula)} → <span class="total">${a.total}</span>`
-      + `<span class="use-dim"> ${кости}</span>`
-      + (app.isDM ? `<span class="use-dim"> против КД ${a.vs}</span>` : ''));
-    строки.push(a.crit ? '<span class="use-crit">двадцатка — критический удар, урон вдвое</span>'
-      : a.hit ? '<span class="use-hit">пробил броню</span>' : '<span class="use-miss">не пробил</span>');
-  }
-  if (u.save) {
-    строки.push(`спасбросок ${esc(u.save.abil)}${app.isDM ? `, сложность ${u.save.dc}` : ''}`
-      + `<span class="use-dim"> при успехе ${u.save.onSave === 'half' ? 'половина' : 'ничего'}</span>`);
-    (u.saves || []).forEach((sv) => {
-      const прибавка = sv.mod ? ` ${sv.mod > 0 ? '+' : '−'}${Math.abs(sv.mod)}` : '';
-      строки.push(`<span class="use-dim">${esc(sv.name)}: [${sv.dice.join(', ')}]${прибавка} → ${sv.total} — </span>`
-        + (sv.ok ? '<span class="use-hit">отбился</span>' : '<span class="use-miss">не отбился</span>'));
-    });
-  }
-  if (u.dmg) {
-    const куски = u.dmg.parts
-      .map((p) => `${p.n}д${p.d}${p.type ? ' ' + esc(p.type) : ''}<span class="use-dim"> [${p.dice.join(', ')}]</span>`)
-      .join(' + ');
-    строки.push(`${куски} → <span class="total">${u.dmg.total}</span>`
-      + (u.dmg.crit ? '<span class="use-dim"> (уже вдвое)</span>' : ''));
-  }
-  // хиты уже сняты: строка говорит, чем дело кончилось. Полоску чужих хитов
-  // игрокам показывать нельзя, поэтому остаток видит только Мастер и хозяин
-  if (u.landed) {
-    u.landed.forEach((l) => {
-      const знак = l.delta > 0 ? '+' : '−';
-      const остаток = (app.isDM || l.pub) ? `, осталось ${l.left} из ${l.max}` : '';
-      // ноль бывает у неуязвимого: «−0» читается как опечатка, пишем словами
-      const число = l.delta === 0 ? 'урон не прошёл' : `${знак}${Math.abs(l.delta)}`;
-      строки.push(`<span class="${l.delta > 0 ? 'use-hit' : 'use-miss'}">${esc(l.name)}: ${число}</span>`
-        + (l.why ? `<span class="use-dim"> (${esc(l.why)})</span>` : '')
-        + `<span class="use-dim">${остаток}</span>`
-        + (l.down ? '<span class="use-miss"> — свалился</span>' : ''));
-    });
-  }
-  if (u.conc) строки.push('<span class="use-dim">требует концентрации</span>');
-  return строки.map((s) => `<div class="use-line">${s}</div>`).join('');
-}
-
 /** Показать фигурку: если она в другой локации, сначала переходим туда. */
 function goToToken(t) {
   if (!t) return;
@@ -624,10 +518,6 @@ function goToToken(t) {
   setTimeout(() => app.board.focusToken(t.id), 40);
 }
 
-/** Имя существа глазами читателя: скрытые имена НПС и врагов игрок не видит. */
-function tokenName(t) {
-  return (app.isDM || t.namePublic !== false) ? t.name : 'Неизвестное существо';
-}
 
 function renderInit(s) {
   const list = $('#init-list');
@@ -682,12 +572,6 @@ function renderInit(s) {
   });
 }
 
-function numInput(value, onChange) {
-  const i = el('input'); i.type = 'number'; i.value = value;
-  i.addEventListener('change', () => onChange(Number(i.value) || 0));
-  return i;
-}
-
 function renderPics(s) {
   const grid = $('#pics-grid'); if (!grid) return;
   grid.innerHTML = '';
@@ -716,21 +600,6 @@ function updateShowcase(s) {
 }
 
 /* ─────────────────────── Шаг назад ─────────────────────── */
-
-let toastTimer = null;
-/** Короткое слово о случившемся: всплыло над полем и само растаяло. */
-function toast(text) {
-  const box = $('#toast');
-  if (!box) return;
-  clearTimeout(toastTimer);
-  box.textContent = text;
-  box.hidden = false;
-  box.classList.remove('is-going');
-  toastTimer = setTimeout(() => {
-    box.classList.add('is-going');
-    toastTimer = setTimeout(() => { box.hidden = true; }, 350);
-  }, 1800);
-}
 
 /** Отмена своего последнего действия: обратное уходит всем за столом. */
 function doUndo() {
@@ -942,7 +811,6 @@ function renderMembers() {
 
 /* ─────────────────── База существ: карточка из «Иконок» ─────────────────── */
 
-const libUpd = (id, patch) => app.store.dispatch({ t: 'lib.update', id, patch });
 
 /**
  * Карточка существа в базе. Хиты, обзор и видимость имени живут здесь, а не
@@ -1204,219 +1072,8 @@ function openTokenCard(t, screenPos) {
  * Ставим карточку рядом с фигуркой, но целиком внутри поля: меряем её
  * настоящий размер и, если места справа/снизу нет, разворачиваем в другую сторону.
  */
-function placeCard(card, at) {
-  const pad = 8, gap = 12;
-  const board = $('#board').getBoundingClientRect();      // куда нельзя вылезать
-  const host = (card.offsetParent || document.body).getBoundingClientRect();
 
-  // нижняя панель инструментов должна остаться нажимаемой — карточку выше неё
-  const bar = ['#draw-bar', '#fog-bar', '#wall-bar', '#edit-bar']
-    .map((sel) => $(sel)).find((b) => b && !b.hidden);
-  const bottom = Math.min(board.bottom - pad, bar ? bar.getBoundingClientRect().top - 8 : Infinity);
 
-  card.style.maxHeight = (bottom - board.top - pad) + 'px';
-  const w = card.offsetWidth, h = card.offsetHeight;
-  const px = board.left + at.x, py = board.top + at.y;    // фигурка в координатах окна
-
-  let left = px + gap;
-  if (left + w > board.right - pad) left = px - gap - w;  // не влезло справа — станем слева
-  left = Math.max(board.left + pad, Math.min(left, board.right - w - pad));
-
-  let top = py + gap;
-  if (top + h > bottom) top = py - gap - h;               // не влезло снизу — станем выше
-  top = Math.max(board.top + pad, Math.min(top, bottom - h));
-
-  card.style.left = Math.round(left - host.left) + 'px';
-  card.style.top = Math.round(top - host.top) + 'px';
-}
-
-const upd = (id, patch) => app.store.dispatch({ t: 'token.update', id, patch });
-
-/* ─────────── Переходы между локациями и точки входа ─────────── */
-
-const cellKeyOf = (g, x, y) => Math.floor((x - g.ox) / g.size) + ',' + Math.floor((y - g.oy) / g.size);
-const cellCenterOf = (g, cx, cy) => ({ x: g.ox + (cx + 0.5) * g.size, y: g.oy + (cy + 0.5) * g.size });
-
-/**
- * Куда встанет пришедший: точка входа, назначенная для этой прежней локации,
- * иначе основная, иначе любая. Занятую клетку не занимаем второй раз —
- * ищем ближайшую свободную рядом.
- */
-function spawnSpot(to, fromLocId) {
-  const g = to.grid;
-  const spawns = to.spawns || [];
-  const byFrom = spawns.filter((z) => z.fromLocId === fromLocId);
-  const main = spawns.filter((z) => z.main);
-  const cands = byFrom.length ? byFrom : (main.length ? main : spawns);
-  if (!cands.length) return null;
-
-  const taken = new Set(Object.values(app.store.get().tokens)
-    .filter((t) => t.locId === to.id)
-    .map((t) => cellKeyOf(g, t.x, t.y)));
-  // зона занимает прямоугольник клеток — идём по ним, поэтому пришедшие не слипаются
-  for (const z of cands) {
-    const [zx, zy] = cellKeyOf(g, z.x, z.y).split(',').map(Number);
-    for (let dy = 0; dy < Math.max(1, z.ch || 1); dy++) {
-      for (let dx = 0; dx < Math.max(1, z.cw || 1); dx++) {
-        if (!taken.has((zx + dx) + ',' + (zy + dy))) return cellCenterOf(g, zx + dx, zy + dy);
-      }
-    }
-  }
-
-  // все точки заняты — становимся в ближайшую свободную клетку, сбоку раньше, чем наискось
-  const [cx, cy] = cellKeyOf(g, cands[0].x, cands[0].y).split(',').map(Number);
-  for (let r = 1; r <= 8; r++) {
-    const ring = [];
-    for (let dx = -r; dx <= r; dx++) {
-      for (let dy = -r; dy <= r; dy++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
-        if (!taken.has((cx + dx) + ',' + (cy + dy))) ring.push([dx, dy]);
-      }
-    }
-    ring.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
-    if (ring.length) return cellCenterOf(g, cx + ring[0][0], cy + ring[0][1]);
-  }
-  return { x: cands[0].x, y: cands[0].y };
-}
-
-/** Телепорт фигурки: на точку входа новой локации, а если её нет — на ту же клетку. */
-function moveTokenToLocation(t, toId, quiet) {
-  const s = app.store.get();
-  const from = s.locations[t.locId], to = s.locations[toId];
-  if (!from || !to || from.id === to.id) return;
-  const spot = spawnSpot(to, from.id) || (() => {
-    const cx = Math.floor((t.x - from.grid.ox) / from.grid.size);
-    const cy = Math.floor((t.y - from.grid.oy) / from.grid.size);
-    return cellCenterOf(to.grid, cx, cy);
-  })();
-  upd(t.id, { locId: toId, x: spot.x, y: spot.y });
-  if (quiet) return;
-  say(`${t.name} перемещён в «${to.name}»`, 'system');
-  $('#token-card').hidden = true;
-}
-
-/** Фигурка встала на зелёную стрелку — уводим её в назначенную локацию. */
-function enterPortal(t, portal) {
-  const s = app.store.get();
-  const to = s.locations[portal.toLocId];
-  if (!t || !to || to.id === t.locId) return;
-  moveTokenToLocation(t, to.id, true);
-  say(`${t.name} перешёл в локацию «${to.name}»`, 'system');
-}
-
-const ZONE_TITLE = { portals: 'Переход в другую локацию', spawns: 'Точка входа', lights: 'Фонарь', walls: 'Стена или дверь' };
-
-/** Что вообще стоит в этой локации — чтобы в правке было видно, чего искать. */
-function renderEditCounts(s) {
-  const box = $('#edit-counts');
-  if (!box || $('#edit-bar').hidden) return;
-  const l = s.locations[s.activeLoc];
-  if (!l) { box.textContent = 'Локация не выбрана'; return; }
-  const walls = (l.walls || []).filter((w) => w.type !== 'door').length;
-  const doors = (l.walls || []).length - walls;
-  const parts = [
-    ['стен', walls], ['дверей', doors], ['фонарей', (l.lights || []).length],
-    ['переходов', (l.portals || []).length], ['входов', (l.spawns || []).length],
-  ];
-  const some = parts.filter(([, n]) => n);
-  box.textContent = some.length ? some.map(([n, v]) => `${n}: ${v}`).join(' · ') : 'В локации пока ничего не поставлено';
-}
-
-/** Настройки поставленного объекта: зоны, фонари и стены правит только Мастер. */
-function openZoneCard(kind, zone, pos) {
-  if (!app.isDM) return;
-  const card = $('#token-card');
-  card.innerHTML = '';
-  card.hidden = false;
-  const s = app.store.get();
-  const locId = s.activeLoc;
-  const zUpd = (patch) => app.store.dispatch({ t: 'zone.update', locId, kind, id: zone.id, patch });
-  const drop = (t, extra) => app.store.dispatch({ t, locId, id: zone.id, ...extra });
-
-  const close = el('button', 'icon-btn close', '×');
-  close.addEventListener('click', () => { card.hidden = true; });
-  card.append(close, el('h4', '', ZONE_TITLE[kind] || 'Объект'));
-
-  if (kind === 'lights') {
-    card.append(field('Дальность света, футов',
-      numInput(zone.feet || 20, (v) => zUpd({ feet: Math.max(1, Math.min(500, v)) }))));
-    card.append(el('p', 'hint', 'Свет обрывается о стены и закрытые двери и виден всем за столом. Сам фонарь видит только Мастер — его можно двигать по полю.'));
-    const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать фонарь');
-    bDel.addEventListener('click', () => { drop('light.remove'); card.hidden = true; });
-    card.append(bDel);
-    placeCard(card, pos);
-    return;
-  }
-
-  if (kind === 'walls') {
-    const kindSel = el('select', 'sel');
-    [['wall', 'Стена'], ['door', 'Дверь']].forEach(([v, label]) => {
-      const o = new Option(label, v);
-      if ((zone.type || 'wall') === v) o.selected = true;
-      kindSel.append(o);
-    });
-    kindSel.addEventListener('change', () => zUpd({ type: kindSel.value }));
-    card.append(field('Что это', kindSel));
-    card.append(checkRow('Открыта (для двери)', !!zone.open, (on) => zUpd({ open: on })));
-    card.append(el('p', 'hint', 'Стена и закрытая дверь обрывают обзор. Тяните за концы, чтобы поправить длину.'));
-    const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать');
-    bDel.addEventListener('click', () => { drop('wall.remove'); card.hidden = true; });
-    card.append(bDel);
-    placeCard(card, pos);
-    return;
-  }
-
-  const sel = el('select', 'sel');
-  const others = s.order.filter((id) => id !== locId);
-  if (kind === 'portals') {
-    sel.append(new Option('— локация не выбрана —', ''));
-    others.forEach((id) => {
-      const o = new Option(s.locations[id].name, id);
-      if (zone.toLocId === id) o.selected = true;
-      sel.append(o);
-    });
-    sel.addEventListener('change', () => zUpd({ toLocId: sel.value || null }));
-    card.append(field('Куда ведёт', sel));
-    card.append(el('p', 'hint', 'Фигурка, вставшая на эту клетку, окажется в выбранной локации — на её точке входа.'));
-  } else {
-    sel.append(new Option('— из любой локации —', ''));
-    others.forEach((id) => {
-      const o = new Option('из «' + s.locations[id].name + '»', id);
-      if (zone.fromLocId === id) o.selected = true;
-      sel.append(o);
-    });
-    sel.addEventListener('change', () => zUpd({ fromLocId: sel.value || null }));
-    card.append(field('Откуда приходят', sel));
-    card.append(checkRow('Основная точка входа', !!zone.main, (on) => zUpd({ main: on })));
-    card.append(el('p', 'hint', 'Сюда встают пришедшие из выбранной локации. Основная принимает всех остальных. Занятые клетки не занимаются дважды — следующий встанет на свободную.'));
-  }
-  card.append(field('Размер, клеток (ширина × высота)', pair(
-    numInput(zone.cw || 1, (v) => zUpd({ cw: Math.max(1, Math.min(20, v)) })),
-    numInput(zone.ch || 1, (v) => zUpd({ ch: Math.max(1, Math.min(20, v)) })))));
-  card.append(el('p', 'hint', 'Растянуть можно и мышью — за уголок ◢ в правом нижнем углу зоны.'));
-  if (!others.length) card.append(el('p', 'hint', 'Пока есть только одна локация — создайте вторую в панели слева.'));
-
-  const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать зону');
-  bDel.addEventListener('click', () => {
-    app.store.dispatch({ t: 'zone.remove', locId, kind, id: zone.id });
-    card.hidden = true;
-  });
-  card.append(bDel);
-  placeCard(card, pos);
-}
-function field(label, input) {
-  const f = el('label', 'field');
-  f.append(el('span', '', label), input);
-  return f;
-}
-function pair(a, b) { const d = el('div', 'row-2'); d.append(a, b); return d; }
-/**
- * Получаемый урон в карточке существа: выбрали вид урона и нажали множитель.
- * Подписи именно множителями — «½» под заголовком про стойкость читалось
- * наоборот. Выбранное живёт фишками: щёлкнул по фишке, и она ушла.
- * Три списка вместо одного словаря: массив в правке заменяется целиком, и
- * убрать вид урона получается без возни с удалением ключей.
- */
 const GUARD_KINDS = [
   ['resist', '×½', 'получает половину урона'],
   ['vuln', '×2', 'получает двойной урон'],
@@ -1520,18 +1177,6 @@ function movesField(get, set, from) {
   return box;
 }
 
-function checkRow(label, checked, onChange) {
-  const l = el('label', 'check');
-  const i = el('input'); i.type = 'checkbox'; i.checked = checked;
-  i.addEventListener('change', () => onChange(i.checked));
-  l.append(i, el('span', '', label));
-  return l;
-}
-function textInput(value, onChange) {
-  const i = el('input'); i.value = value;
-  i.addEventListener('change', () => onChange(i.value.slice(0, 32)));
-  return i;
-}
 
 function toggleInit(tokenId) {
   const s = app.store.get();
@@ -1567,18 +1212,6 @@ function dropToken(libId, worldPos) {
 
 /* ───────────────────────── Чат и броски ───────────────────────── */
 
-function say(text, kind = 'chat', extra = {}) {
-  app.store.dispatch({
-    t: 'chat.add',
-    msg: { id: uid('m'), ts: Date.now(), by: app.me.id, name: app.me.name, kind, text, ...extra },
-  });
-}
-
-/** Подпись под кубиками: у броска из листа впереди стоит название характеристики. */
-function rollCaption(name, r, secret) {
-  return `${name}: ${r.label ? r.label + ' · ' : ''}${r.formula}${secret ? ' · тайно' : ''}`;
-}
-
 let diceMode = 'open';
 function doRoll(sides) {
   const count = Math.max(1, Math.min(20, Number($('#dice-count').value) || 1));
@@ -1595,211 +1228,6 @@ function doRoll(sides) {
 
    Меню выбора здесь стояло ради преимущества и помехи. Их убрали — выбирать
    стало нечего, и нажатие сразу кидает. */
-
-/* ── Применение приёма ──────────────────────────────────────────────
-   Игрок выбирает способность, потом наводит её на поле: в фигурку, кругом
-   от точки или конусом от себя. Дальше считаем сами — кроме спасбросков,
-   их катает Мастер. Числа Мастера столу не показываем. */
-
-const AIM_HINT = {
-  one: 'Укажите цель. Правая кнопка — отмена.',
-  area: 'Укажите центр области. Правая кнопка — отмена.',
-  cone: 'Укажите направление конуса. Правая кнопка — отмена.',
-};
-
-/** Бонус приёма: от характеристики листа, свой или никакой. */
-function moveBonus(m, ch) {
-  const b = m.bonus || {};
-  if (b.from === 'custom') return Number(b.value) || 0;
-  if (b.from && b.from !== 'none' && ch) return sheetMod(ch.sheet[b.from]);
-  return 0;
-}
-
-/** Кости приёма: два куска, у каждого свой вид урона. */
-function rollMoveDice(m) {
-  const parts = (m.dice || []).filter((d) => d.n > 0).map((d) => {
-    const r = roll(d.d, d.n);
-    return { n: d.n, d: d.d, type: d.type, dice: r.dice, sum: r.total };
-  });
-  if (!parts.length) return null;
-  return { parts, total: parts.reduce((a, p) => a + p.sum, 0) };
-}
-
-/**
- * Меню у кнопки: как кидать этот приём. Спрашиваем только там, где есть свой
- * бросок д20 — у приёмов со спасброском кидает цель, и выбирать нечего.
- */
-const ADV_WAYS = [
-  [null, 'Обычный бросок'],
-  ['adv', 'С преимуществом'],
-  ['dis', 'С помехой'],
-];
-
-function askAdv(anchor, onPick) {
-  const menu = el('div', 'rollmenu');
-  ADV_WAYS.forEach(([v, label]) => {
-    const b = el('button', 'rollmenu-b', label);
-    b.type = 'button';
-    b.addEventListener('click', (e) => { e.stopPropagation(); close(); onPick(v); });
-    menu.append(b);
-  });
-  document.body.append(menu);
-  const r = anchor.getBoundingClientRect();
-  menu.style.left = Math.min(r.left, window.innerWidth - 216) + 'px';
-  menu.style.top = (r.bottom + 6) + 'px';
-  requestAnimationFrame(() => menu.classList.add('is-on'));
-  function close() { menu.remove(); document.removeEventListener('click', away, true); }
-  function away(e) { if (!menu.contains(e.target)) close(); }
-  setTimeout(() => document.addEventListener('click', away, true), 0);
-}
-
-function useMove(m, ch, anchor, from = null) {
-  const дальше = (adv) => aimMove(m, ch, adv, from);
-  if (m.guard === 'ac' && anchor) askAdv(anchor, дальше);
-  else дальше(null);
-}
-
-function aimMove(m, ch, adv, from = null) {
-  const s = app.store.get();
-  // от кого летит: у героя это его фигурка, у врага — та, из чьей карточки жмут
-  const mine = from || Object.values(s.tokens)
-    .find((t) => t.locId === s.activeLoc && nameKey(t.ownerName) === nameKey(app.me.name));
-  if (m.aim === 'cone' && !mine) return toast('Конус пускают от своей фигурки, а её нет на поле');
-  if (m.aim !== 'one' && !(m.size > 0)) return toast('У приёма не задан размер в футах');
-  toast(AIM_HINT[m.aim] || AIM_HINT.one);
-  app.board.startAim({
-    kind: m.aim,
-    feet: m.size,
-    from: mine ? { x: mine.x, y: mine.y } : { x: 0, y: 0 },
-    onPick: ({ targets }) => resolveMove(m, ch, targets, adv, mine && from ? tokenName(from) : null),
-  });
-}
-
-function resolveMove(m, ch, targets, adv = null, byName = null) {
-  if (!targets.length) return toast('Никого не задело');
-  const use = {
-    name: m.name || 'Приём',
-    by: byName,                               // бьёт существо, а не сам Мастер
-    conc: !!m.conc,
-    targets: targets.map((t) => tokenName(t)),
-  };
-  let headline = null;
-
-  let задетые = targets;
-  let спасброски = null;
-  if (m.guard === 'ac') {
-    const t = targets[0];
-    const r = roll(20, 1, moveBonus(m, ch), adv);
-    // натуральная двадцатка бьёт всегда и бьёт вдвое — броня её не держит.
-    // При двух костях смотрим на ту, что пошла в счёт
-    const crit = r.kept === 20;
-    // равно КД — это попадание
-    const hit = crit || r.total >= (Number(t.ac) || 10);
-    use.attack = {
-      formula: r.formula, dice: r.dice, kept: r.kept, adv: r.adv,
-      total: r.total, vs: Number(t.ac) || 10, hit, crit, target: tokenName(t),
-    };
-    use.targets = [tokenName(t)];
-    задетые = hit ? [t] : [];
-    if (hit) use.dmg = critDouble(rollMoveDice(m), crit);
-    headline = r;
-  } else if (m.guard === 'save') {
-    use.save = { abil: abilLabel(m.guardAbil), dc: m.dc, onSave: m.onSave };
-    use.dmg = rollMoveDice(m);
-    // за каждую цель кидаем сами: прибавка к спасброску записана у существа
-    спасброски = targets.map((t) => {
-      const прибавка = Number((t.saves || {})[m.guardAbil]) || 0;
-      const r = roll(20, 1, прибавка);
-      const ok = r.total >= (Number(m.dc) || 10);
-      return { id: t.id, name: tokenName(t), total: r.total, dice: r.dice, mod: прибавка, ok };
-    });
-    use.saves = спасброски;
-  } else {
-    use.dmg = rollMoveDice(m);
-    headline = use.dmg && { sides: use.dmg.parts[0].d, mod: 0, dice: use.dmg.parts.flatMap((p) => p.dice), total: use.dmg.total, formula: dmgFormula(use.dmg) };
-  }
-
-  if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect, спасброски, m.onSave);
-  say('', 'use', { use });
-  if (headline) showRoll($('#dice-stage'), headline, `${byName || app.me.name}: ${use.name}`);
-}
-
-/**
- * Критический удар: выпала двадцатка — урон удваивается целиком. Удваиваем
- * каждый кусок, а не только итог: стойкость к виду урона считается по кускам,
- * и иначе она делила бы уже не то число.
- */
-function critDouble(dmg, crit) {
-  if (!dmg || !crit) return dmg;
-  return {
-    crit: true,
-    parts: dmg.parts.map((p) => ({ ...p, sum: p.sum * 2 })),
-    total: dmg.total * 2,
-  };
-}
-
-/**
- * Стойкость существа к виду урона: половина, вдвое или не берёт вовсе.
- * Считаем по каждому куску отдельно — «1д8 рубящий + 2д6 огонь» по существу,
- * которое боится огня, но держит сталь, даёт разные числа с разных костей.
- * Половину округляем вниз, как в правилах.
- */
-function hitAfterGuard(t, parts) {
-  let total = 0;
-  const пометки = new Set();
-  parts.forEach((p) => {
-    const тип = p.type || '';
-    if (тип && (t.immune || []).includes(тип)) { пометки.add(`${тип} ×0`); return; }
-    if (тип && (t.vuln || []).includes(тип)) { total += p.sum * 2; пометки.add(`${тип} ×2`); return; }
-    if (тип && (t.resist || []).includes(тип)) { total += Math.floor(p.sum / 2); пометки.add(`${тип} ×½`); return; }
-    total += p.sum;
-  });
-  return { total, why: [...пометки].join(', ') };
-}
-
-/**
- * Урон и лечение садятся сами: посчитали — сразу сняли или вернули хиты.
- * Правит тот, кто применил приём: действие уходит в общий поток, и остальные
- * увидят уже готовый результат, а не посчитают его заново.
- */
-function applyToHp(targets, dmg, effect, saves, onSave) {
-  if (!dmg || !(dmg.total > 0) || effect === 'buff' || effect === 'debuff') return null;
-  const s = app.store.get();
-  const лечим = effect === 'heal';
-  const out = [];
-  targets.forEach((t0) => {
-    const t = s.tokens[t0.id];
-    if (!t || !(t.hp && t.hp.max > 0)) return;      // без максимума хитов считать нечего
-    // спасбросок режет урон до стойкости: сперва цель уворачивается, а уже
-    // потом её шкура делит то, что долетело
-    const спас = saves && saves.find((x) => x.id === t.id);
-    if (спас && спас.ok && onSave !== 'half') return;        // отбилась начисто
-    const куски = спас && спас.ok
-      ? dmg.parts.map((p) => ({ ...p, sum: Math.floor(p.sum / 2) }))
-      : dmg.parts;
-    // лечение стойкостью не режут: она про урон
-    const { total, why } = лечим ? { total: dmg.total, why: '' } : hitAfterGuard(t, куски);
-    const было = Number(t.hp.cur) || 0;
-    const стало = Math.max(0, Math.min(t.hp.max, было + (лечим ? total : -total)));
-    if (стало === было && !why) return;
-    app.store.dispatch({ t: 'token.update', id: t.id, patch: { hp: { cur: стало } } });
-    out.push({
-      name: tokenName(t), delta: стало - было, left: стало, max: t.hp.max, why,
-      down: стало === 0 && !лечим, pub: t.hpPublic !== false,   // чужой остаток виден не всем
-    });
-  });
-  return out.length ? out : null;
-}
-
-const abilLabel = (id) => (ABILITIES.find((a) => a.id === id) || { label: '—' }).label;
-const dmgFormula = (d) => d.parts.map((p) => `${p.n}д${p.d}${p.type ? ' ' + p.type : ''}`).join(' + ');
-
-function rollAbility(label, mod) {
-  const r = roll(20, 1, mod);
-  r.label = label;
-  say('', 'roll', { roll: r });
-  showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, false));
-}
 
 /* ───────────────────────── Провода интерфейса ───────────────────────── */
 
@@ -2356,16 +1784,6 @@ async function importCampaign(e) {
 }
 
 /* ───────────────────────── Мелочи ───────────────────────── */
-
-function el(tag, cls = '', text = '') {
-  const n = document.createElement(tag);
-  if (cls) n.className = cls;
-  if (text) n.textContent = text;
-  return n;
-}
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
 
 document.addEventListener('click', (e) => {
   const card = $('#token-card');

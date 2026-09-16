@@ -190,7 +190,8 @@ await dm.evaluate(() => {
 await dm.evaluate(() => {
   const card = document.querySelector('#token-card');
   const fields = [...card.querySelectorAll('.field')];
-  const vis = fields.find((f) => f.textContent.includes('Дальность зрения')).querySelector('input');
+  // в карточке существа поле зовётся «Обзор», у фигурки на поле — «Дальность зрения»
+  const vis = fields.find((f) => /Обзор|Дальность зрения/.test(f.textContent)).querySelector('input');
   vis.value = 45; vis.dispatchEvent(new Event('change'));
 });
 await dm.waitForTimeout(400);
