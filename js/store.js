@@ -80,6 +80,7 @@ export function normalize(raw) {
     t.resist = t.resist || [];
     t.vuln = t.vuln || [];
     t.immune = t.immune || [];
+    t.saves = { ...emptySaves(), ...(t.saves || {}) };   // прибавки к спасброскам
   });
   // Карточки существ: имя, хиты и обзор живут в базе, а не только на фигурке
   Object.values(s.library).forEach((it) => { it.stats = { ...defaultStats(it.kind), ...(it.stats || {}) }; });
@@ -105,6 +106,17 @@ export function newLocation(name) {
 }
 
 /**
+ * Прибавки к спасброскам существа: по одной на характеристику. У героя они
+ * берутся из листа, у врага их пишет Мастер — иначе спасбросок кидать нечем.
+ */
+export const SAVE_ABILS = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
+export function emptySaves() {
+  const s = {};
+  SAVE_ABILS.forEach((id) => { s[id] = 0; });
+  return s;
+}
+
+/**
  * Настройки существа по умолчанию. Герои открыты столу, НПС и враги — нет:
  * игрок не должен читать имя и хиты того, кого ещё не разглядел.
  */
@@ -117,6 +129,7 @@ export function defaultStats(kind) {
     hpPublic: kind === 'pc',
     namePublic: kind === 'pc',
     resist: [], vuln: [], immune: [],   // виды урона, которые берут иначе
+    saves: emptySaves(),
   };
 }
 
@@ -126,7 +139,7 @@ export function newToken(patch) {
     assetId: null, libId: null, name: 'Существо', kind: 'npc',
     ownerId: null, ownerName: null, hp: { cur: 10, max: 10 }, ac: 10,
     hpPublic: true, namePublic: true, statuses: [],
-    resist: [], vuln: [], immune: [],
+    resist: [], vuln: [], immune: [], saves: emptySaves(),
     vision: 0, ...patch,
   };
 }

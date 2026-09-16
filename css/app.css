@@ -601,6 +601,11 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .guard-add{display:grid; grid-template-columns:1fr auto auto auto; gap:var(--s1); align-items:center}
 .guard-add .btn{min-width:40px}
 
+/* Спасброски: шесть окошек в два ряда — подпись над полем, как в листе */
+.saves-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s1); margin-top:4px}
+.saves-cell{display:flex; flex-direction:column; gap:2px; min-width:0}
+.saves-cell input{width:100%; text-align:center}
+
 .only-mobile{display:none}
 
 /* ── Телефон ─────────────────────────────────────────────────────── */

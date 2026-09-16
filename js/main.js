@@ -552,6 +552,11 @@ function useBody(u) {
   if (u.save) {
     строки.push(`спасбросок ${esc(u.save.abil)}${app.isDM ? `, сложность ${u.save.dc}` : ''}`
       + `<span class="use-dim"> при успехе ${u.save.onSave === 'half' ? 'половина' : 'ничего'}</span>`);
+    (u.saves || []).forEach((sv) => {
+      const прибавка = sv.mod ? ` ${sv.mod > 0 ? '+' : '−'}${Math.abs(sv.mod)}` : '';
+      строки.push(`<span class="use-dim">${esc(sv.name)}: [${sv.dice.join(', ')}]${прибавка} → ${sv.total} — </span>`
+        + (sv.ok ? '<span class="use-hit">отбился</span>' : '<span class="use-miss">не отбился</span>'));
+    });
   }
   if (u.dmg) {
     const куски = u.dmg.parts
@@ -941,9 +946,9 @@ function openLibCard(it, ev) {
     numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
   card.append(field('Размер, клеток',
     numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
-  card.append(guardField(
-    () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) }),
-    (patch) => libUpd(it.id, { stats: patch })));
+  const статы = () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) });
+  card.append(guardField(статы, (patch) => libUpd(it.id, { stats: patch })));
+  card.append(savesField(статы, (patch) => libUpd(it.id, { stats: patch })));
   card.append(checkRow('Имя видно игрокам', st.namePublic !== false,
     (on) => libUpd(it.id, { stats: { namePublic: on } })));
   card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
@@ -1021,6 +1026,9 @@ function openTokenCard(t, screenPos) {
   card.append(field('Дальность зрения, футов (0 — без обзора)',
     numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
   card.append(guardField(
+    () => app.store.get().tokens[t.id] || t,
+    (patch) => upd(t.id, patch)));
+  card.append(savesField(
     () => app.store.get().tokens[t.id] || t,
     (patch) => upd(t.id, patch)));
   card.append(checkRow('Имя видно игрокам', t.namePublic !== false,
@@ -1364,6 +1372,31 @@ function guardField(get, set) {
   return box;
 }
 
+/**
+ * Прибавки к спасброскам: шесть маленьких окошек в два ряда. Пишутся со знаком,
+ * потому что бывают и отрицательными — у неуклюжего существа своя ловкость.
+ */
+function savesField(get, set) {
+  const box = el('div', 'field');
+  box.append(el('span', 'fld-l', 'Спасброски (прибавка к д20)'));
+  const grid = el('div', 'saves-grid');
+  const cur = get().saves || {};
+  ABILITIES.forEach((a) => {
+    const cell = el('label', 'saves-cell');
+    const i = el('input', 'num-sm');
+    i.type = 'number'; i.min = -20; i.max = 20;
+    i.value = Number(cur[a.id]) || 0;
+    i.addEventListener('input', () => {
+      const v = Math.max(-20, Math.min(20, Number(i.value) || 0));
+      set({ saves: { ...(get().saves || {}), [a.id]: v } });
+    });
+    cell.append(el('span', 'fld-l', a.label.slice(0, 3)), i);
+    grid.append(cell);
+  });
+  box.append(grid);
+  return box;
+}
+
 function checkRow(label, checked, onChange) {
   const l = el('label', 'check');
   const i = el('input'); i.type = 'checkbox'; i.checked = checked;
@@ -1400,6 +1433,7 @@ function dropToken(libId, worldPos) {
     cells: st.cells, vision: st.vision, hp: { ...st.hp }, ac: st.ac,
     hpPublic: st.hpPublic, namePublic: st.namePublic,
     resist: [...(st.resist || [])], vuln: [...(st.vuln || [])], immune: [...(st.immune || [])],
+    saves: { ...(st.saves || {}) },
     // персонаж из кабинета принадлежит своему игроку — привязываем сразу
     ownerId: it.owner ? it.owner.id : null,
     ownerName: it.owner ? it.owner.name : null,
@@ -1493,6 +1527,7 @@ function resolveMove(m, ch, targets) {
   let headline = null;
 
   let задетые = targets;
+  let спасброски = null;
   if (m.guard === 'ac') {
     const t = targets[0];
     const r = roll(20, 1, moveBonus(m, ch));
@@ -1507,13 +1542,21 @@ function resolveMove(m, ch, targets) {
     headline = r;
   } else if (m.guard === 'save') {
     use.save = { abil: abilLabel(m.guardAbil), dc: m.dc, onSave: m.onSave };
-    use.pending = true;                       // спасброски за целями катает Мастер
+    use.dmg = rollMoveDice(m);
+    // за каждую цель кидаем сами: прибавка к спасброску записана у существа
+    спасброски = targets.map((t) => {
+      const прибавка = Number((t.saves || {})[m.guardAbil]) || 0;
+      const r = roll(20, 1, прибавка);
+      const ok = r.total >= (Number(m.dc) || 10);
+      return { id: t.id, name: tokenName(t), total: r.total, dice: r.dice, mod: прибавка, ok };
+    });
+    use.saves = спасброски;
   } else {
     use.dmg = rollMoveDice(m);
     headline = use.dmg && { sides: use.dmg.parts[0].d, mod: 0, dice: use.dmg.parts.flatMap((p) => p.dice), total: use.dmg.total, formula: dmgFormula(use.dmg) };
   }
 
-  if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect);
+  if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect, спасброски, m.onSave);
   say('', 'use', { use });
   if (headline) showRoll($('#dice-stage'), headline, `${app.me.name}: ${use.name}`);
 }
@@ -1556,7 +1599,7 @@ function hitAfterGuard(t, parts) {
  * Правит тот, кто применил приём: действие уходит в общий поток, и остальные
  * увидят уже готовый результат, а не посчитают его заново.
  */
-function applyToHp(targets, dmg, effect) {
+function applyToHp(targets, dmg, effect, saves, onSave) {
   if (!dmg || !(dmg.total > 0) || effect === 'buff' || effect === 'debuff') return null;
   const s = app.store.get();
   const лечим = effect === 'heal';
@@ -1564,8 +1607,15 @@ function applyToHp(targets, dmg, effect) {
   targets.forEach((t0) => {
     const t = s.tokens[t0.id];
     if (!t || !(t.hp && t.hp.max > 0)) return;      // без максимума хитов считать нечего
+    // спасбросок режет урон до стойкости: сперва цель уворачивается, а уже
+    // потом её шкура делит то, что долетело
+    const спас = saves && saves.find((x) => x.id === t.id);
+    if (спас && спас.ok && onSave !== 'half') return;        // отбилась начисто
+    const куски = спас && спас.ok
+      ? dmg.parts.map((p) => ({ ...p, sum: Math.floor(p.sum / 2) }))
+      : dmg.parts;
     // лечение стойкостью не режут: она про урон
-    const { total, why } = лечим ? { total: dmg.total, why: '' } : hitAfterGuard(t, dmg.parts);
+    const { total, why } = лечим ? { total: dmg.total, why: '' } : hitAfterGuard(t, куски);
     const было = Number(t.hp.cur) || 0;
     const стало = Math.max(0, Math.min(t.hp.max, было + (лечим ? total : -total)));
     if (стало === было && !why) return;
