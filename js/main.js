@@ -217,7 +217,7 @@ function start(sync, state, me) {
   window.__stats = () => (app.sync.stats ? app.sync.stats() : null);
   window.__openToken = (id) => openTokenCard(app.store.get().tokens[id], { x: 200, y: 200 });
   // приём мимо наводки: проверке незачем целиться мышью по холсту
-  window.__resolveMove = (m, ids) => resolveMove(m, null, ids.map((id) => app.store.get().tokens[id]));
+  window.__resolveMove = (m, ids, adv) => resolveMove(m, null, ids.map((id) => app.store.get().tokens[id]), adv);
   wireUI();
   renderAll(app.store.get());
   app.board.fit();
@@ -546,8 +546,10 @@ function useBody(u) {
   const строки = [`<b class="roll-what">${esc(u.name)}</b> → ${esc(u.targets.join(', '))}`];
   if (u.attack) {
     const a = u.attack;
+    // при двух костях видно, какая пошла в счёт: [17, 4] → взяли 17
+    const кости = a.adv ? `[${a.dice.join(', ')}] → взяли ${a.kept}` : `[${a.dice.join(', ')}]`;
     строки.push(`атака ${esc(a.formula)} → <span class="total">${a.total}</span>`
-      + `<span class="use-dim"> [${a.dice.join(', ')}]</span>`
+      + `<span class="use-dim"> ${кости}</span>`
       + (app.isDM ? `<span class="use-dim"> против КД ${a.vs}</span>` : ''));
     строки.push(a.crit ? '<span class="use-crit">двадцатка — критический удар, урон вдвое</span>'
       : a.hit ? '<span class="use-hit">пробил броню</span>' : '<span class="use-miss">не пробил</span>');
@@ -1515,7 +1517,41 @@ function rollMoveDice(m) {
   return { parts, total: parts.reduce((a, p) => a + p.sum, 0) };
 }
 
-function useMove(m, ch) {
+/**
+ * Меню у кнопки: как кидать этот приём. Спрашиваем только там, где есть свой
+ * бросок д20 — у приёмов со спасброском кидает цель, и выбирать нечего.
+ */
+const ADV_WAYS = [
+  [null, 'Обычный бросок'],
+  ['adv', 'С преимуществом'],
+  ['dis', 'С помехой'],
+];
+
+function askAdv(anchor, onPick) {
+  const menu = el('div', 'rollmenu');
+  ADV_WAYS.forEach(([v, label]) => {
+    const b = el('button', 'rollmenu-b', label);
+    b.type = 'button';
+    b.addEventListener('click', (e) => { e.stopPropagation(); close(); onPick(v); });
+    menu.append(b);
+  });
+  document.body.append(menu);
+  const r = anchor.getBoundingClientRect();
+  menu.style.left = Math.min(r.left, window.innerWidth - 216) + 'px';
+  menu.style.top = (r.bottom + 6) + 'px';
+  requestAnimationFrame(() => menu.classList.add('is-on'));
+  function close() { menu.remove(); document.removeEventListener('click', away, true); }
+  function away(e) { if (!menu.contains(e.target)) close(); }
+  setTimeout(() => document.addEventListener('click', away, true), 0);
+}
+
+function useMove(m, ch, anchor) {
+  const дальше = (adv) => aimMove(m, ch, adv);
+  if (m.guard === 'ac' && anchor) askAdv(anchor, дальше);
+  else дальше(null);
+}
+
+function aimMove(m, ch, adv) {
   const s = app.store.get();
   const mine = Object.values(s.tokens)
     .find((t) => t.locId === s.activeLoc && nameKey(t.ownerName) === nameKey(app.me.name));
@@ -1526,11 +1562,11 @@ function useMove(m, ch) {
     kind: m.aim,
     feet: m.size,
     from: mine ? { x: mine.x, y: mine.y } : { x: 0, y: 0 },
-    onPick: ({ targets }) => resolveMove(m, ch, targets),
+    onPick: ({ targets }) => resolveMove(m, ch, targets, adv),
   });
 }
 
-function resolveMove(m, ch, targets) {
+function resolveMove(m, ch, targets, adv = null) {
   if (!targets.length) return toast('Никого не задело');
   const use = {
     name: m.name || 'Приём',
@@ -1543,12 +1579,16 @@ function resolveMove(m, ch, targets) {
   let спасброски = null;
   if (m.guard === 'ac') {
     const t = targets[0];
-    const r = roll(20, 1, moveBonus(m, ch));
-    // натуральная двадцатка бьёт всегда и бьёт вдвое — броня её не держит
-    const crit = r.dice[0] === 20;
+    const r = roll(20, 1, moveBonus(m, ch), adv);
+    // натуральная двадцатка бьёт всегда и бьёт вдвое — броня её не держит.
+    // При двух костях смотрим на ту, что пошла в счёт
+    const crit = r.kept === 20;
     // равно КД — это попадание
     const hit = crit || r.total >= (Number(t.ac) || 10);
-    use.attack = { formula: r.formula, dice: r.dice, total: r.total, vs: Number(t.ac) || 10, hit, crit, target: tokenName(t) };
+    use.attack = {
+      formula: r.formula, dice: r.dice, kept: r.kept, adv: r.adv,
+      total: r.total, vs: Number(t.ac) || 10, hit, crit, target: tokenName(t),
+    };
     use.targets = [tokenName(t)];
     задетые = hit ? [t] : [];
     if (hit) use.dmg = critDouble(rollMoveDice(m), crit);
@@ -1924,7 +1964,7 @@ async function wireHeroSheet() {
   renderSheetLite($('#lite-sheet'), ch, onEdit, {
     level: levelOf(app.store.get(), myKey),
     onRoll: rollAbility,
-    onUse: (m) => useMove(m, ch),
+    onUse: (m, anchor) => useMove(m, ch, anchor),
   });
   showLevel(app.store.get());
   /* ── Связь листа с фигуркой на поле ───────────────────────────────

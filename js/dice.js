@@ -3,14 +3,25 @@
 
 export const DICE = [4, 6, 8, 10, 12, 20, 100];
 
-// Преимущества и помехи здесь нет намеренно: два д20 и выбор большего игрок
-// сводит сам, а приложению это давало только лишний переключатель.
-export function roll(sides, count = 1, mod = 0) {
-  const dice = Array.from({ length: count }, () => 1 + Math.floor(Math.random() * sides));
-  const sum = dice.reduce((a, b) => a + b, 0);
+/**
+ * Бросок. adv — 'adv' (преимущество) или 'dis' (помеха): кидаем два д20 и
+ * берём большее или меньшее, и уже к нему прибавляется модификатор.
+ * kept — число на костях, которое пошло в счёт; по нему же смотрят, выпала ли
+ * натуральная двадцатка.
+ */
+export function roll(sides, count = 1, mod = 0, adv = null) {
+  const rnd = () => 1 + Math.floor(Math.random() * sides);
+  const пара = (adv === 'adv' || adv === 'dis') && sides === 20;
+  const dice = пара ? [rnd(), rnd()] : Array.from({ length: count }, rnd);
+  const kept = пара
+    ? (adv === 'dis' ? Math.min(...dice) : Math.max(...dice))
+    : dice.reduce((a, b) => a + b, 0);
+  const знак = mod ? (mod > 0 ? '+' + mod : String(mod)) : '';
   return {
-    sides, mod, dice, total: sum + mod,
-    formula: `${dice.length}d${sides}${mod ? (mod > 0 ? '+' + mod : mod) : ''}`,
+    sides, mod, dice, kept, adv: пара ? adv : null, total: kept + mod,
+    formula: пара
+      ? `2d20 ${adv === 'dis' ? 'помеха' : 'преимущество'}${знак}`
+      : `${dice.length}d${sides}${знак}`,
   };
 }
 

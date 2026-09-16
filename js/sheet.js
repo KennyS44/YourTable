@@ -729,7 +729,9 @@ function moveList(s, onEdit, ctx = {}) {
         const use = el('button', 'move-use', 'Применить');
         use.type = 'button';
         use.title = 'Навести приём на поле';
-        use.addEventListener('click', () => ctx.onUse(m));
+        // кнопку отдаём наружу: у неё раскрывается выбор «обычный, с
+        // преимуществом, с помехой», и меню встаёт ровно под ней
+        use.addEventListener('click', (e) => { e.stopPropagation(); ctx.onUse(m, use); });
         head.append(use);
       }
       if (!ro) {

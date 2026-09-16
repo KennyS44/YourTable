@@ -147,6 +147,21 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 @keyframes toast-in{from{opacity:0; transform:translate(-50%,10px)} to{opacity:1; transform:translate(-50%,0)}}
 @keyframes toast-out{from{opacity:1} to{opacity:0; transform:translate(-50%,-6px)}}
 
+/* ── Как кидать приём: обычный, с преимуществом, с помехой ── */
+.rollmenu{
+  position:fixed; z-index:45; width:200px; max-width:calc(100vw - 16px);
+  display:flex; flex-direction:column; gap:var(--s1); padding:var(--s1);
+  border:1px solid var(--gold-dim); border-radius:var(--r); background:var(--panel);
+  box-shadow:var(--shadow); opacity:0; transform:translateY(-4px);
+  transition:opacity .16s var(--ease), transform .16s var(--ease);
+}
+.rollmenu.is-on{opacity:1; transform:translateY(0)}
+.rollmenu-b{
+  min-height:44px; padding:0 var(--s3); text-align:left; font-size:16px;
+  border:0; border-radius:var(--r-sm); background:transparent; color:var(--text); cursor:pointer;
+}
+.rollmenu-b:hover{background:var(--panel-2); color:var(--gold)}
+
 /* название характеристики или приёма перед формулой в ленте бросков */
 .roll-what{color:var(--gold)}
 .use-line{margin-top:2px; line-height:1.5}
