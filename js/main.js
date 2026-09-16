@@ -934,7 +934,13 @@ function openLibCard(it, ev) {
     if (it.kind === v) o.selected = true;
     kindSel.append(o);
   });
-  kindSel.addEventListener('change', () => libUpd(it.id, { kind: kindSel.value }));
+  kindSel.addEventListener('change', () => {
+    libUpd(it.id, { kind: kindSel.value });
+    // у героя своих спасбросков и стойкости в базе нет — перерисуем карточку,
+    // чтобы лишние поля ушли сразу, а не при следующем открытии
+    const свежий = app.store.get().library[it.id];
+    if (свежий) openLibCard(свежий, ev);
+  });
   card.append(field('Вид', kindSel));
 
   const st = { ...defaultStats(it.kind), ...(it.stats || {}) };
@@ -946,9 +952,13 @@ function openLibCard(it, ev) {
     numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
   card.append(field('Размер, клеток',
     numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
-  const статы = () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) });
-  card.append(guardField(статы, (patch) => libUpd(it.id, { stats: patch })));
-  card.append(savesField(статы, (patch) => libUpd(it.id, { stats: patch })));
+  // Герой приносит своё: стойкость к урону и спасброски у него в листе, а не
+  // в базе иконок. Поэтому эти поля — только у НПС и врагов.
+  if (it.kind !== 'pc') {
+    const статы = () => ({ ...defaultStats(it.kind), ...((app.store.get().library[it.id] || it).stats || {}) });
+    card.append(guardField(статы, (patch) => libUpd(it.id, { stats: patch })));
+    card.append(savesField(статы, (patch) => libUpd(it.id, { stats: patch })));
+  }
   card.append(checkRow('Имя видно игрокам', st.namePublic !== false,
     (on) => libUpd(it.id, { stats: { namePublic: on } })));
   card.append(checkRow('Полоска хитов видна игрокам', st.hpPublic !== false,
@@ -1025,12 +1035,12 @@ function openTokenCard(t, screenPos) {
   card.append(field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))));
   card.append(field('Дальность зрения, футов (0 — без обзора)',
     numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
-  card.append(guardField(
-    () => app.store.get().tokens[t.id] || t,
-    (patch) => upd(t.id, patch)));
-  card.append(savesField(
-    () => app.store.get().tokens[t.id] || t,
-    (patch) => upd(t.id, patch)));
+  // то же и у фигурки: у героя стойкость и спасброски берутся из его листа
+  if (t.kind !== 'pc') {
+    const живой = () => app.store.get().tokens[t.id] || t;
+    card.append(guardField(живой, (patch) => upd(t.id, patch)));
+    card.append(savesField(живой, (patch) => upd(t.id, patch)));
+  }
   card.append(checkRow('Имя видно игрокам', t.namePublic !== false,
     (on) => upd(t.id, { namePublic: on })));
   card.append(checkRow('Полоска хитов видна игрокам', t.hpPublic !== false,
