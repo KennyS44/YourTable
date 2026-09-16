@@ -970,11 +970,13 @@ function libFields(host, it, redraw, kinds = null) {
   host.append(field('Хиты (тек./макс.)', pair(
     numInput(st.hp.cur, (v) => libUpd(it.id, { stats: { hp: { cur: v } } })),
     numInput(st.hp.max, (v) => libUpd(it.id, { stats: { hp: { max: v } } })))));
-  host.append(field('КД', numInput(st.ac, (v) => libUpd(it.id, { stats: { ac: Math.max(0, v) } }))));
-  host.append(field('Дальность зрения, футов (0 — без обзора)',
+  // числа идут парами: столбиком карточка растягивалась на две высоты экрана
+  host.append(pair(
+    field('КД', numInput(st.ac, (v) => libUpd(it.id, { stats: { ac: Math.max(0, v) } }))),
+    field('Размер, клеток',
+      numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } })))));
+  host.append(field('Обзор, футов (0 — без обзора)',
     numInput(st.vision, (v) => libUpd(it.id, { stats: { vision: Math.max(0, v) } }))));
-  host.append(field('Размер, клеток',
-    numInput(st.cells, (v) => libUpd(it.id, { stats: { cells: Math.max(1, Math.min(6, v)) } }))));
   // Герой приносит своё: стойкость к урону и спасброски у него в листе, а не
   // в базе иконок. Поэтому эти поля — только у НПС и врагов.
   if (it.kind !== 'pc') {
@@ -1100,12 +1102,28 @@ function openTokenCard(t, screenPos) {
   }
 
   card.append(field('Имя', textInput(t.name, (v) => upd(t.id, { name: v }))));
-  card.append(field('Размер, клеток', numInput(t.cells, (v) => upd(t.id, { cells: Math.max(1, Math.min(6, v)) }))));
-  card.append(field('Хиты (тек./макс.)', pair(
-    numInput(t.hp.cur, (v) => upd(t.id, { hp: { cur: v } })),
-    numInput(t.hp.max, (v) => upd(t.id, { hp: { max: v } })))));
+  // хиты сначала видно, а потом правится: полоска тянется вслед за числами
+  const bar = el('div', 'hp-bar');
+  const fill = el('i', 'hp-fill');
+  bar.append(fill);
+  const paintBar = () => {
+    const cur = app.store.get().tokens[t.id] || t;
+    const max = Math.max(1, cur.hp.max || 1);
+    const доля = Math.max(0, Math.min(1, (cur.hp.cur || 0) / max));
+    fill.style.width = (доля * 100) + '%';
+    bar.dataset.level = доля > 0.5 ? 'ok' : доля > 0.2 ? 'low' : 'bad';
+  };
+  const hpRow = pair(
+    numInput(t.hp.cur, (v) => { upd(t.id, { hp: { cur: v } }); paintBar(); }),
+    numInput(t.hp.max, (v) => { upd(t.id, { hp: { max: v } }); paintBar(); }));
+  const hp = el('div', 'field');
+  hp.append(el('span', '', 'Хиты (тек./макс.)'), bar, hpRow);
+  card.append(hp);
+  paintBar();
   // КД видит только Мастер: игроку незачем знать, во что он целится
-  card.append(field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))));
+  card.append(pair(
+    field('КД', numInput(t.ac, (v) => upd(t.id, { ac: Math.max(0, v) }))),
+    field('Размер, клеток', numInput(t.cells, (v) => upd(t.id, { cells: Math.max(1, Math.min(6, v)) })))));
   card.append(field('Дальность зрения, футов (0 — без обзора)',
     numInput(t.vision, (v) => upd(t.id, { vision: Math.max(0, v) }))));
   // то же и у фигурки: у героя стойкость и спасброски берутся из его листа
@@ -1151,8 +1169,8 @@ function openTokenCard(t, screenPos) {
   }
 
   const inInit = app.store.get().init.order.some((o) => o.id === t.id);
-  const row = el('div', 'row-2');
-  const bInit = el('button', 'btn btn-soft btn-sm', inInit ? 'Убрать из боя' : 'В бой (d20)');
+  const row = el('div', 'card-acts');
+  const bInit = el('button', 'btn btn-soft btn-sm', inInit ? 'Убрать из боя' : 'Бросить инициативу');
   bInit.addEventListener('click', () => { toggleInit(t.id); card.hidden = true; });
   const bDel = el('button', 'btn btn-quiet btn-sm', 'Удалить');
   bDel.addEventListener('click', () => { app.store.dispatch({ t: 'token.remove', id: t.id }); card.hidden = true; });

@@ -129,12 +129,15 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .toolbar{display:flex; gap:var(--s1); background:var(--bg-2); padding:var(--s1); border-radius:var(--r-sm)}
 .tool{
   width:44px; height:44px; border:0; border-radius:var(--r-sm); background:transparent;
-  color:var(--muted); font-size:20px; cursor:pointer; transition:background .18s var(--ease), color .18s var(--ease);
+  color:#c8c0b1; font-size:24px; line-height:1; cursor:pointer;
+  transition:background .18s var(--ease), color .18s var(--ease);
 }
-.tool:hover{color:var(--text)}
-.tool.is-active{background:var(--panel-2); color:var(--gold)}
+.tool:hover{color:var(--text); background:var(--panel)}
+.tool.is-active{background:var(--panel-2); color:var(--gold); box-shadow:inset 0 0 0 1px var(--gold-dim)}
+/* Инструменты разбиты по смыслу: движение · рисование · мастерское · отмена */
+.tool-sep{width:1px; align-self:center; height:26px; margin:0 2px; background:#4d4638}
 /* Отмена стоит особняком: это не режим, а шаг назад */
-.tool-undo{border-left:1px solid var(--line); border-radius:0 var(--r-sm) var(--r-sm) 0}
+.tool-undo{font-size:22px}
 .tool-undo:disabled{opacity:.3; cursor:default}
 .tool-undo:disabled:hover{color:var(--muted)}
 /* Туман — выключатель, а не режим: живёт у правого края, вне тулбара */
@@ -623,6 +626,16 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .token-card .field{margin-bottom:var(--s2)}
 .token-card .close{position:absolute; top:var(--s1); right:var(--s1)}
 .token-card .row-2,.token-card > .btn{margin-top:var(--s2)}
+.token-card .row-2 .field{margin-bottom:0}
+/* Главное действие занимает строку, «Удалить» жмётся к краю и не тянет взгляд */
+.card-acts{display:flex; align-items:center; gap:var(--s2); margin-top:var(--s2)}
+.card-acts .btn{flex:1 1 auto; white-space:nowrap}
+.card-acts .btn-quiet{flex:0 0 auto}
+/* Хиты видно раньше, чем читаешь числа */
+.hp-bar{height:8px; border-radius:999px; background:var(--bg-2); border:1px solid var(--line-soft); overflow:hidden; margin:4px 0}
+.hp-fill{display:block; height:100%; background:var(--ok); transition:width .25s var(--ease)}
+.hp-bar[data-level=low] .hp-fill{background:var(--gold)}
+.hp-bar[data-level=bad] .hp-fill{background:var(--danger)}
 
 /* Стойкость к урону: фишки сверху, под ними выбор вида и три кнопки */
 .guard-chips{display:flex; flex-wrap:wrap; gap:var(--s1); margin:4px 0}
@@ -666,6 +679,8 @@ em{color:var(--muted); font-style:normal; font-size:14px}
 .prep-card-head{display:flex; align-items:center; gap:var(--s2); margin-bottom:var(--s3)}
 .prep-name{font-family:var(--f-head); font-size:20px; color:var(--gold); flex:1 1 auto; min-width:0}
 .prep-card .field{margin-bottom:var(--s2)}
+.prep-card .row-2 .field{margin-bottom:0}
+.prep-card .row-2{margin-bottom:var(--s2)}
 .prep-empty{max-width:1200px; margin:var(--s4) auto 0}
 
 .only-mobile{display:none}
