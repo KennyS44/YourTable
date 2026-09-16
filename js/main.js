@@ -213,6 +213,8 @@ function start(sync, state, me) {
   window.__ruler = () => app.board.ruler();
   window.__stats = () => (app.sync.stats ? app.sync.stats() : null);
   window.__openToken = (id) => openTokenCard(app.store.get().tokens[id], { x: 200, y: 200 });
+  // приём мимо наводки: проверке незачем целиться мышью по холсту
+  window.__resolveMove = (m, ids) => resolveMove(m, null, ids.map((id) => app.store.get().tokens[id]));
   wireUI();
   renderAll(app.store.get());
   app.board.fit();
@@ -555,6 +557,17 @@ function useBody(u) {
       .map((p) => `${p.n}д${p.d}${p.type ? ' ' + esc(p.type) : ''}<span class="use-dim"> [${p.dice.join(', ')}]</span>`)
       .join(' + ');
     строки.push(`${куски} → <span class="total">${u.dmg.total}</span>`);
+  }
+  // хиты уже сняты: строка говорит, чем дело кончилось. Полоску чужих хитов
+  // игрокам показывать нельзя, поэтому остаток видит только Мастер и хозяин
+  if (u.landed) {
+    u.landed.forEach((l) => {
+      const знак = l.delta > 0 ? '+' : '−';
+      const остаток = (app.isDM || l.pub) ? `, осталось ${l.left} из ${l.max}` : '';
+      строки.push(`<span class="${l.delta > 0 ? 'use-hit' : 'use-miss'}">${esc(l.name)}: ${знак}${Math.abs(l.delta)}</span>`
+        + `<span class="use-dim">${остаток}</span>`
+        + (l.down ? '<span class="use-miss"> — свалился</span>' : ''));
+    });
   }
   if (u.conc) строки.push('<span class="use-dim">требует концентрации</span>');
   return строки.map((s) => `<div class="use-line">${s}</div>`).join('');
@@ -1401,6 +1414,7 @@ function resolveMove(m, ch, targets) {
   };
   let headline = null;
 
+  let задетые = targets;
   if (m.guard === 'ac') {
     const t = targets[0];
     const r = roll(20, 1, moveBonus(m, ch));
@@ -1408,6 +1422,7 @@ function resolveMove(m, ch, targets) {
     const hit = r.total >= (Number(t.ac) || 10);
     use.attack = { formula: r.formula, dice: r.dice, total: r.total, vs: Number(t.ac) || 10, hit, target: tokenName(t) };
     use.targets = [tokenName(t)];
+    задетые = hit ? [t] : [];
     if (hit) use.dmg = rollMoveDice(m);
     headline = r;
   } else if (m.guard === 'save') {
@@ -1418,8 +1433,37 @@ function resolveMove(m, ch, targets) {
     headline = use.dmg && { sides: use.dmg.parts[0].d, mod: 0, dice: use.dmg.parts.flatMap((p) => p.dice), total: use.dmg.total, formula: dmgFormula(use.dmg) };
   }
 
+  if (use.dmg) use.landed = applyToHp(задетые, use.dmg.total, m.effect);
   say('', 'use', { use });
   if (headline) showRoll($('#dice-stage'), headline, `${app.me.name}: ${use.name}`);
+}
+
+/**
+ * Урон и лечение садятся сами: посчитали — сразу сняли или вернули хиты.
+ * Правит тот, кто применил приём: действие уходит в общий поток, и остальные
+ * увидят уже готовый результат, а не посчитают его заново.
+ *
+ * Сопротивлений и уязвимостей у фигурок пока нет, поэтому число идёт как есть;
+ * когда они появятся, делить надо здесь.
+ */
+function applyToHp(targets, total, effect) {
+  if (!(total > 0) || effect === 'buff' || effect === 'debuff') return null;
+  const s = app.store.get();
+  const лечим = effect === 'heal';
+  const out = [];
+  targets.forEach((t0) => {
+    const t = s.tokens[t0.id];
+    if (!t || !(t.hp && t.hp.max > 0)) return;      // без максимума хитов считать нечего
+    const было = Number(t.hp.cur) || 0;
+    const стало = Math.max(0, Math.min(t.hp.max, было + (лечим ? total : -total)));
+    if (стало === было) return;
+    app.store.dispatch({ t: 'token.update', id: t.id, patch: { hp: { cur: стало } } });
+    out.push({
+      name: tokenName(t), delta: стало - было, left: стало, max: t.hp.max,
+      down: стало === 0, pub: t.hpPublic !== false,   // чужой остаток виден не всем
+    });
+  });
+  return out.length ? out : null;
 }
 
 const abilLabel = (id) => (ABILITIES.find((a) => a.id === id) || { label: '—' }).label;
@@ -1565,8 +1609,6 @@ function wireUI() {
   $$('[data-ltab]').forEach((b) => b.addEventListener('click', () => {
     $$('[data-ltab]').forEach((x) => x.classList.toggle('is-active', x === b));
     $$('[data-lpanel]').forEach((p) => { p.hidden = p.dataset.lpanel !== b.dataset.ltab; });
-    // иконкам нужна ширина: в 300 пикселях в ряд влезает три существа и обрезанное имя
-    $('#panel-left').classList.toggle('is-wide', b.dataset.ltab === 'library');
   }));
 
   wireDM();
