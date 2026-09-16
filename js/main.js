@@ -1796,10 +1796,12 @@ function wireUI() {
 async function wireHeroSheet() {
   if (app.isDM || app.ghost) return;
   const panel = $('[data-lpanel="hero"]');
-  const tab = $('[data-ltab="hero"]');
-  if (!panel || !tab) return;
-  tab.classList.add('is-active');
+  if (!panel) return;
   panel.hidden = false;
+  // вкладок у игрока не осталось — пустую полоску убираем, чтобы лист начинался
+  // сразу с имени и уровня
+  const tabs = $('#panel-left .tabs');
+  if (tabs && !tabs.children.length) tabs.remove();
 
   // словом отзываемся только на беду: удачное сохранение молчит
   const hint = $('#lite-hint');

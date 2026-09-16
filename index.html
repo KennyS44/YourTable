@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/app.css?v=50">
+<link rel="stylesheet" href="css/app.css?v=51">
 <!-- лист персонажа игрока в левой панели живёт по тем же правилам, что и в кабинете -->
-<link rel="stylesheet" href="css/cabinet.css?v=50">
+<link rel="stylesheet" href="css/cabinet.css?v=51">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -22,23 +22,23 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/main.js":           "./js/main.js?v=50",
-    "./js/sync.js":           "./js/sync.js?v=50",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=50",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=50",
-    "./js/store.js":          "./js/store.js?v=50",
-    "./js/history.js":        "./js/history.js?v=50",
-    "./js/board.js":          "./js/board.js?v=50",
-    "./js/dice.js":           "./js/dice.js?v=50",
-    "./js/dice3d.js":         "./js/dice3d.js?v=50",
-    "./js/roomcode.js":       "./js/roomcode.js?v=50",
-    "./js/registry.js":       "./js/registry.js?v=50",
-    "./js/translit.js":       "./js/translit.js?v=50",
-    "./js/sheet.js":          "./js/sheet.js?v=50",
-    "./js/classes.js":        "./js/classes.js?v=50",
-    "./js/charlink.js":       "./js/charlink.js?v=50",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=50",
-    "./js/idb.js":            "./js/idb.js?v=50"
+    "./js/main.js":           "./js/main.js?v=51",
+    "./js/sync.js":           "./js/sync.js?v=51",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=51",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=51",
+    "./js/store.js":          "./js/store.js?v=51",
+    "./js/history.js":        "./js/history.js?v=51",
+    "./js/board.js":          "./js/board.js?v=51",
+    "./js/dice.js":           "./js/dice.js?v=51",
+    "./js/dice3d.js":         "./js/dice3d.js?v=51",
+    "./js/roomcode.js":       "./js/roomcode.js?v=51",
+    "./js/registry.js":       "./js/registry.js?v=51",
+    "./js/translit.js":       "./js/translit.js?v=51",
+    "./js/sheet.js":          "./js/sheet.js?v=51",
+    "./js/classes.js":        "./js/classes.js?v=51",
+    "./js/charlink.js":       "./js/charlink.js?v=51",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=51",
+    "./js/idb.js":            "./js/idb.js?v=51"
   }
 }
 </script>
@@ -163,7 +163,8 @@
         <button class="tab is-active dm-only" data-ltab="locations">Локации</button>
         <button class="tab dm-only" data-ltab="library">Иконки</button>
         <button class="tab dm-only" data-ltab="room">Комната</button>
-        <button class="tab player-only" data-ltab="hero">Персонаж</button>
+        <!-- у игрока вкладка одна, и называть её нечем: под ней сразу его лист -->
+
       </div>
 
       <!-- Лист персонажа игрока: короткий, чтобы всё нужное было под рукой -->
@@ -421,6 +422,6 @@
   <div class="token-card" id="token-card" hidden></div>
 </div>
 
-<script type="module" src="js/main.js?v=50"></script>
+<script type="module" src="js/main.js?v=51"></script>
 </body>
 </html>
