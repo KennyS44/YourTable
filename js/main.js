@@ -18,7 +18,7 @@ import {
   $, $$, el, esc, field, pair, numInput, textInput, checkRow, toast, placeCard,
 } from './ui.js';
 import { app, upd, libUpd, nameKey, tokenName } from './app-state.js';
-import { renderChat, say, rollCaption } from './chat.js';
+import { renderChat, say, rollCaption, actorName } from './chat.js';
 import { moveTokenToLocation, enterPortal, openZoneCard, renderEditCounts } from './zones.js';
 import { useMove, rollAbility, applyToHp } from './moves-use.js';
 
@@ -1222,7 +1222,7 @@ function doRoll(sides) {
   const r = roll(sides, count, mod);
   const secret = diceMode === 'secret' && app.isDM;
   say('', 'roll', { roll: r, secret });
-  showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, secret));
+  showRoll($('#dice-stage'), r, rollCaption(actorName(), r, secret));
 }
 
 /* ── Броски прямо из листа ──────────────────────────────────────────
@@ -1658,7 +1658,7 @@ function wireDM() {
         : ['all', 'всю ленту'];
     if (!confirm(`Очистить ${слово} у всех за столом?`)) return;
     app.store.dispatch({ t: 'chat.clear', kind });
-    say(`Мастер очистил ${слово}`, 'system');
+    say(`Госпожа очистила ${слово}`, 'system');
   });
 
   $('#init-roll-all').addEventListener('click', () => {
@@ -1691,7 +1691,7 @@ function wireDM() {
     if (!confirm(`Перевести существ (${list.length}) в «${to.name}»?`)) return;
     list.forEach((t) => moveTokenToLocation(t, toId, true));
     app.store.dispatch({ t: 'loc.active', id: toId });
-    say(`Мастер перевёл существ (${list.length}) в «${to.name}»`, 'system');
+    say(`Госпожа перевела существ (${list.length}) в «${to.name}»`, 'system');
   });
 
   const s0 = app.store.get();

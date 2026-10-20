@@ -111,10 +111,13 @@ function useBody(u) {
   return строки.map((s) => `<div class="use-line">${s}</div>`).join('');
 }
 
+/** Шутка стола: в бросках и приёмах Мастер подписан «Госпожа», в обычном чате — своим именем. */
+export const actorName = () => (app.isDM ? 'Госпожа' : app.me.name);
+
 export function say(text, kind = 'chat', extra = {}) {
   app.store.dispatch({
     t: 'chat.add',
-    msg: { id: uid('m'), ts: Date.now(), by: app.me.id, name: app.me.name, kind, text, ...extra },
+    msg: { id: uid('m'), ts: Date.now(), by: app.me.id, name: kind === 'chat' ? app.me.name : actorName(), kind, text, ...extra },
   });
 }
 

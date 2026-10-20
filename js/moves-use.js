@@ -5,7 +5,7 @@
 // по броне, спасбросок за цель, стойкость к виду урона и сами хиты.
 
 import { app, upd, nameKey, tokenName } from './app-state.js';
-import { say, rollCaption } from './chat.js';
+import { say, rollCaption, actorName } from './chat.js';
 import { $, el, toast } from './ui.js';
 import { roll } from './dice.js';
 import { showRoll } from './dice3d.js';
@@ -136,7 +136,7 @@ function resolveMove(m, ch, targets, adv = null, byName = null) {
 
   if (use.dmg) use.landed = applyToHp(задетые, use.dmg, m.effect, спасброски, m.onSave);
   say('', 'use', { use });
-  if (headline) showRoll($('#dice-stage'), headline, `${byName || app.me.name}: ${use.name}`);
+  if (headline) showRoll($('#dice-stage'), headline, `${byName || actorName()}: ${use.name}`);
 }
 
 /**
@@ -213,5 +213,5 @@ export function rollAbility(label, mod) {
   const r = roll(20, 1, mod);
   r.label = label;
   say('', 'roll', { roll: r });
-  showRoll($('#dice-stage'), r, rollCaption(app.me.name, r, false));
+  showRoll($('#dice-stage'), r, rollCaption(actorName(), r, false));
 }
