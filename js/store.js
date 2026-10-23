@@ -226,7 +226,15 @@ export function reduce(s, a) {
       break;
     case 'token.update': {
       const cur = s.tokens[a.id]; if (!cur) break;
-      s.tokens = { ...s.tokens, [a.id]: deepMerge(cur, a.patch) };
+      const next = deepMerge(cur, a.patch);
+      // Хиты героя упали до нуля — он без сознания. Считает каждый у себя
+      // одинаково, поэтому отдельное действие по сети не нужно.
+      const heroDown = (next.kind === 'pc' || next.ownerName) && a.patch.hp
+        && next.hp && next.hp.max > 0 && next.hp.cur <= 0;
+      if (heroDown && !(next.statuses || []).includes('Без сознания')) {
+        next.statuses = [...(next.statuses || []), 'Без сознания'];
+      }
+      s.tokens = { ...s.tokens, [a.id]: next };
       break;
     }
     // Отдельное действие: база не хранит пустые массивы, поэтому «состояний
