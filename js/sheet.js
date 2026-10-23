@@ -579,7 +579,7 @@ function rowDel(name, onYes) {
 export function moveList(s, onEdit, ctx = {}) {
   const ro = !!ctx.readOnly;
   const host = el('div', 'moves');
-  let open = null;
+  let open = ctx.openId || null;       // какой приём раскрыт сразу
   const save = (deep) => { onEdit('feats', s.feats); if (deep && ctx.onChange) ctx.onChange(); };
 
   const sel = (pairs, cur, on) => {

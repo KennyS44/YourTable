@@ -3,7 +3,7 @@
 
 import { invert } from './history.js';
 
-export const STATUSES = ['Отравлен', 'Оглушён', 'Испуган', 'Обездвижен', 'Без сознания', 'Благословлён', 'Ослеплён'];
+export const STATUSES = ['Отравлен', 'Оглушён', 'Испуган', 'Обездвижен', 'Без сознания', 'Благословлён', 'Ослеплён', 'Невидим'];
 
 /** Ключ состояния для оформления эффекта на экране игрока. */
 export const STATUS_FX = {
@@ -21,6 +21,7 @@ export function emptyState(room) {
     library: {},                // id -> {id, name, kind, assetId}
     inspiration: {},            // ключ имени -> сколько вдохновений
     levels: {},                 // ключ имени -> уровень персонажа: его поднимает Мастер
+    bindBan: {},                // ключ имени -> до какого времени ему нельзя привязывать
     tokens: {},                 // id -> токен
     init: { order: [], idx: 0, round: 1 },
     chat: [],                   // {id, ts, by, name, kind, text, roll, secret}
@@ -61,6 +62,7 @@ export function normalize(raw) {
   s.tokens = s.tokens || {};
   s.inspiration = s.inspiration || {};
   s.levels = s.levels || {};
+  s.bindBan = s.bindBan || {};
   s.pics = { assets: [], shown: null, ...(s.pics || {}) };
   s.pics.assets = s.pics.assets || [];
   s.init = { order: [], idx: 0, round: 1, ...(s.init || {}) };
@@ -234,8 +236,25 @@ export function reduce(s, a) {
       s.tokens = { ...s.tokens, [a.id]: { ...cur, statuses: a.statuses || [] } };
       break;
     }
+    // Привязка: {to, by, byName} — за кем идёт и кто привязал. Как и состояния,
+    // снятие доезжает отсутствующим полем: база не хранит null.
+    case 'token.leash': {
+      const cur = s.tokens[a.id]; if (!cur) break;
+      const next = { ...cur };
+      if (a.leash) next.leash = a.leash; else delete next.leash;
+      s.tokens = { ...s.tokens, [a.id]: next };
+      break;
+    }
+    case 'bind.ban':
+      s.bindBan = { ...(s.bindBan || {}), [a.key]: a.until };
+      break;
     case 'token.remove': {
-      const next = { ...s.tokens }; delete next[a.id]; s.tokens = next;
+      const next = { ...s.tokens }; delete next[a.id];
+      // ушёл ведущий — его привязанные свободны
+      Object.values(next).forEach((t) => {
+        if (t.leash && t.leash.to === a.id) { next[t.id] = { ...t }; delete next[t.id].leash; }
+      });
+      s.tokens = next;
       s.init = { ...s.init, order: s.init.order.filter((o) => o.id !== a.id) };
       break;
     }

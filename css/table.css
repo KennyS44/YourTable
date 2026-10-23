@@ -530,6 +530,72 @@
 .card-acts .btn{flex:1 1 auto; white-space:nowrap}
 .card-acts .btn-quiet{flex:0 0 auto}
 
+/* ── Привязка ─────────────────────────────────────────────────────── */
+#board.is-leash{cursor:pointer}
+.tool-leash{position:relative; font-size:22px}
+/* обратный отсчёт запрета на кнопке инструмента */
+.tool-timer{
+  position:absolute; left:50%; bottom:-8px; transform:translateX(-50%);
+  font-size:12px; line-height:16px; padding:0 var(--s1); border-radius:var(--r-sm);
+  background:var(--danger); color:#fff; font-variant-numeric:tabular-nums; pointer-events:none;
+}
+.leash-bar{
+  position:absolute; top:64px; left:50%; transform:translateX(-50%); z-index:16;
+  display:flex; flex-direction:column; gap:var(--s1); max-width:calc(100% - 24px);
+  animation:rise-x .25s var(--ease) both;
+}
+.leash-row{
+  display:flex; align-items:center; gap:var(--s3); padding:var(--s1) var(--s1) var(--s1) var(--s3);
+  background:rgba(30,28,24,.94); border:1px solid var(--gold-dim); border-radius:var(--r); box-shadow:var(--shadow);
+}
+.leash-txt{font-size:14px; color:var(--text)}
+
+/* ── Панель приёмов Мастера ───────────────────────────────────────── */
+.ability-bar{
+  position:absolute; left:50%; bottom:var(--s4); transform:translateX(-50%); z-index:20;
+  display:flex; flex-direction:column; align-items:center; gap:var(--s2); max-width:calc(100% - 24px);
+  animation:rise-x .25s var(--ease) both;
+}
+.ab-panel{
+  background:rgba(30,28,24,.94); border:1px solid var(--line); border-radius:var(--r);
+  padding:var(--s2) var(--s3) var(--s3); box-shadow:var(--shadow); max-width:100%;
+}
+.ab-head{display:flex; align-items:center; gap:var(--s3); margin-bottom:var(--s2)}
+.ab-who{font-family:var(--f-head); font-size:16px; color:var(--gold)}
+.ab-hint{font-size:14px; color:var(--muted); margin-right:auto}
+.ab-tiles{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s2)}
+.ab-cell{position:relative}
+.ab-tile{
+  width:96px; height:88px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:var(--s1); padding:var(--s2); border:1px solid var(--gold-dim); border-radius:var(--r-sm);
+  background:linear-gradient(180deg,#2e2a22,#1e1c18); color:var(--text); cursor:pointer;
+  transition:transform .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.ab-tile:hover{border-color:var(--gold); box-shadow:inset 0 0 0 1px var(--gold); transform:translateY(-2px)}
+.ab-tile:active{transform:none}
+.ab-pic{
+  width:32px; height:32px; flex:none; display:grid; place-items:center; border-radius:var(--r-sm);
+  background:center/cover no-repeat; font-size:20px; color:var(--gold);
+}
+.ab-name{
+  max-width:100%; font-size:14px; line-height:1.25; text-align:center; overflow:hidden;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; word-break:break-word;
+}
+.ab-add{border-style:dashed; color:var(--muted)}
+.ab-add .ab-pic{color:var(--muted)}
+.ab-edit{
+  position:absolute; top:var(--s1); right:var(--s1); width:24px; height:24px; padding:0;
+  border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel);
+  color:var(--muted); font-size:14px; line-height:1; cursor:pointer;
+  transition:color .15s var(--ease), border-color .15s var(--ease);
+}
+.ab-edit:hover{color:var(--gold); border-color:var(--gold-dim)}
+.ab-editor{
+  width:420px; max-width:100%; max-height:50vh; overflow:auto; overscroll-behavior:contain;
+  background:var(--panel); border:1px solid var(--line); border-radius:var(--r);
+  padding:var(--s3); box-shadow:var(--shadow); animation:rise .2s var(--ease) both;
+}
+
 
 /* Спасброски: шесть окошек в два ряда — подпись над полем, как в листе */
 .saves-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s1); margin-top:4px}

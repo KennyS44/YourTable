@@ -61,14 +61,24 @@ function askAdv(anchor, onPick) {
   document.body.append(menu);
   const r = anchor.getBoundingClientRect();
   menu.style.left = Math.min(r.left, window.innerWidth - 216) + 'px';
-  menu.style.top = (r.bottom + 6) + 'px';
+  // у нижнего края (панель приёмов Мастера) меню раскрывается вверх
+  if (r.bottom + 6 + menu.offsetHeight > window.innerHeight) menu.style.top = (r.top - 6 - menu.offsetHeight) + 'px';
+  else menu.style.top = (r.bottom + 6) + 'px';
   requestAnimationFrame(() => menu.classList.add('is-on'));
   function close() { menu.remove(); document.removeEventListener('click', away, true); }
   function away(e) { if (!menu.contains(e.target)) close(); }
   setTimeout(() => document.addEventListener('click', away, true), 0);
 }
 
+/** Свой персонаж игрока без сознания: ему остаются только броски кубиков. */
+function meDown() {
+  if (app.isDM) return false;
+  return Object.values(app.store.get().tokens).some((t) =>
+    nameKey(t.ownerName) === nameKey(app.me.name) && (t.statuses || []).includes('Без сознания'));
+}
+
 export function useMove(m, ch, anchor, from = null) {
+  if (meDown()) return toast('Без сознания: остаются только броски кубиков');
   const дальше = (adv) => aimMove(m, ch, adv, from);
   if (m.guard === 'ac' && anchor) askAdv(anchor, дальше);
   else дальше(null);

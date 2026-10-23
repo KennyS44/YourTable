@@ -7,7 +7,10 @@ const IMG_CACHE = new Map();
 const LIGHT_FEET = 20;
 
 export function createBoard(opts) {
-  const { canvas, store, sync, me, isDM, onTokenOpen, onViewChange, onZoneOpen, onPortalEnter } = opts;
+  const {
+    canvas, store, sync, me, isDM, onTokenOpen, onViewChange, onZoneOpen, onPortalEnter,
+    onLeash, onTokenCtrl, onDenied,
+  } = opts;
   const ctx = canvas.getContext('2d');
 
   let view = { x: 0, y: 0, scale: 1 };
@@ -33,6 +36,7 @@ export function createBoard(opts) {
   let touched = false;      // камеру уже двигали руками — не вписываем автоматически
   let lastLocId = null;
   let aiming = null;        // наводка приёма: {kind, feet, from, at, onPick, onCancel}
+  let leashFrom = null;     // инструмент привязки: кого уже выбрали ведущим
   // Сколько футов фигурка уже прошла в этом ходу. Счёт свой у каждого, кто
   // тянет: считать вскладчину незачем — чужие фигурки тянет кто-то другой.
   let walked = { turn: '', by: {} };
@@ -43,6 +47,8 @@ export function createBoard(opts) {
   const S = () => store.get();
   const loc = () => { const s = S(); return s.activeLoc ? s.locations[s.activeLoc] : null; };
   const toksHere = () => { const l = loc(); return l ? Object.values(S().tokens).filter((t) => t.locId === l.id) : []; };
+  /** Те, кого этот человек видит на поле: невидимые чужие сюда не попадают. */
+  const shownHere = () => toksHere().filter(seen);
 
   const w2s = (x, y) => ({ x: x * view.scale + view.x, y: y * view.scale + view.y });
   const s2w = (x, y) => ({ x: (x - view.x) / view.scale, y: (y - view.y) / view.scale });
@@ -74,9 +80,20 @@ export function createBoard(opts) {
   const isErasing = () => (tool === 'draw' && draw.shape === 'eraser') || (tool === 'wall' && wallKind === 'erase');
 
   const nameKey = (n) => String(n || '').trim().toLowerCase();
-  function canMove(t) {
-    return isDM || t.ownerId === me.id || (t.ownerName && nameKey(t.ownerName) === nameKey(me.name));
+  const hasStatus = (t, name) => (t.statuses || []).includes(name);
+  function owns(t) {
+    return t.ownerId === me.id || (t.ownerName && nameKey(t.ownerName) === nameKey(me.name));
   }
+  /** Почему игроку сейчас нельзя тянуть свою фигурку; пусто — можно. */
+  function moveBan(t) {
+    if (isDM) return '';
+    if (hasStatus(t, 'Без сознания')) return 'Без сознания: персонаж не может двигаться';
+    if (t.leash) return 'Персонаж привязан и идёт следом за ведущим';
+    return '';
+  }
+  function canMove(t) { return isDM || owns(t); }
+  /** Невидимого видят Мастер и хозяин, остальным его на поле нет вовсе. */
+  const seen = (t) => isDM || !hasStatus(t, 'Невидим') || owns(t);
 
   /* ── сетка и клетки ────────────────────────────────────────── */
   function gridOf() { const l = loc(); return l ? l.grid : { size: 70, ox: 0, oy: 0, feet: 5, show: true }; }
@@ -227,11 +244,14 @@ export function createBoard(opts) {
 
   function drawTokens() {
     const g = gridOf();
-    toksHere().forEach((t) => {
+    drawLeashes();
+    shownHere().forEach((t) => {
       const size = g.size * t.cells * view.scale;
       const p = w2s(t.x, t.y);
       const img = getImage(t.assetId);
       ctx.save();
+      // невидимого Мастер и хозяин видят призраком: он здесь, но другим не виден
+      if (hasStatus(t, 'Невидим')) ctx.globalAlpha = .45;
       // подставка
       ctx.beginPath();
       ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
@@ -290,9 +310,58 @@ export function createBoard(opts) {
   }
 
   function ringColor(t) {
-    if (hoverId === t.id) return '#e0c063';
+    if (hoverId === t.id || leashFrom === t.id) return '#e0c063';
     if (t.ownerName || t.ownerId) return '#7fa8c9';
     return t.kind === 'enemy' ? '#b8604a' : t.kind === 'pc' ? '#83a05f' : '#8d7440';
+  }
+
+  /* ── Привязка: кто за кем идёт ─────────────────────────────────────
+     Привязанный стоит в соседней клетке и шагает туда, откуда ведущий
+     только что ушёл: по его же следу, значит и сквозь стену не пройдёт. */
+
+  /** Кто идёт следом за этой фигуркой. */
+  const followersOf = (id) => toksHere().filter((f) => f.leash && f.leash.to === id);
+
+  /** Цепь между ведущим и привязанным — пунктир по земле, под фигурками. */
+  function drawLeashes() {
+    const all = S().tokens;
+    shownHere().forEach((f) => {
+      const lead = f.leash && all[f.leash.to];
+      if (!lead || lead.locId !== f.locId || !seen(lead)) return;
+      const a = w2s(lead.x, lead.y), b = w2s(f.x, f.y);
+      ctx.save();
+      ctx.setLineDash([6, 4]); ctx.lineWidth = Math.max(2, 3 * view.scale);
+      ctx.strokeStyle = 'rgba(224,192,99,.85)';
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  const sameCell = (a, b) => cellKey(a.x, a.y) === cellKey(b.x, b.y);
+  function besideCell(c, p) {
+    const g = gridOf();
+    return Math.max(Math.abs(c.x - p.x), Math.abs(c.y - p.y)) <= g.size * 1.01 && !sameCell(c, p);
+  }
+
+  /** Ставит привязанного на клетку рядом с ведущим. prev — откуда ведущий ушёл. */
+  function placeFollower(f, lead, prev) {
+    const g = gridOf();
+    let spot = prev && besideCell(lead, prev) && !firstWall(lead, prev) ? prev : null;
+    if (!spot) {
+      // ведущего перенесли далеко: берём соседнюю клетку, ближнюю к привязанному
+      let bestD = Infinity;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          if (!dx && !dy) continue;
+          const c = { x: lead.x + dx * g.size, y: lead.y + dy * g.size };
+          const d = Math.hypot(c.x - f.x, c.y - f.y);
+          if (d < bestD && !firstWall(lead, c)) { spot = c; bestD = d; }
+        }
+      }
+    }
+    if (!spot || (f.x === spot.x && f.y === spot.y)) return;
+    f.x = spot.x; f.y = spot.y;
+    store.dispatch({ t: 'token.update', id: f.id, patch: { x: spot.x, y: spot.y } });
   }
 
   function drawStrokes(list) { list.forEach((d) => drawStroke(d, false)); }
@@ -379,23 +448,28 @@ export function createBoard(opts) {
         const rr = Math.hypot(b.x - a.x, b.y - a.y);
         ctx.beginPath(); ctx.arc(a.x, a.y, rr, 0, Math.PI * 2); ctx.stroke();
         ctx.globalAlpha = .12; ctx.fill();
-        labelFeet(rr, a.x, a.y - rr - 16);          // над краем круга, а не в центре
+        labelFeet(rr, a.x, a.y - rr - 16, a, rr);   // над краем круга, а не в центре
       } else if (d.shape === 'cone') {
         const ang = Math.atan2(b.y - a.y, b.x - a.x), rr = Math.hypot(b.x - a.x, b.y - a.y);
         ctx.beginPath(); ctx.moveTo(a.x, a.y);
         ctx.arc(a.x, a.y, rr, ang - .45, ang + .45); ctx.closePath();
         ctx.stroke(); ctx.globalAlpha = .14; ctx.fill();
         // подпись за дальним краем конуса, по направлению броска
-        labelFeet(rr, a.x + Math.cos(ang) * (rr + 20), a.y + Math.sin(ang) * (rr + 20));
+        labelFeet(rr, a.x + Math.cos(ang) * (rr + 20), a.y + Math.sin(ang) * (rr + 20), a, rr);
       }
     }
     ctx.restore();
   }
 
-  /** Подпись дальности ставим у края фигуры, чтобы она не легла на иконку существа. */
-  function labelFeet(rPx, x, y) {
+  /**
+   * Подпись дальности ставим у края фигуры, чтобы она не легла на иконку существа.
+   * К краю экрана её прижимаем, только пока сама фигура (круг c, r) хоть краем
+   * на экране: иначе подпись висела у кромки от фигуры, которой уже не видно.
+   */
+  function labelFeet(rPx, x, y, c, cr) {
     const ft = Math.round((rPx / view.scale) * feetPerPx());
     const r = canvas.getBoundingClientRect();
+    if (c.x + cr < 0 || c.y + cr < 0 || c.x - cr > r.width || c.y - cr > r.height) return;
     chip(ft + ' фт', Math.max(40, Math.min(r.width - 40, x)), Math.max(20, Math.min(r.height - 20, y)));
   }
 
@@ -441,7 +515,7 @@ export function createBoard(opts) {
       const c = w2s(aiming.at.x, aiming.at.y);
       const r = feetToWorld(aiming.feet) * view.scale;
       ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      labelFeet(r, c.x, c.y - r - 16);
+      labelFeet(r, c.x, c.y - r - 16, c, r);
     } else if (aiming.kind === 'cone') {
       const a = w2s(aiming.from.x, aiming.from.y);
       const r = feetToWorld(aiming.feet) * view.scale;
@@ -450,10 +524,10 @@ export function createBoard(opts) {
       ctx.moveTo(a.x, a.y);
       ctx.arc(a.x, a.y, r, dir - CONE_HALF, dir + CONE_HALF);
       ctx.closePath(); ctx.fill(); ctx.stroke();
-      labelFeet(r, a.x + Math.cos(dir) * (r + 20), a.y + Math.sin(dir) * (r + 20));
+      labelFeet(r, a.x + Math.cos(dir) * (r + 20), a.y + Math.sin(dir) * (r + 20), a, r);
     }
     // накрытых обводим, чтобы было видно, по кому пойдёт бросок
-    toksHere().forEach((t) => {
+    shownHere().forEach((t) => {
       if (!hit.has(t.id)) return;
       const p = w2s(t.x, t.y);
       const g = gridOf();
@@ -540,6 +614,67 @@ export function createBoard(opts) {
   const zonesOf = (kind) => { const l = loc(); return (l && l[kind]) || []; };
   /** Что перекрывает обзор: стены всегда, двери — пока закрыты. */
   const blockers = () => wallsOf().filter((w) => w.type !== 'door' || !w.open);
+
+  /* ── Стены держат фигурки игроков ──────────────────────────────────
+     Игрок тянет свою фигурку, и она идёт за курсором, пока не упрётся в стену
+     или закрытую дверь. Дальше скользит вдоль стены: так её можно довести до
+     угла или проёма, не отпуская. Мастера стены не держат. */
+
+  const WALL_GAP = 1;          // на сколько пикселей карты фигурка не доходит до стены
+
+  /** Первая стена на пути a→b: доля пути до неё и сама стена, или null. */
+  function firstWall(a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    let best = null;
+    for (const s of blockers()) {
+      const sx = s.x2 - s.x1, sy = s.y2 - s.y1;
+      const den = dx * sy - dy * sx;
+      if (Math.abs(den) < 1e-9) continue;
+      const k = ((s.x1 - a.x) * sy - (s.y1 - a.y) * sx) / den;
+      const u = ((s.x1 - a.x) * dy - (s.y1 - a.y) * dx) / den;
+      if (k >= 0 && k <= 1 && u >= 0 && u <= 1 && (!best || k < best.k)) best = { k, s };
+    }
+    return best;
+  }
+
+  /** Докуда дойдёт точка из a в сторону b, не пересекая стен. */
+  function stopAtWall(a, b) {
+    const hit = firstWall(a, b);
+    if (!hit) return b;
+    const s = hit.s;
+    const wx = s.x2 - s.x1, wy = s.y2 - s.y1, wl = Math.hypot(wx, wy) || 1;
+    // встаём в точке удара, отступив от стены по нормали на свою сторону
+    const px = a.x + (b.x - a.x) * hit.k, py = a.y + (b.y - a.y) * hit.k;
+    const side = Math.sign(wx * (a.y - s.y1) - wy * (a.x - s.x1)) || 1;
+    return { x: px - (wy / wl) * side * WALL_GAP, y: py + (wx / wl) * side * WALL_GAP };
+  }
+
+  function walkTo(a, b) {
+    const stop = stopAtWall(a, b);
+    if (stop === b) return b;
+    // остаток пути проецируем на стену — фигурка скользит вдоль неё за курсором
+    const hit = firstWall(a, b), s = hit.s;
+    const wx = s.x2 - s.x1, wy = s.y2 - s.y1, wl = Math.hypot(wx, wy) || 1;
+    const along = ((b.x - stop.x) * wx + (b.y - stop.y) * wy) / wl;
+    const slide = { x: stop.x + (wx / wl) * along, y: stop.y + (wy / wl) * along };
+    return stopAtWall(stop, slide);
+  }
+
+  /** Клетка, куда фигурка встанет, когда её отпустили: ближайшая, до которой нет стены. */
+  function landingCell(p) {
+    const own = cellCenter(p.x, p.y);
+    if (isDM || !firstWall(p, own)) return own;
+    const g = gridOf();
+    let best = null, bestD = Infinity;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const c = { x: own.x + dx * g.size, y: own.y + dy * g.size };
+        const d = Math.hypot(c.x - p.x, c.y - p.y);
+        if (d < bestD && !firstWall(p, c)) { best = c; bestD = d; }
+      }
+    }
+    return best || p;
+  }
 
   /** Насколько далеко луч из точки уходит до отрезка (null — не пересекает). */
   function rayHit(px, py, dx, dy, s) {
@@ -932,7 +1067,7 @@ export function createBoard(opts) {
   /* ── попадание в токен ─────────────────────────────────────── */
   function tokenAt(wx, wy) {
     const g = gridOf();
-    const list = toksHere();
+    const list = shownHere();
     for (let i = list.length - 1; i >= 0; i--) {
       const t = list[i];
       if (Math.hypot(wx - t.x, wy - t.y) <= (g.size * t.cells) / 2) return t;
@@ -961,13 +1096,44 @@ export function createBoard(opts) {
       return;
     }
 
+    // Ctrl + щелчок по существу — Мастеру его приёмы внизу экрана
+    if (isDM && (e.ctrlKey || e.metaKey) && e.button === 0 && (tool === 'select' || tool === 'token')) {
+      onTokenCtrl && onTokenCtrl(tokenAt(w.x, w.y));
+      return;
+    }
+
+    // привязка: сначала свой персонаж, потом тот, кого он поведёт
+    if (tool === 'leash' && !mid) {
+      const t = tokenAt(w.x, w.y);
+      if (t) {
+        if (!leashFrom) {
+          if (canMove(t)) leashFrom = t.id;
+          else onDenied && onDenied('Сначала щёлкните своего персонажа — он поведёт');
+        } else if (t.id === leashFrom) {
+          leashFrom = null;
+        } else {
+          const lead = leashFrom;
+          leashFrom = null;
+          onLeash && onLeash(lead, t.id);
+        }
+        render(); return;
+      }
+      if (leashFrom) { leashFrom = null; render(); }      // мимо — выбор снят, карта тянется
+    }
+
     // режим «только фигурки»: карта на месте, тянуть можно лишь существ
     if ((tool === 'select' || tool === 'token') && !mid) {
       const t = tokenAt(w.x, w.y);
+      const ban = t && canMove(t) && moveBan(t);
+      if (ban) {
+        onDenied && onDenied(ban);
+        drag = { type: 'tap', at: p, id: t.id };
+        return;
+      }
       if (t && canMove(t)) {
         drag = {
           type: 'token', id: t.id, dx: t.x - w.x, dy: t.y - w.y, moved: false,
-          start: { x: t.x, y: t.y }, limit: walkLimit(t),
+          start: { x: t.x, y: t.y }, limit: walkLimit(t), cell: cellCenter(t.x, t.y),
         };
         return;
       }
@@ -1084,7 +1250,7 @@ export function createBoard(opts) {
 
     if (!drag) {
       if (isErasing()) { hoverAt = p; render(); return; }
-      const t = (tool === 'select' || tool === 'token') ? tokenAt(w.x, w.y) : null;
+      const t = (tool === 'select' || tool === 'token' || tool === 'leash') ? tokenAt(w.x, w.y) : null;
       const id = t ? t.id : null;
       // подсказка курсором: под мышкой дверь, её можно открыть
       if (isDM && !t && (tool === 'select' || tool === 'token')) {
@@ -1105,8 +1271,16 @@ export function createBoard(opts) {
       const t = S().tokens[drag.id]; if (!t) return;
       drag.moved = true;
       drag.at = { x: w.x + drag.dx, y: w.y + drag.dy };
+      if (!isDM) drag.at = walkTo({ x: t.x, y: t.y }, drag.at);
       // у себя двигаем сразу, остальным шлём 12 раз в секунду — иначе канал захлёбывается
       t.x = drag.at.x; t.y = drag.at.y;
+      // перешёл в другую клетку — привязанный шагает в ту, что он оставил
+      const cell = cellCenter(t.x, t.y);
+      if (!sameCell(cell, drag.cell)) {
+        const prev = drag.cell;
+        drag.cell = cell;
+        followersOf(t.id).forEach((f) => placeFollower(f, cell, prev));
+      }
       render();
       const now = performance.now();
       if (now - (drag.sentAt || 0) > 80) {
@@ -1179,8 +1353,9 @@ export function createBoard(opts) {
     if (drag.type === 'token') {
       const t = S().tokens[drag.id];
       if (t) {
-        const c = cellCenter(t.x, t.y);
+        const c = landingCell(t);
         store.dispatch({ t: 'token.update', id: drag.id, patch: { x: c.x, y: c.y } });
+        if (drag.moved) followersOf(t.id).forEach((f) => placeFollower(f, c, drag.cell));
         // футы кладём в счёт хода по вставшей клетке, а не по месту, где отпустили
         if (drag.moved && drag.limit) {
           walked.by[drag.id] = drag.limit.spent + feetBetween(drag.start, c);
@@ -1322,7 +1497,7 @@ export function createBoard(opts) {
     ruler: () => ruler && rulerReadout(),
     setTool(t) {
       if (aiming) { aiming = null; }      // взялся за инструмент — наводка снята
-      tool = t; ruler = null;
+      tool = t; ruler = null; leashFrom = null;
       canvas.className = t === 'select' ? '' : 'is-' + t;
       render();
     },
@@ -1364,6 +1539,13 @@ export function createBoard(opts) {
       was.onCancel && was.onCancel();
     },
     aimingNow: () => !!aiming,
+    /** Только что привязали — ставим привязанного в соседнюю клетку. */
+    pullFollowers(id) {
+      const lead = S().tokens[id]; if (!lead) return;
+      const c = cellCenter(lead.x, lead.y);
+      followersOf(id).forEach((f) => placeFollower(f, c, null));
+      render();
+    },
     /** Для проверок: кого сейчас накрывает наводка. */
     aimTargetIds: () => aimTargets().map((t) => t.id),
     /** Для проверок: сколько футов фигурка прошла в этом ходу. */

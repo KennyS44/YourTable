@@ -74,6 +74,11 @@ export function enterPortal(t, portal) {
   const to = s.locations[portal.toLocId];
   if (!t || !to || to.id === t.locId) return;
   moveTokenToLocation(t, to.id, true);
+  // привязанный уходит следом и встаёт в клетку рядом
+  const lead = app.store.get().tokens[t.id];
+  Object.values(s.tokens).forEach((f) => {
+    if (f.leash && f.leash.to === t.id) upd(f.id, { locId: to.id, x: lead.x - to.grid.size, y: lead.y });
+  });
   say(`${t.name} перешёл в локацию «${to.name}»`, 'system');
 }
 

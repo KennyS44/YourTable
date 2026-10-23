@@ -21,6 +21,8 @@ import { app, upd, libUpd, nameKey, tokenName } from './app-state.js';
 import { renderChat, say, rollCaption, actorName } from './chat.js';
 import { moveTokenToLocation, enterPortal, openZoneCard, renderEditCounts } from './zones.js';
 import { useMove, rollAbility, applyToHp } from './moves-use.js';
+import { bindTokens, canUnbind, unbindButton, renderLeashBar } from './leash.js';
+import { openAbilityBar, closeAbilityBar, renderAbilityBar, wireAbilityBar } from './ability-bar.js';
 
 const COLORS = ['#c9a45a', '#ece6d9', '#b8604a', '#83a05f', '#7fa8c9', '#a678b8', '#e0a05a', '#6f6a5e'];
 const SHAPES = [
@@ -190,6 +192,9 @@ function start(sync, state, me) {
     onTokenOpen: openTokenCard,
     onZoneOpen: openZoneCard,
     onPortalEnter: enterPortal,
+    onLeash: bindTokens,
+    onTokenCtrl: openAbilityBar,
+    onDenied: toast,
     onViewChange: (v) => { $('#zoom-val').textContent = Math.round(v.scale * 100) + '%'; },
   });
 
@@ -408,6 +413,8 @@ function renderAll(s, action) {
   renderHeroes(s);
   renderStatusFx(s);
   renderEditCounts(s);
+  renderLeashBar(s);
+  renderAbilityBar(s);
   const loc = s.activeLoc ? s.locations[s.activeLoc] : null;
   $('#loc-title').textContent = loc ? loc.name : '';
   $('#empty-hint').hidden = !!loc;
@@ -529,6 +536,8 @@ function renderInit(s) {
   s.init.order.forEach((entry, i) => {
     const t = s.tokens[entry.id];
     if (!t) return;
+    // невидимого чужие игроки не видят и в очереди боя
+    if (!app.isDM && (t.statuses || []).includes('Невидим') && nameKey(t.ownerName) !== nameKey(app.me.name)) return;
     const row = el('div', 'init-item' + (i === s.init.idx ? ' is-turn' : ''));
     const head = el('div', 'init-head');
     const img = el('img'); img.alt = '';
@@ -980,6 +989,7 @@ function openTokenCard(t, screenPos) {
     const info = el('div', 'hint',
       `${hpVisible ? `Хиты: ${t.hp.cur}/${t.hp.max}. ` : ''}${(t.statuses || []).join(', ') || 'Состояний нет'}`);
     card.append(info);
+    if (canUnbind(t)) card.append(unbindButton(t));
     placeCard(card, screenPos);
     return;
   }
@@ -1047,6 +1057,9 @@ function openTokenCard(t, screenPos) {
   bDel.addEventListener('click', () => { app.store.dispatch({ t: 'token.remove', id: t.id }); card.hidden = true; });
   row.append(bInit, bDel);
   card.append(el('div', 'divider'), row);
+  if (t.leash) card.append(unbindButton(t));
+  const ведомый = Object.values(s.tokens).find((x) => x.leash && x.leash.to === t.id);
+  if (ведомый) card.append(unbindButton(ведомый));
 
   const lib = s.library[t.libId];
   if (lib) {
@@ -1250,7 +1263,9 @@ function wireUI() {
       if (!eb.hidden) renderEditCounts(app.store.get());
     }
     $('#token-card').hidden = true;
+    closeAbilityBar();
   }));
+  wireAbilityBar();
 
   // панель рисования
   const colorBox = $('#draw-colors');
