@@ -23,6 +23,7 @@ import { moveTokenToLocation, enterPortal, openZoneCard, renderEditCounts } from
 import { useMove, rollAbility, applyToHp } from './moves-use.js';
 import { bindTokens, canUnbind, unbindButton, renderLeashBar } from './leash.js';
 import { openAbilityBar, closeAbilityBar, renderAbilityBar, wireAbilityBar } from './ability-bar.js';
+import { initMusic } from './music.js';
 
 const COLORS = ['#c9a45a', '#ece6d9', '#b8604a', '#83a05f', '#7fa8c9', '#a678b8', '#e0a05a', '#6f6a5e'];
 const SHAPES = [
@@ -225,6 +226,7 @@ function start(sync, state, me) {
   // приём мимо наводки: проверке незачем целиться мышью по холсту
   window.__resolveMove = (m, ids, adv) => resolveMove(m, null, ids.map((id) => app.store.get().tokens[id]), adv);
   wireUI();
+  initMusic();
   renderAll(app.store.get());
   app.board.fit();
   // отмечаем стол в реестре: перечислить комнаты в базе иначе нельзя

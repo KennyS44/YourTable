@@ -7,7 +7,8 @@
 //   rooms/{путь}/actions    — поток изменений
 //   rooms/{путь}/events     — разовые события (полёт кубика)
 //   rooms/{путь}/presence   — кто сейчас за столом
-//   rooms/{путь}/assets     — карты, иконки, картинки (data URL)
+//   rooms/{путь}/assets     — карты, иконки, картинки (data URL);
+//                             музыка — кусками {id}_0, {id}_1… по ~1 МБ base64
 //
 // Путь комнаты содержит отпечаток её ключа, поэтому чужой в неё не попадёт,
 // не зная ключа.
@@ -16,6 +17,8 @@ import { idb } from './idb.js';
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.12.5/';
 const KEEP_ACTIONS = 100;
+// одна строка в базе не больше 10 МБ, да и грузить такую долго: режем трек на куски
+const AUDIO_CHUNK = 768 * 1024;
 
 export async function createFirebaseSync(roomPath, me, cfg, opts = {}) {
   const [{ initializeApp }, db] = await Promise.all([
@@ -41,6 +44,10 @@ export async function createFirebaseSync(roomPath, me, cfg, opts = {}) {
     snap.forEach((c) => { k = c.key; });
     return k;
   };
+  // разница часов с сервером: музыка у всех идёт от одного «сейчас»
+  let clockOffset = 0;
+  db.onValue(db.ref(database, '.info/serverTimeOffset'), (snap) => { clockOffset = snap.val() || 0; });
+
   const [afterAction, afterEvent] = await Promise.all([lastKey('actions'), lastKey('events')]);
 
   db.onChildAdded(db.query(R('actions'), db.limitToLast(40)), (snap) => {
@@ -155,12 +162,62 @@ export async function createFirebaseSync(roomPath, me, cfg, opts = {}) {
       return url;
     },
     delAsset: (id) => Promise.all([idb.delAsset(id), db.remove(R('assets/' + id))]),
+
+    /** Время сервера, мс: по нему все играют трек с одного места. */
+    now: () => Date.now() + clockOffset,
+
+    /** Трек в базу кусками; у себя кладём целиком. Возвращает число кусков. */
+    async putAudio(id, blob, onProgress) {
+      await idb.putAsset(id, blob);
+      const n = Math.max(1, Math.ceil(blob.size / AUDIO_CHUNK));
+      for (let i = 0; i < n; i++) {
+        const part = await toBase64(blob.slice(i * AUDIO_CHUNK, (i + 1) * AUDIO_CHUNK));
+        await db.set(R(`assets/${id}_${i}`), part);
+        stats.bytesSent += part.length;
+        if (onProgress) onProgress((i + 1) / n);
+      }
+      return n;
+    },
+    /** Трек целиком: из своего хранилища, а если нет — собираем из кусков базы. */
+    async getAudio(track, onProgress) {
+      const local = await idb.getAsset(track.id);
+      if (local) return local;
+      let done = 0;
+      const parts = await Promise.all(Array.from({ length: track.n }, (_, i) =>
+        db.get(R(`assets/${track.id}_${i}`)).then((snap) => {
+          if (onProgress) onProgress(++done / track.n);
+          return snap.val();
+        })));
+      if (parts.some((p) => !p)) return null;
+      const blob = new Blob(parts.map(fromBase64), { type: track.type || 'audio/mpeg' });
+      idb.putAsset(track.id, blob);
+      return blob;
+    },
+    delAudio: (track) => Promise.all([
+      idb.delAsset(track.id),
+      ...Array.from({ length: track.n || 1 }, (_, i) => db.remove(R(`assets/${track.id}_${i}`))),
+    ]),
   };
 }
 
 /** RTDB не принимает undefined и не хранит пустые объекты — чистим перед записью. */
 function clean(v) {
   return JSON.parse(JSON.stringify(v, (k, val) => (val === undefined ? null : val)));
+}
+
+function toBase64(blob) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(',')[1] || '');
+    fr.onerror = () => rej(fr.error);
+    fr.readAsDataURL(blob);
+  });
+}
+function fromBase64(s) {
+  const bin = atob(s);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 /** Отпечаток ключа комнаты: путь знают только те, кому дали ключ. */

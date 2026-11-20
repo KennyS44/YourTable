@@ -29,6 +29,7 @@
     "./js/moves-use.js":        "./js/moves-use.js?v=60",
     "./js/leash.js":          "./js/leash.js?v=60",
     "./js/ability-bar.js":    "./js/ability-bar.js?v=60",
+    "./js/music.js":          "./js/music.js?v=60",
     "./js/ui.js":             "./js/ui.js?v=60",
     "./js/main.js":           "./js/main.js?v=60",
     "./js/sync.js":           "./js/sync.js?v=60",
@@ -164,6 +165,18 @@
       <button class="gem-badge" id="gem-badge" hidden title="Ваше вдохновение">
         <span class="gem" aria-hidden="true"><svg class="gem-svg" viewBox="0 0 40 44"><use href="#gem-shape"/></svg></span><span class="gem-count" id="gem-count">0</span>
       </button>
+      <!-- музыка Мастера: кнопка видна, пока выбран трек; громкость у каждого своя -->
+      <button class="btn btn-ghost music-btn" id="btn-music" hidden title="Музыка: своя громкость">♪</button>
+      <div class="music-pop" id="music-pop" hidden>
+        <p class="music-pop-title" id="music-now"></p>
+        <p class="hint" id="music-state"></p>
+        <label class="music-range">
+          <span>Моя громкость <b id="music-my-val"></b></span>
+          <input type="range" id="music-my-vol" min="0" max="100" step="1">
+        </label>
+        <button class="btn btn-soft btn-sm w-full" id="music-mute">Без звука</button>
+        <p class="hint">Слышно только вам. Общую громкость задаёт Мастер.</p>
+      </div>
       <button class="btn btn-ghost" id="btn-dice">Кубики</button>
       <button class="btn btn-ghost only-mobile" id="btn-panel">Панели</button>
       <span class="members" id="members"></span>
@@ -177,6 +190,7 @@
         <button class="tab is-active dm-only" data-ltab="locations">Локации</button>
         <button class="tab dm-only" data-ltab="library">Иконки</button>
         <button class="tab dm-only" data-ltab="room">Комната</button>
+        <button class="tab dm-only" data-ltab="music">Музыка</button>
         <!-- у игрока вкладка одна, и называть её нечем: под ней сразу его лист -->
 
       </div>
@@ -269,6 +283,23 @@
         <h3 class="h-sm h-danger">Удаление стола</h3>
         <!-- предупреждение не потерялось: оно целиком в окне подтверждения -->
         <button class="btn btn-danger w-full" id="btn-delete-room">Удалить стол насовсем</button>
+      </section>
+
+      <section class="panel-body dm-only" data-lpanel="music" hidden>
+        <label class="btn btn-soft w-full file-btn">+ Загрузить музыку<input type="file" id="music-upload" accept="audio/*" multiple hidden></label>
+        <p class="hint">mp3, ogg или m4a, до 20 МБ за трек. ▶ — играть у всех за столом.</p>
+        <p class="hint music-progress" id="music-progress" hidden></p>
+        <div class="music-list" id="music-list"></div>
+        <div class="row-2 music-controls">
+          <button class="btn btn-soft btn-sm" id="music-stop">■ Стоп</button>
+          <label class="check"><input type="checkbox" id="music-loop"><span>Повтор трека</span></label>
+        </div>
+        <label class="music-range">
+          <span>Громкость для всех <b id="music-vol-val"></b></span>
+          <input type="range" id="music-vol" min="0" max="100" step="1">
+        </label>
+        <p class="hint">У каждого ещё своя громкость — кнопка ♪ вверху экрана.</p>
+        <p class="hint" id="music-used"></p>
       </section>
     </aside>
 
@@ -407,6 +438,7 @@
         <div class="lib-grid" id="pics-grid"></div>
         <button class="btn btn-soft w-full" id="pics-hide">Убрать с экрана игроков</button>
       </section>
+
     </aside>
   </main>
 

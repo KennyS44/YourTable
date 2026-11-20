@@ -26,6 +26,8 @@ export function emptyState(room) {
     init: { order: [], idx: 0, round: 1 },
     chat: [],                   // {id, ts, by, name, kind, text, roll, secret}
     pics: { assets: [], shown: null },
+    // музыка Мастера: список треков, что играет сейчас и общая громкость
+    music: { tracks: [], now: null, vol: 0.8, loop: true },
     seq: 0,
   };
 }
@@ -65,6 +67,8 @@ export function normalize(raw) {
   s.bindBan = s.bindBan || {};
   s.pics = { assets: [], shown: null, ...(s.pics || {}) };
   s.pics.assets = s.pics.assets || [];
+  s.music = { tracks: [], now: null, vol: 0.8, loop: true, ...(s.music || {}) };
+  s.music.tracks = s.music.tracks || [];
   s.init = { order: [], idx: 0, round: 1, ...(s.init || {}) };
   s.init.order = s.init.order || [];
 
@@ -396,6 +400,23 @@ export function reduce(s, a) {
       break;
     case 'pics.show':
       s.pics = { ...s.pics, shown: a.assetId }; break;
+
+    // трек: {id, name, type, size, n — сколько кусков в базе, dur — секунды}
+    case 'music.add':
+      s.music = { ...s.music, tracks: [...s.music.tracks, a.track] }; break;
+    case 'music.remove':
+      s.music = {
+        ...s.music,
+        tracks: s.music.tracks.filter((x) => x.id !== a.id),
+        now: s.music.now && s.music.now.id === a.id ? null : s.music.now,
+      };
+      break;
+    // now: {id, playing, at, pos} — с какого места (pos, сек) и когда (at, время сервера)
+    case 'music.set':
+      s.music = { ...s.music, ...a.patch }; break;
+    // отдельным действием: null в патче база выбросит, и остановка до других не дойдёт
+    case 'music.stop':
+      s.music = { ...s.music, now: null }; break;
 
     case 'state.replace':
       return { ...a.state };

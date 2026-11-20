@@ -107,5 +107,15 @@ export async function createSync(roomId, me, opts = {}) {
     getAsset: (id) => idb.getAsset(id),
     delAsset: (id) => idb.delAsset(id),
     allAssets: () => idb.allAssets(),
+
+    now: () => Date.now(),
+    // соседние вкладки делят одно хранилище — музыку кладём туда целиком
+    async putAudio(id, blob, onProgress) {
+      await idb.putAsset(id, blob);
+      if (onProgress) onProgress(1);
+      return 1;
+    },
+    getAudio: (track) => idb.getAsset(track.id),
+    delAudio: (track) => idb.delAsset(track.id),
   };
 }

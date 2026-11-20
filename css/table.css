@@ -632,6 +632,39 @@
 .only-mobile{display:none}
 
 /* ── Телефон ─────────────────────────────────────────────────────── */
+/* ── Музыка: кнопка ♪, своя громкость, пульт Мастера ──────────────── */
+.music-btn{min-width:44px; transition:background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease)}
+.music-btn.is-alert{border-color:var(--gold); color:var(--gold); animation:music-call 1.6s var(--ease) infinite}
+@keyframes music-call{50%{box-shadow:0 0 0 4px rgba(201,164,90,.25)}}
+.music-pop{
+  position:fixed; top:64px; right:var(--s4); z-index:46; width:280px;
+  padding:var(--s4); border:1px solid var(--line); border-radius:var(--r);
+  background:var(--panel); box-shadow:var(--shadow);
+}
+.music-pop-title{margin:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.music-pop .hint{margin-bottom:var(--s3)}
+.music-range{display:flex; flex-direction:column; gap:var(--s1); margin:var(--s3) 0}
+.music-range > span{font-size:14px; color:var(--muted)}
+.music-range b{color:var(--text); font-weight:500}
+.music-range input{width:100%; min-height:32px; accent-color:var(--gold); cursor:pointer}
+.music-list{display:flex; flex-direction:column; gap:var(--s2); margin:var(--s3) 0}
+.music-row{
+  display:flex; align-items:center; gap:var(--s2); padding:var(--s2);
+  border:1px solid var(--line-soft); border-radius:var(--r-sm); background:var(--bg-2);
+  transition:border-color .18s var(--ease);
+}
+.music-row.is-current{border-color:var(--gold-dim)}
+.music-row.is-current .music-play{color:var(--gold); border-color:var(--gold-dim)}
+.music-play{width:44px; height:44px; min-width:44px; font-size:14px}
+.music-del{background:transparent; border-color:transparent; color:var(--muted)}
+.music-del:hover{color:var(--danger)}
+.music-name{flex:1; min-width:0; display:flex; flex-direction:column}
+.music-title{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.music-meta{font-size:14px; color:var(--muted)}
+.music-controls{align-items:center}
+.music-progress{color:var(--gold)}
+@media (prefers-reduced-motion:reduce){ .music-btn.is-alert{animation:none} }
+
 @media (max-width:900px){
   .panel{
     position:absolute; z-index:30; inset:auto 0 0 0; width:100%; flex-basis:auto;
