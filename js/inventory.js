@@ -12,6 +12,7 @@
 //   op = {id, ts, k:'add', item}            — новый предмет (или +штук к такому же)
 //        {id, ts, k:'qty', itemId, d}       — штук больше/меньше; ноль — предмет уходит
 //        {id, ts, k:'del', itemId}          — убрать предмет
+//        {id, ts, k:'own', itemId}          — Мастер признал предмет игрока: И → М
 //        {id, ts, k:'coin', c, d}           — монеты: c = pp | gp | sp | cp
 
 export const COINS = [
@@ -79,6 +80,12 @@ export function applyOps(inv, ops) {
       if (!it.qty) drop(it.id);
     } else if (op.k === 'del') {
       drop(op.itemId);
+    } else if (op.k === 'own') {
+      const it = out.items.find((x) => x.id === op.itemId);
+      if (!it || it.by === 'm') return;
+      // такой же предмет от Мастера уже есть — сливаем в него
+      const same = out.items.find((x) => x.by === 'm' && nameKey(x.name) === nameKey(it.name));
+      if (same) { same.qty += it.qty; drop(it.id); } else it.by = 'm';
     } else if (op.k === 'coin' && COINS.some((c) => c.id === op.c)) {
       out.coins[op.c] = Math.max(0, (out.coins[op.c] || 0) + (Number(op.d) || 0));
     }
@@ -100,6 +107,7 @@ export function describeOp(inv, op, who, byMaster) {
   if (!it) return null;
   // свои предметы игрок тратит молча; выданное Мастером — на виду у всех
   if (!byMaster && it.by !== 'm') return null;
+  if (op.k === 'own') return byMaster && it.by !== 'm' ? `${who}: «${it.name}» — подтверждено Мастером` : null;
   if (op.k === 'del') return byMaster ? `${who} теряет: ${it.name}` : `${who} убирает из инвентаря: ${it.name}`;
   if (op.k === 'qty') {
     const left = Math.max(0, it.qty + op.d);
@@ -190,19 +198,30 @@ export function invWidget(getInv, { role, onOp }) {
     list.innerHTML = '';
     if (!inv.items.length) list.append(el('p', 'hint inv-empty', 'Пусто.'));
     inv.items.forEach((it) => {
+      // имя — на всю ширину строки, под ним количество и кнопки
       const row = el('div', 'inv-row');
       row.append(badge(it.by), el('span', 'inv-name', it.name));
+      const ctl = el('div', 'inv-ctl');
       const q = el('div', 'inv-qty');
       if (!ro) q.append(step('−', 'Меньше на одну', () => onOp(newOp('qty', { itemId: it.id, d: -1 }))));
       q.append(el('span', 'inv-n', it.qty + ' шт.'));
       // выданному Мастером игрок штук не прибавляет — только тратит
       if (!ro && (role === 'dm' || it.by !== 'm')) q.append(step('+', 'Больше на одну', () => onOp(newOp('qty', { itemId: it.id, d: 1 }))));
-      row.append(q);
-      if (!ro) {
-        row.append(step('×', 'Убрать из инвентаря', () => {
-          if (confirm(`Убрать «${it.name}» из инвентаря?`)) onOp(newOp('del', { itemId: it.id }));
-        }));
+      ctl.append(q);
+      // Мастер признаёт вписанное игроком: жетон И становится М
+      if (role === 'dm' && it.by !== 'm') {
+        const ok = step('✓', 'Подтвердить: предмет станет выданным Мастером (жетон М)', () => onOp(newOp('own', { itemId: it.id })));
+        ok.classList.add('inv-own');
+        ctl.append(ok);
       }
+      if (!ro) {
+        const del = step('×', 'Убрать из инвентаря', () => {
+          if (confirm(`Убрать «${it.name}» из инвентаря?`)) onOp(newOp('del', { itemId: it.id }));
+        });
+        del.classList.add('inv-del');
+        ctl.append(del);
+      }
+      row.append(ctl);
       list.append(row);
     });
   }

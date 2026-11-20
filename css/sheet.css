@@ -379,7 +379,7 @@
    Жетон — маленькая монета, как гербы классов: золотая М — выдал Мастер,
    серебряная И — вписал сам игрок. */
 .inv{display:flex; flex-direction:column; gap:var(--s3)}
-.inv-coins{display:grid; grid-template-columns:repeat(auto-fit, minmax(112px, 1fr)); gap:var(--s2)}
+.inv-coins{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--s2)}
 .inv-coin{
   display:flex; align-items:center; gap:var(--s2); min-width:0; padding:0 var(--s2);
   border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel);
@@ -402,7 +402,10 @@
 
 .inv-list{display:flex; flex-direction:column}
 .inv-empty{margin:0}
-.inv-row{display:flex; align-items:center; gap:var(--s2); min-height:44px; padding:var(--s1) 0; border-bottom:1px solid var(--line-soft)}
+.inv-row{
+  display:grid; grid-template-columns:24px minmax(0, 1fr); column-gap:var(--s2); row-gap:var(--s1); align-items:start;
+  padding:var(--s2) 0; border-bottom:1px solid var(--line-soft);
+}
 .inv-row:last-child{border-bottom:0}
 .inv-tok{
   width:24px; height:24px; flex:none; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
@@ -411,8 +414,10 @@
 }
 .inv-tok-m{background:radial-gradient(circle at 50% 35%, #e3c98f, #c9a45a); border:1px solid #8d7440}
 .inv-tok-p{background:radial-gradient(circle at 50% 35%, #e4e2dd, #9d9a93); border:1px solid #6f6a5e}
-.inv-name{flex:1; min-width:0; overflow-wrap:anywhere}
-.inv-qty{display:flex; align-items:center; gap:var(--s1)}
+.inv-name{min-width:0; padding-top:1px; overflow-wrap:break-word}
+/* вторая строка: количество слева, «подтвердить» и «убрать» справа */
+.inv-ctl{grid-column:2; display:flex; align-items:center; gap:var(--s2)}
+.inv-qty{display:flex; align-items:center; gap:var(--s1); margin-right:auto}
 .inv-n{min-width:40px; text-align:center; font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums}
 .inv-step{
   width:32px; height:32px; flex:none; display:inline-flex; align-items:center; justify-content:center;
@@ -420,8 +425,10 @@
   font-size:16px; cursor:pointer; transition:background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
 }
 .inv-step:hover{border-color:var(--gold-dim); color:var(--gold)}
-.inv-row > .inv-step{border-color:transparent; background:transparent; color:var(--muted)}
-.inv-row > .inv-step:hover{color:var(--danger)}
+.inv-del{border-color:transparent; background:transparent; color:var(--muted)}
+.inv-del:hover{border-color:transparent; color:var(--danger)}
+.inv-own{color:var(--gold); border-color:var(--gold-dim)}
+.inv-own:hover{background:#332f27}
 
 .inv-add{display:flex; gap:var(--s2)}
 .inv-add input{
