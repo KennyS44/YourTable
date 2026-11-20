@@ -1,6 +1,8 @@
 // Поле боя: карта, сетка, токены, туман войны, рисование, линейка.
 // Всё рисуется в один canvas — так проще держать зум и перетаскивание согласованными.
 
+import { TERRAIN_LOOK, newTerrain } from './terrain.js';
+
 const IMG_CACHE = new Map();
 
 /** Дальность нового фонаря, футов: дальше её правят в его карточке. */
@@ -9,7 +11,7 @@ const LIGHT_FEET = 20;
 export function createBoard(opts) {
   const {
     canvas, store, sync, me, isDM, onTokenOpen, onViewChange, onZoneOpen, onPortalEnter,
-    onLeash, onTokenCtrl, onDenied,
+    onLeash, onTokenCtrl, onDenied, onTerrainEnter,
   } = opts;
   const ctx = canvas.getContext('2d');
 
@@ -18,7 +20,7 @@ export function createBoard(opts) {
   let draw = { shape: 'pen', color: '#c9a45a', width: 4 };
   let fogBrush = 1;
   let fogMode = 'reveal';       // 'reveal' — открывает местность, 'hide' — возвращает туман
-  let wallKind = 'wall';        // 'wall' | 'door' | 'lantern' | 'portal' | 'spawn' | 'erase'
+  let wallKind = 'wall';        // 'wall' | 'door' | 'lantern' | 'portal' | 'spawn' | 'terrain' | 'erase'
   let wallSnap = true;          // концы стен липнут друг к другу — без щелей в углах
   let eraseSize = 40;           // радиус ластика в пикселях карты — заметно крупнее кисти
   let eraseWork = null;         // что останется от рисунков, пока ластик ведут
@@ -37,9 +39,6 @@ export function createBoard(opts) {
   let lastLocId = null;
   let aiming = null;        // наводка приёма: {kind, feet, from, at, onPick, onCancel}
   let leashFrom = null;     // инструмент привязки: кого уже выбрали ведущим
-  // Сколько футов фигурка уже прошла в этом ходу. Счёт свой у каждого, кто
-  // тянет: считать вскладчину незачем — чужие фигурки тянет кто-то другой.
-  let walked = { turn: '', by: {} };
 
   const fogLayer = document.createElement('canvas');
 
@@ -110,33 +109,83 @@ export function createBoard(opts) {
 
   /* ── передвижение в бою ────────────────────────────────────────────
      Скорость держит только тех, кто стоит в очереди боя: вне боя фигурки
-     ходят свободно, и мерить там нечего. Счёт обнуляется сам, когда ход
-     переходит дальше или очередь пересобрали. */
-
-  /** Чей сейчас ход, одной строкой: сменилась — значит начался новый ход. */
-  function turnKey() {
-    const i = S().init;
-    return i.order.length ? i.round + ':' + i.idx + ':' + i.order.length : '';
-  }
+     ходят свободно, и мерить там нечего. Пройденное лежит в общем состоянии
+     стола (init.walked) и обнуляется, когда начинается ход самого существа:
+     потратил скорость — стоишь до своего следующего хода. Игрока предел
+     держит, Мастера нет. Рывок (init.dash) даёт вдвое больше. */
 
   /** Скорость и уже пройденное, если фигурка в бою. Иначе null. */
   function walkLimit(t) {
-    const key = turnKey();
-    if (!key || !S().init.order.some((o) => o.id === t.id)) return null;
-    if (walked.turn !== key) walked = { turn: key, by: {} };
-    return { speed: Math.max(0, Number(t.speed) || 0), spent: walked.by[t.id] || 0 };
+    const i = S().init;
+    if (!i.order.length || !i.order.some((o) => o.id === t.id)) return null;
+    const dash = !!(i.dash || {})[t.id];
+    const speed = Math.max(0, Number(t.speed) || 0) * (dash ? 2 : 1);
+    return { speed, dash, spent: Number((i.walked || {})[t.id]) || 0 };
   }
 
-  /** Футы по прямой между двумя точками карты — как их меряет линейка. */
-  function feetBetween(a, b) {
+  /**
+   * Цена пути a→b в футах: прямая, как её меряет линейка, плюс по клетке
+   * сверху за каждую клетку трудной местности, в которую путь вошёл. Так
+   * шаг в грязь стоит 10 футов вместо 5, как в правилах. Клетку, где
+   * фигурка стояла, не считаем — в неё не входили.
+   */
+  function pathFeet(a, b) {
     const g = gridOf();
-    return Math.round((Math.hypot(b.x - a.x, b.y - a.y) / g.size) * g.feet);
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!len) return 0;
+    const hard = zonesOf('terrain').filter((z) => z.hard);
+    let extra = 0;
+    if (hard.length) {
+      const seen = new Set([cellKey(a.x, a.y)]);
+      const n = Math.ceil(len / (g.size / 8));
+      for (let i = 1; i <= n; i++) {
+        const k = i / n;
+        const x = a.x + (b.x - a.x) * k, y = a.y + (b.y - a.y) * k;
+        const key = cellKey(x, y);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const c = cellCenter(x, y);
+        if (hard.some((z) => inZone(c, z))) extra += g.feet;
+      }
+    }
+    return Math.round((len / g.size) * g.feet) + extra;
   }
+
+  /**
+   * Опасная местность, в которую путь a→b вошёл: лава и яд, через которые
+   * прошли или где встали. Ту, где фигурка уже стояла, не считаем — она
+   * берёт своё в начале хода, а не на каждом шаге внутри.
+   */
+  function terrainCrossed(a, b) {
+    const g = gridOf();
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (g.size / 4)));
+    return zonesOf('terrain').filter((z) => !inZone(a, z)).filter((z) => {
+      for (let i = 1; i <= n; i++) {
+        const k = i / n;
+        if (inZone({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }, z)) return true;
+      }
+      return false;
+    });
+  }
+
+  /** Докуда игрок дойдёт из a в сторону b, не потратив больше left футов. */
+  function clampWalk(a, b, left) {
+    if (pathFeet(a, b) <= left) return b;
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 18; i++) {
+      const k = (lo + hi) / 2;
+      if (pathFeet(a, { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k }) <= left) lo = k; else hi = k;
+    }
+    return { x: a.x + (b.x - a.x) * lo, y: a.y + (b.y - a.y) * lo };
+  }
+
+  /** Сколько футов осталось у игрока в этом перетаскивании; Infinity — без предела. */
+  const leftFeet = (d) => (isDM || !d.limit ? Infinity : Math.max(0, d.limit.speed - d.limit.spent));
 
   /** След от начала перетаскивания: пунктир и подпись «25 / 30 фт». */
   function drawWalk() {
     const t = S().tokens[drag.id]; if (!t) return;
-    const всего = drag.limit.spent + feetBetween(drag.start, t);
+    const всего = drag.limit.spent + pathFeet(drag.start, t);
     if (!всего) return;
     const много = всего > drag.limit.speed;
     const цвет = много ? '#d08a6a' : '#c9a45a';
@@ -147,7 +196,7 @@ export function createBoard(opts) {
     ctx.setLineDash([]);
     ctx.beginPath(); ctx.arc(a.x, a.y, 4, 0, Math.PI * 2); ctx.fillStyle = цвет; ctx.fill();
     ctx.restore();
-    chip(`${всего} / ${drag.limit.speed} фт`, b.x, b.y - gridOf().size * t.cells * view.scale / 2 - 18, цвет);
+    chip(`${всего} / ${drag.limit.speed} фт${drag.limit.dash ? ' · рывок' : ''}`, b.x, b.y - gridOf().size * t.cells * view.scale / 2 - 18, цвет);
   }
 
   /* ── отрисовка ─────────────────────────────────────────────── */
@@ -184,6 +233,7 @@ export function createBoard(opts) {
     if (l.grid.show) drawGrid(W, H, bounds);
     drawStrokes(eraseWork || l.drawings || []);   // под ластиком показываем, что останется
     if (preview) drawStroke(preview, true);
+    drawTerrain();
     drawTokens();
     if (l.fogOn) drawFog(W, H, bounds);
     drawZones();
@@ -660,20 +710,28 @@ export function createBoard(opts) {
     return stopAtWall(stop, slide);
   }
 
-  /** Клетка, куда фигурка встанет, когда её отпустили: ближайшая, до которой нет стены. */
-  function landingCell(p) {
+  /**
+   * Клетка, куда фигурка встанет, когда её отпустили: ближайшая, до которой
+   * нет стены. У игрока в бою — ещё и та, на которую хватает скорости;
+   * не хватает ни на одну — остаётся, где стоял.
+   */
+  function landingCell(p, d) {
     const own = cellCenter(p.x, p.y);
-    if (isDM || !firstWall(p, own)) return own;
+    if (isDM) return own;
+    const left = d ? leftFeet(d) : Infinity;
+    const ok = (c) => !firstWall(p, c) && (left === Infinity || pathFeet(d.start, c) <= left);
+    if (ok(own)) return own;
     const g = gridOf();
     let best = null, bestD = Infinity;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const c = { x: own.x + dx * g.size, y: own.y + dy * g.size };
-        const d = Math.hypot(c.x - p.x, c.y - p.y);
-        if (d < bestD && !firstWall(p, c)) { best = c; bestD = d; }
+        const dist = Math.hypot(c.x - p.x, c.y - p.y);
+        if (dist < bestD && ok(c)) { best = c; bestD = dist; }
       }
     }
-    return best || p;
+    if (best) return best;
+    return left === Infinity ? p : { ...d.start };
   }
 
   /** Насколько далеко луч из точки уходит до отрезка (null — не пересекает). */
@@ -807,6 +865,48 @@ export function createBoard(opts) {
   }
 
   /**
+   * Местность видят все: игрок должен знать, что впереди лава. Заливка цветом,
+   * штриховка и значок по центру; трудная местность обведена пунктиром.
+   * Под туманом её не видно — туман рисуется поверх.
+   */
+  function drawTerrain() {
+    const list = zonesOf('terrain');
+    if (!list.length) return;
+    const g = gridOf();
+    const side = g.size * view.scale;
+    if (side < 4) return;
+    list.forEach((z) => {
+      const look = TERRAIN_LOOK[z.type] || TERRAIN_LOOK.water;
+      const b = zoneBox(z), p = w2s(b.x, b.y);
+      const w = b.w * view.scale, h = b.h * view.scale;
+      ctx.save();
+      ctx.fillStyle = `rgba(${look.rgb},.32)`;
+      ctx.fillRect(p.x, p.y, w, h);
+      // косая штриховка: местность читается и на пёстрой карте
+      ctx.beginPath(); ctx.rect(p.x, p.y, w, h); ctx.clip();
+      ctx.strokeStyle = `rgba(${look.rgb},.38)`; ctx.lineWidth = Math.max(1, side * .04);
+      const step = Math.max(6, side / 4);
+      ctx.beginPath();
+      for (let x = p.x - h; x < p.x + w; x += step) { ctx.moveTo(x, p.y + h); ctx.lineTo(x + h, p.y); }
+      ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = `rgba(${look.rgb},.95)`;
+      if (z.hard) ctx.setLineDash([6, 5]);
+      ctx.strokeRect(p.x + 1, p.y + 1, w - 2, h - 2);
+      ctx.setLineDash([]);
+      if (side >= 18) {
+        ctx.fillStyle = `rgb(${look.ink})`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `${Math.round(Math.min(side * .5, 40))}px Inter, sans-serif`;
+        ctx.fillText(look.glyph, p.x + w / 2, p.y + h / 2);
+      }
+      ctx.restore();
+      if (tool === 'wall' || tool === 'edit') {
+        zoneCaption(z.name || look.label, p.x + w / 2, p.y + h + 4, side);
+        sizeHandle(p.x + w, p.y + h, `rgb(${look.rgb})`);
+      }
+    });
+  }
+
+  /**
    * Переходы и точки входа — служебная разметка Мастера: игрокам их не видно,
    * иначе на карте будет висеть подсказка «здесь выход».
    */
@@ -912,9 +1012,20 @@ export function createBoard(opts) {
     };
   }
 
-  /** Зона под точкой — сравниваем с её прямоугольником. only сужает поиск до одного вида. */
+  function inZone(w, z) {
+    const b = zoneBox(z);
+    return w.x >= b.x && w.x <= b.x + b.w && w.y >= b.y && w.y <= b.y + b.h;
+  }
+
+  /** Все виды зон; местность последней — переходы поверх неё хватаются первыми. */
+  const ZONE_KINDS = ['portals', 'spawns', 'terrain'];
+
+  /**
+   * Зона под точкой — сравниваем с её прямоугольником. only сужает поиск до
+   * одного вида или списка видов.
+   */
   function zoneAt(w, only) {
-    for (const kind of (only ? [only] : ['portals', 'spawns'])) {
+    for (const kind of (only ? [].concat(only) : ZONE_KINDS)) {
       const list = zonesOf(kind);
       for (let i = list.length - 1; i >= 0; i--) {
         const b = zoneBox(list[i]);
@@ -926,7 +1037,7 @@ export function createBoard(opts) {
 
   /** Уголок изменения размера — правый нижний угол зоны, ловим по экрану. */
   function zoneHandleAt(p, only) {
-    for (const kind of (only ? [only] : ['portals', 'spawns'])) {
+    for (const kind of (only ? [].concat(only) : ZONE_KINDS)) {
       const list = zonesOf(kind);
       for (let i = list.length - 1; i >= 0; i--) {
         const b = zoneBox(list[i]);
@@ -1144,7 +1255,9 @@ export function createBoard(opts) {
           drag = { type: 'door-tap', id: hitW.wall.id, open: hitW.wall.open, from: p };
           return;
         }
-        const hitZ = zoneAt(w);                            // переход или точка входа — открываем настройки
+        // переход или точка входа — открываем настройки; местность правят
+        // в режиме стен и в правке, иначе по большой луже карту не потащить
+        const hitZ = zoneAt(w, ['portals', 'spawns']);
         if (hitZ) { drag = { type: 'zone-tap', kind: hitZ.kind, zone: hitZ.zone, from: p }; return; }
       }
       if (t || tool === 'token') { drag = { type: 'tap', at: p, id: t && t.id }; return; }
@@ -1172,7 +1285,7 @@ export function createBoard(opts) {
       // В правке хватаем что угодно; в режиме стен — только то, что сейчас ставим,
       // иначе новый переход не поставить поверх стены.
       const all = tool === 'edit';
-      const zoneKind = wallKind === 'portal' ? 'portals' : wallKind === 'spawn' ? 'spawns' : null;
+      const zoneKind = { portal: 'portals', spawn: 'spawns', terrain: 'terrain' }[wallKind] || null;
       const grabZone = all || !!zoneKind;
       const only = all ? null : zoneKind;
       const handle = grabZone ? zoneHandleAt(p, only) : null;         // уголок — растянуть зону
@@ -1203,6 +1316,13 @@ export function createBoard(opts) {
       if (tool === 'edit') {                               // в правке пустое место двигает карту
         drag = { type: 'pan', from: p, view: { ...view } };
         canvas.classList.add('is-drag');
+        return;
+      }
+      if (wallKind === 'terrain') {
+        const c = cellCenter(w.x, w.y);                    // новая местность — с одной клетки
+        const zone = { id: zoneId(), x: c.x, y: c.y, cw: 1, ch: 1, ...newTerrain('water') };
+        store.dispatch({ t: 'zone.add', locId: loc().id, kind: 'terrain', zone });
+        onZoneOpen && onZoneOpen('terrain', zone, p);      // сразу спрашиваем, что это
         return;
       }
       if (wallKind === 'portal' || wallKind === 'spawn') {
@@ -1271,7 +1391,12 @@ export function createBoard(opts) {
       const t = S().tokens[drag.id]; if (!t) return;
       drag.moved = true;
       drag.at = { x: w.x + drag.dx, y: w.y + drag.dy };
-      if (!isDM) drag.at = walkTo({ x: t.x, y: t.y }, drag.at);
+      if (!isDM) {
+        // скорость кончилась — дальше не тянется; стены проверяем уже от урезанной точки
+        const left = leftFeet(drag);
+        if (left !== Infinity) drag.at = clampWalk(drag.start, drag.at, left);
+        drag.at = walkTo({ x: t.x, y: t.y }, drag.at);
+      }
       // у себя двигаем сразу, остальным шлём 12 раз в секунду — иначе канал захлёбывается
       t.x = drag.at.x; t.y = drag.at.y;
       // перешёл в другую клетку — привязанный шагает в ту, что он оставил
@@ -1353,12 +1478,16 @@ export function createBoard(opts) {
     if (drag.type === 'token') {
       const t = S().tokens[drag.id];
       if (t) {
-        const c = landingCell(t);
+        const c = landingCell(t, drag);
         store.dispatch({ t: 'token.update', id: drag.id, patch: { x: c.x, y: c.y } });
         if (drag.moved) followersOf(t.id).forEach((f) => placeFollower(f, c, drag.cell));
         // футы кладём в счёт хода по вставшей клетке, а не по месту, где отпустили
-        if (drag.moved && drag.limit) {
-          walked.by[drag.id] = drag.limit.spent + feetBetween(drag.start, c);
+        const feet = drag.moved && drag.limit ? pathFeet(drag.start, c) : 0;
+        if (feet) store.dispatch({ t: 'init.walk', id: drag.id, feet: drag.limit.spent + feet });
+        // прошёл по яду или лаве — местность берёт своё
+        if (drag.moved && onTerrainEnter) {
+          const hit = terrainCrossed(drag.start, c);
+          if (hit.length) onTerrainEnter(S().tokens[drag.id], hit);
         }
         if (!drag.moved) onTokenOpen && onTokenOpen(t, evPos(e));
         // встали на клетку перехода — уходим в другую локацию
@@ -1549,7 +1678,9 @@ export function createBoard(opts) {
     /** Для проверок: кого сейчас накрывает наводка. */
     aimTargetIds: () => aimTargets().map((t) => t.id),
     /** Для проверок: сколько футов фигурка прошла в этом ходу. */
-    walkedFeet(id) { return walked.turn === turnKey() ? (walked.by[id] || 0) : 0; },
+    walkedFeet(id) { return Number((S().init.walked || {})[id]) || 0; },
+    /** Местность, на которой сейчас стоит фигурка. */
+    terrainUnder(t) { return t && t.locId === S().activeLoc ? zonesOf('terrain').filter((z) => inZone(t, z)) : []; },
     /** Для проверок: куда достаёт обзор существа и рисуются ли стены. */
     visionPoints(t) {
       const g = gridOf();

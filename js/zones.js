@@ -6,6 +6,7 @@
 import { app, upd } from './app-state.js';
 import { say } from './chat.js';
 import { $, el, field, pair, numInput, checkRow, placeCard } from './ui.js';
+import { terrainCard } from './terrain.js';
 
 const cellKeyOf = (g, x, y) => Math.floor((x - g.ox) / g.size) + ',' + Math.floor((y - g.oy) / g.size);
 const cellCenterOf = (g, cx, cy) => ({ x: g.ox + (cx + 0.5) * g.size, y: g.oy + (cy + 0.5) * g.size });
@@ -82,7 +83,10 @@ export function enterPortal(t, portal) {
   say(`${t.name} перешёл в локацию «${to.name}»`, 'system');
 }
 
-const ZONE_TITLE = { portals: 'Переход в другую локацию', spawns: 'Точка входа', lights: 'Фонарь', walls: 'Стена или дверь' };
+const ZONE_TITLE = {
+  portals: 'Переход в другую локацию', spawns: 'Точка входа', lights: 'Фонарь', walls: 'Стена или дверь',
+  terrain: 'Местность',
+};
 
 /** Что вообще стоит в этой локации — чтобы в правке было видно, чего искать. */
 export function renderEditCounts(s) {
@@ -95,6 +99,7 @@ export function renderEditCounts(s) {
   const parts = [
     ['стен', walls], ['дверей', doors], ['фонарей', (l.lights || []).length],
     ['переходов', (l.portals || []).length], ['входов', (l.spawns || []).length],
+    ['местности', (l.terrain || []).length],
   ];
   const some = parts.filter(([, n]) => n);
   box.textContent = some.length ? some.map(([n, v]) => `${n}: ${v}`).join(' · ') : 'В локации пока ничего не поставлено';
@@ -144,6 +149,16 @@ export function openZoneCard(kind, zone, pos) {
     return;
   }
 
+  if (kind === 'terrain') {
+    const live = () => ((app.store.get().locations[locId] || {}).terrain || []).find((z) => z.id === zone.id) || zone;
+    // перерисовали карточку (сменили вид) — она остаётся на прежнем месте
+    terrainCard(card, live, zUpd, () => {
+      const { left, top } = card.style;
+      openZoneCard(kind, live(), pos);
+      card.style.left = left; card.style.top = top;
+    });
+  }
+
   const sel = el('select', 'sel');
   const others = s.order.filter((id) => id !== locId);
   if (kind === 'portals') {
@@ -156,7 +171,7 @@ export function openZoneCard(kind, zone, pos) {
     sel.addEventListener('change', () => zUpd({ toLocId: sel.value || null }));
     card.append(field('Куда ведёт', sel));
     card.append(el('p', 'hint', 'Фигурка, вставшая на эту клетку, окажется в выбранной локации — на её точке входа.'));
-  } else {
+  } else if (kind === 'spawns') {
     sel.append(new Option('— из любой локации —', ''));
     others.forEach((id) => {
       const o = new Option('из «' + s.locations[id].name + '»', id);
@@ -172,7 +187,7 @@ export function openZoneCard(kind, zone, pos) {
     numInput(zone.cw || 1, (v) => zUpd({ cw: Math.max(1, Math.min(20, v)) })),
     numInput(zone.ch || 1, (v) => zUpd({ ch: Math.max(1, Math.min(20, v)) })))));
   card.append(el('p', 'hint', 'Растянуть можно и мышью — за уголок ◢ в правом нижнем углу зоны.'));
-  if (!others.length) card.append(el('p', 'hint', 'Пока есть только одна локация — создайте вторую в панели слева.'));
+  if (!others.length && kind !== 'terrain') card.append(el('p', 'hint', 'Пока есть только одна локация — создайте вторую в панели слева.'));
 
   const bDel = el('button', 'btn btn-soft btn-sm w-full', 'Убрать зону');
   bDel.addEventListener('click', () => {

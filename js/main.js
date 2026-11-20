@@ -24,6 +24,7 @@ import { useMove, rollAbility, applyToHp } from './moves-use.js';
 import { bindTokens, canUnbind, unbindButton, renderLeashBar } from './leash.js';
 import { openAbilityBar, closeAbilityBar, renderAbilityBar, wireAbilityBar } from './ability-bar.js';
 import { initMusic } from './music.js';
+import { terrainHit } from './terrain.js';
 import { fixInv, applyOps, describeOp, invWidget } from './inventory.js';
 
 const COLORS = ['#c9a45a', '#ece6d9', '#b8604a', '#83a05f', '#7fa8c9', '#a678b8', '#e0a05a', '#6f6a5e'];
@@ -197,6 +198,7 @@ function start(sync, state, me) {
     onLeash: bindTokens,
     onTokenCtrl: openAbilityBar,
     onDenied: toast,
+    onTerrainEnter: (t, zones) => terrainHit(t, zones, 'входит'),
     onViewChange: (v) => { $('#zoom-val').textContent = Math.round(v.scale * 100) + '%'; },
   });
 
@@ -550,6 +552,25 @@ function renderInit(s) {
     go.addEventListener('click', () => goToToken(t));
     head.append(img, el('span', 'nm', tokenName(t)), go, el('span', 'iv', String(entry.v)));
     row.append(head);
+
+    // сколько прошёл с начала своего хода; рывок даёт Мастер — вдвое до следующего хода
+    const dash = !!(s.init.dash || {})[t.id];
+    const walked = Number((s.init.walked || {})[t.id]) || 0;
+    const speed = (Number(t.speed) || 0) * (dash ? 2 : 1);
+    if (app.isDM || walked || dash) {
+      const mv = el('div', 'init-move');
+      mv.append(el('span', 'init-feet' + (walked > speed ? ' is-over' : ''), `шаги ${walked} / ${speed} фт`));
+      if (app.isDM) {
+        const b = el('button', 'status' + (dash ? ' on' : ''), 'Рывок');
+        b.title = dash ? 'Снять рывок' : 'Рывок: скорость вдвое до начала следующего хода';
+        b.addEventListener('click', () => {
+          app.store.dispatch({ t: 'init.dash', id: t.id, on: !dash });
+          if (!dash) say(`${tokenName(t)} делает рывок: скорость вдвое до следующего хода`, 'system');
+        });
+        mv.append(b);
+      } else if (dash) mv.append(el('span', 'status on', 'Рывок'));
+      row.append(mv);
+    }
 
     if (t.hp && t.hp.max > 0 && (app.isDM || t.hpPublic !== false)) {
       const bar = el('div', 'hp-bar');
@@ -1030,6 +1051,19 @@ function tokensOfLib(s, it) {
 
 /* ───────────────────────── Карточка токена ───────────────────────── */
 
+/** Фигурка этого игрока: своя, а не НПС и не чужой герой. */
+const isMine = (t) => t.ownerId === app.me.id || (t.ownerName && nameKey(t.ownerName) === nameKey(app.me.name));
+
+/** Портрет существа на весь экран. Закрывается щелчком в любом месте или Esc. */
+function openPortrait(t) {
+  const box = $('#portrait');
+  const img = $('#portrait-img');
+  img.removeAttribute('src');
+  $('#portrait-name').textContent = tokenName(t);
+  assetUrl(t.assetId).then((u) => { if (u) img.src = u; });
+  box.hidden = false;
+}
+
 function openTokenCard(t, screenPos) {
   const card = $('#token-card');
   card.innerHTML = '';
@@ -1038,6 +1072,13 @@ function openTokenCard(t, screenPos) {
   const close = el('button', 'icon-btn close', '×');
   close.addEventListener('click', () => { card.hidden = true; });
   card.append(close, el('h4', '', tokenName(t)));
+
+  // чужое существо с картинкой: игрок смотрит портрет на весь экран
+  if (!app.isDM && t.assetId && !isMine(t)) {
+    card.hidden = true;
+    openPortrait(t);
+    return;
+  }
 
   if (!app.isDM) {
     const hpVisible = t.hp && t.hp.max > 0 && t.hpPublic !== false;
@@ -1303,6 +1344,9 @@ function doRoll(sides) {
 /* ───────────────────────── Провода интерфейса ───────────────────────── */
 
 function wireUI() {
+  // портрет на весь экран закрывается щелчком в любом месте и клавишей Esc
+  $('#portrait').addEventListener('click', () => { $('#portrait').hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#portrait').hidden = true; });
   // инструменты; кнопка отмены стоит в том же ряду, но режимом не является
   $$('#toolbar .tool[data-tool]').forEach((b) => b.addEventListener('click', () => {
     $$('#toolbar .tool[data-tool]').forEach((x) => x.classList.toggle('is-active', x === b));
@@ -1703,6 +1747,7 @@ function wireDM() {
     lantern: 'Клик по полю — фонарь. Дальность света задаётся в его карточке, свет обрывается о стены.',
     portal: 'Клик по клетке — зелёная стрелка перехода. Кто на неё встанет, уйдёт в назначенную локацию. Игрокам стрелка не видна.',
     spawn: 'Клик по клетке — точка входа: сюда встают пришедшие из другой локации. Тяните уголок, чтобы растянуть её на несколько клеток.',
+    terrain: 'Клик по клетке — местность: вода, грязь, подъём, яд или лава. Её видят все. Тяните уголок ◢, чтобы растянуть.',
     erase: 'Ведите по стенам, дверям, огонькам и зонам — они пропадут.',
   };
   $$('[data-wallkind]').forEach((b) => b.addEventListener('click', () => {
@@ -1765,7 +1810,14 @@ function wireDM() {
     app.store.dispatch({ t: 'init.set', order });
     say('Инициатива брошена', 'system');
   });
-  $('#init-next').addEventListener('click', () => app.store.dispatch({ t: 'init.next' }));
+  $('#init-next').addEventListener('click', () => {
+    app.store.dispatch({ t: 'init.next' });
+    // ход начался в лаве или ядовитом облаке — местность берёт своё
+    const s = app.store.get();
+    const cur = s.init.order.length && s.tokens[s.init.order[s.init.idx].id];
+    const zones = cur ? app.board.terrainUnder(cur).filter((z) => z.turn !== false) : [];
+    if (zones.length) terrainHit(cur, zones, 'начинает ход');
+  });
   // выход из боя разом: выводить каждого по одному больше не нужно
   $('#init-end').addEventListener('click', () => {
     if (!app.store.get().init.order.length) return;

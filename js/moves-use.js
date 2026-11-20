@@ -198,9 +198,11 @@ export function applyToHp(targets, dmg, effect, saves, onSave) {
     // спасбросок режет урон до стойкости: сперва цель уворачивается, а уже
     // потом её шкура делит то, что долетело
     const спас = saves && saves.find((x) => x.id === t.id);
-    if (спас && спас.ok && onSave !== 'half') return;        // отбилась начисто
+    // при успехе остаётся половина, четверть (местность Мастера) или ничего
+    const доля = { half: 2, quarter: 4 }[onSave];
+    if (спас && спас.ok && !доля) return;                    // отбилась начисто
     const куски = спас && спас.ok
-      ? dmg.parts.map((p) => ({ ...p, sum: Math.floor(p.sum / 2) }))
+      ? dmg.parts.map((p) => ({ ...p, sum: Math.floor(p.sum / доля) }))
       : dmg.parts;
     // лечение стойкостью не режут: она про урон
     const { total, why } = лечим ? { total: dmg.total, why: '' } : hitAfterGuard(t, куски);

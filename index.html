@@ -9,9 +9,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- стол: основа, поле и панели, лист персонажа в левой панели -->
-<link rel="stylesheet" href="css/base.css?v=62">
-<link rel="stylesheet" href="css/table.css?v=62">
-<link rel="stylesheet" href="css/sheet.css?v=62">
+<link rel="stylesheet" href="css/base.css?v=63">
+<link rel="stylesheet" href="css/table.css?v=63">
+<link rel="stylesheet" href="css/sheet.css?v=63">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -23,32 +23,33 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/app-state.js":       "./js/app-state.js?v=62",
-    "./js/chat.js":            "./js/chat.js?v=62",
-    "./js/zones.js":           "./js/zones.js?v=62",
-    "./js/moves-use.js":        "./js/moves-use.js?v=62",
-    "./js/leash.js":          "./js/leash.js?v=62",
-    "./js/ability-bar.js":    "./js/ability-bar.js?v=62",
-    "./js/music.js":          "./js/music.js?v=62",
-    "./js/ui.js":             "./js/ui.js?v=62",
-    "./js/main.js":           "./js/main.js?v=62",
-    "./js/sync.js":           "./js/sync.js?v=62",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=62",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=62",
-    "./js/store.js":          "./js/store.js?v=62",
-    "./js/history.js":        "./js/history.js?v=62",
-    "./js/board.js":          "./js/board.js?v=62",
-    "./js/dice.js":           "./js/dice.js?v=62",
-    "./js/dice3d.js":         "./js/dice3d.js?v=62",
-    "./js/roomcode.js":       "./js/roomcode.js?v=62",
-    "./js/registry.js":       "./js/registry.js?v=62",
-    "./js/translit.js":       "./js/translit.js?v=62",
-    "./js/sheet.js":          "./js/sheet.js?v=62",
-    "./js/inventory.js":      "./js/inventory.js?v=62",
-    "./js/classes.js":        "./js/classes.js?v=62",
-    "./js/charlink.js":       "./js/charlink.js?v=62",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=62",
-    "./js/idb.js":            "./js/idb.js?v=62"
+    "./js/app-state.js":       "./js/app-state.js?v=63",
+    "./js/chat.js":            "./js/chat.js?v=63",
+    "./js/zones.js":           "./js/zones.js?v=63",
+    "./js/moves-use.js":        "./js/moves-use.js?v=63",
+    "./js/leash.js":          "./js/leash.js?v=63",
+    "./js/ability-bar.js":    "./js/ability-bar.js?v=63",
+    "./js/music.js":          "./js/music.js?v=63",
+    "./js/terrain.js":        "./js/terrain.js?v=63",
+    "./js/ui.js":             "./js/ui.js?v=63",
+    "./js/main.js":           "./js/main.js?v=63",
+    "./js/sync.js":           "./js/sync.js?v=63",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=63",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=63",
+    "./js/store.js":          "./js/store.js?v=63",
+    "./js/history.js":        "./js/history.js?v=63",
+    "./js/board.js":          "./js/board.js?v=63",
+    "./js/dice.js":           "./js/dice.js?v=63",
+    "./js/dice3d.js":         "./js/dice3d.js?v=63",
+    "./js/roomcode.js":       "./js/roomcode.js?v=63",
+    "./js/registry.js":       "./js/registry.js?v=63",
+    "./js/translit.js":       "./js/translit.js?v=63",
+    "./js/sheet.js":          "./js/sheet.js?v=63",
+    "./js/inventory.js":      "./js/inventory.js?v=63",
+    "./js/classes.js":        "./js/classes.js?v=63",
+    "./js/charlink.js":       "./js/charlink.js?v=63",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=63",
+    "./js/idb.js":            "./js/idb.js?v=63"
   }
 }
 </script>
@@ -332,6 +333,7 @@
           <button class="shape" data-wallkind="lantern">Фонарь</button>
           <button class="shape" data-wallkind="portal">Переход</button>
           <button class="shape" data-wallkind="spawn">Вход</button>
+          <button class="shape" data-wallkind="terrain">Местность</button>
           <button class="shape" data-wallkind="erase">Ластик</button>
         </div>
         <label class="check"><input type="checkbox" id="wall-snap" checked><span>Магнит к концам</span></label>
@@ -464,6 +466,11 @@
 
   <!-- Карточка токена -->
   <div class="token-card" id="token-card" hidden></div>
+  <!-- портрет существа на весь экран: игрок щёлкнул по чужой фигурке -->
+  <div class="portrait" id="portrait" hidden>
+    <img id="portrait-img" alt="">
+    <span class="portrait-name" id="portrait-name"></span>
+  </div>
 
   <!-- Подготовка существ: все НПС и враги комнаты на одной странице -->
   <div class="prep dm-only" id="prep" hidden>
@@ -481,6 +488,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=62"></script>
+<script type="module" src="js/main.js?v=63"></script>
 </body>
 </html>

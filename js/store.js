@@ -23,7 +23,7 @@ export function emptyState(room) {
     levels: {},                 // ключ имени -> уровень персонажа: его поднимает Мастер
     bindBan: {},                // ключ имени -> до какого времени ему нельзя привязывать
     tokens: {},                 // id -> токен
-    init: { order: [], idx: 0, round: 1 },
+    init: { order: [], idx: 0, round: 1, walked: {}, dash: {} },
     chat: [],                   // {id, ts, by, name, kind, text, roll, secret}
     pics: { assets: [], shown: null },
     // музыка Мастера: список треков, что играет сейчас и общая громкость
@@ -52,6 +52,8 @@ export function fixLoc(l) {
     // Зоны занимают прямоугольник клеток; у старых, поставленных до этого, — одна клетка
     portals: (l.portals || []).map((x) => ({ ...x, cw: x.cw || 1, ch: x.ch || 1 })),
     spawns: (l.spawns || []).map((x) => ({ ...x, cw: x.cw || 1, ch: x.ch || 1 })),
+    // местность: вода, грязь, подъём, яд, лава — видна всем и действует на вошедших
+    terrain: (l.terrain || []).map((x) => ({ ...x, cw: x.cw || 1, ch: x.ch || 1 })),
     drawings: (l.drawings || []).map((d) => ({ ...d, pts: d.pts || [] })),
   };
 }
@@ -77,6 +79,9 @@ export function normalize(raw) {
   s.invOps = s.invOps || {};
   s.init = { order: [], idx: 0, round: 1, ...(s.init || {}) };
   s.init.order = s.init.order || [];
+  // сколько футов кто прошёл с начала своего хода и кто сделал рывок
+  s.init.walked = s.init.walked || {};
+  s.init.dash = s.init.dash || {};
 
   Object.keys(s.locations).forEach((id) => { s.locations[id] = fixLoc(s.locations[id]); });
   Object.values(s.tokens).forEach((t) => {
@@ -115,6 +120,7 @@ export function newLocation(name) {
     lights: [],                 // фонари: {id, x, y, feet}
     portals: [],                // переходы: {id, x, y, cw, ch, toLocId} — уводят в другую локацию
     spawns: [],                 // точки входа: {id, x, y, cw, ch, fromLocId, main}
+    terrain: [],                // местность: вода, грязь, подъём, яд, лава (js/terrain.js)
     view: null,                 // {x, y, scale} — камера по умолчанию
   };
 }
@@ -326,8 +332,8 @@ export function reduce(s, a) {
       break;
     }
 
-    // Переходы и точки входа устроены одинаково, поэтому и действия общие:
-    // a.kind — 'portals' или 'spawns'.
+    // Переходы, точки входа и местность устроены одинаково, поэтому и действия
+    // общие: a.kind — 'portals', 'spawns' или 'terrain'.
     case 'zone.add': {
       const loc = s.locations[a.locId]; if (!loc) break;
       s.locations = { ...s.locations, [a.locId]: { ...loc, [a.kind]: [...(loc[a.kind] || []), a.zone] } };
@@ -385,19 +391,36 @@ export function reduce(s, a) {
       break;
 
     case 'init.set':
-      s.init = { ...s.init, order: a.order || [], idx: 0, round: 1 }; break;
+      s.init = { ...s.init, order: a.order || [], idx: 0, round: 1, walked: {}, dash: {} }; break;
     case 'init.next': {
       const n = s.init.order.length; if (!n) break;
       const idx = (s.init.idx + 1) % n;
-      s.init = { ...s.init, idx, round: idx === 0 ? s.init.round + 1 : s.init.round };
+      // начался ход существа — его счёт шагов и рывок обнуляются
+      const id = s.init.order[idx].id;
+      const walked = { ...(s.init.walked || {}) }, dash = { ...(s.init.dash || {}) };
+      delete walked[id]; delete dash[id];
+      s.init = { ...s.init, idx, round: idx === 0 ? s.init.round + 1 : s.init.round, walked, dash };
       break;
     }
     case 'init.clear':
-      s.init = { order: [], idx: 0, round: 1 }; break;
+      s.init = { order: [], idx: 0, round: 1, walked: {}, dash: {} }; break;
     // Очередь боя, какой она была (отмена шага хода или сброса).
-    case 'init.restore':
-      s.init = { order: (a.init && a.init.order) || [], idx: (a.init && a.init.idx) || 0, round: (a.init && a.init.round) || 1 };
+    case 'init.restore': {
+      const b = a.init || {};
+      s.init = { order: b.order || [], idx: b.idx || 0, round: b.round || 1, walked: b.walked || {}, dash: b.dash || {} };
       break;
+    }
+    // Сколько футов существо прошло с начала своего хода.
+    case 'init.walk':
+      s.init = { ...s.init, walked: { ...(s.init.walked || {}), [a.id]: Math.max(0, Number(a.feet) || 0) } };
+      break;
+    // Рывок: скорость вдвое до начала следующего хода существа.
+    case 'init.dash': {
+      const dash = { ...(s.init.dash || {}) };
+      if (a.on) dash[a.id] = 1; else delete dash[a.id];
+      s.init = { ...s.init, dash };
+      break;
+    }
 
     case 'pics.add':
       s.pics = { ...s.pics, assets: [...s.pics.assets, ...a.assets] }; break;

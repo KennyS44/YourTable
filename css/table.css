@@ -226,6 +226,10 @@
 .hp-bar{height:6px; border-radius:3px; background:#3a2f2a; margin-top:var(--s2); overflow:hidden}
 .hp-fill{height:100%; background:linear-gradient(90deg,#7f9a5c,#a8bd6f); transition:width .3s var(--ease)}
 .hp-row{display:flex; align-items:center; gap:var(--s1); margin-top:var(--s1); font-size:14px; color:var(--muted)}
+/* шаги в бою: сколько прошёл с начала своего хода и рывок */
+.init-move{display:flex; align-items:center; gap:var(--s2); margin-top:var(--s1); font-size:14px; color:var(--muted)}
+.init-feet{flex:1}
+.init-feet.is-over{color:var(--danger)}
 .hp-row input{width:52px; min-height:32px; padding:0 var(--s1); background:var(--panel-2); border:1px solid var(--line); border-radius:4px; color:var(--text); font-size:14px}
 .status-row{display:flex; gap:var(--s1); flex-wrap:wrap; margin-top:var(--s1)}
 .status{font-size:14px; padding:0 var(--s2); border-radius:999px; border:1px solid var(--line); color:var(--muted); background:var(--panel-2); cursor:pointer}
@@ -325,6 +329,20 @@
   box-shadow:var(--shadow); animation:rise .25s var(--ease) both;
 }
 .showcase-chip:hover{background:#332f27}
+
+/* ── Портрет существа на весь экран ─────────────────────────────── */
+.portrait{
+  position:fixed; inset:0; z-index:60; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:var(--s3); padding:var(--s8); cursor:zoom-out;
+  background:rgba(15,14,12,.94); animation:fade-in .25s var(--ease) both;
+}
+.portrait[hidden]{display:none}
+.portrait img{
+  /* мелкую картинку растягиваем: портрет должен быть крупным, а не точкой посреди экрана */
+  width:100%; height:calc(100% - 48px); min-height:0; object-fit:contain;
+}
+.portrait-name{font-family:var(--f-head); font-size:20px; color:var(--gold)}
+@keyframes fade-in{from{opacity:0} to{opacity:1}}
 
 /* ── Самоцвет вдохновения ────────────────────────────────────────── */
 .gem-badge{

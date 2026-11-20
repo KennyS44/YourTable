@@ -79,7 +79,7 @@ function useBody(u) {
   }
   if (u.save) {
     строки.push(`спасбросок ${esc(u.save.abil)}${app.isDM ? `, сложность ${u.save.dc}` : ''}`
-      + `<span class="use-dim"> при успехе ${u.save.onSave === 'half' ? 'половина' : 'ничего'}</span>`);
+      + `<span class="use-dim"> при успехе ${{ half: 'половина', quarter: 'четверть' }[u.save.onSave] || 'ничего'}</span>`);
     (u.saves || []).forEach((sv) => {
       const прибавка = sv.mod ? ` ${sv.mod > 0 ? '+' : '−'}${Math.abs(sv.mod)}` : '';
       строки.push(`<span class="use-dim">${esc(sv.name)}: [${sv.dice.join(', ')}]${прибавка} → ${sv.total} — </span>`
@@ -107,6 +107,7 @@ function useBody(u) {
         + (l.down ? '<span class="use-miss"> — свалился</span>' : ''));
     });
   }
+  if (u.status) строки.push(`<span class="use-miss">${esc(u.status)}</span>`);
   if (u.conc) строки.push('<span class="use-dim">требует концентрации</span>');
   return строки.map((s) => `<div class="use-line">${s}</div>`).join('');
 }
