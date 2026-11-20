@@ -585,36 +585,46 @@ function renderInit(s) {
         row.append(hp);
       }
     }
-    if (app.isDM) {
-      // висят только наложенные состояния, остальные ждут под «+ состояние»:
-      // иначе каждая строка боя разрастается в стену одинаковых слов
-      const st = el('div', 'status-row');
-      const свои = t.statuses || [];
-      const кнопка = (name, on) => {
-        const b = el('button', 'status' + (on ? ' on' : ''), name);
-        b.addEventListener('click', () => {
-          const next = on ? свои.filter((x) => x !== name) : [...свои, name];
-          app.store.dispatch({ t: 'token.status', id: t.id, statuses: next });
-        });
-        return b;
-      };
-      свои.forEach((name) => st.append(кнопка(name, true)));
-      const add = el('button', 'status status-add', свои.length ? '+' : '+ состояние');
-      add.title = 'Наложить состояние';
-      add.addEventListener('click', () => {
-        const box = el('div', 'status-row status-pick');
-        STATUSES.filter((n) => !свои.includes(n)).forEach((n) => box.append(кнопка(n, false)));
-        add.replaceWith(box);
-      });
-      st.append(add);
-      row.append(st);
-    } else if ((t.statuses || []).length) {
-      const st = el('div', 'status-row');
-      t.statuses.forEach((n) => st.append(el('span', 'status on', n)));
-      row.append(st);
-    }
+    // состояния героя Мастер правит во вкладке «Герои» — там они есть и вне боя;
+    // здесь остаются враги и НПС
+    const hero = !!(t.ownerName || t.ownerId);
+    const st = statusRow(t, app.isDM && !hero);
+    if (st) row.append(st);
     list.append(row);
   });
+}
+
+/**
+ * Состояния существа. Мастеру (edit) — наложенные кнопками, остальные ждут
+ * под «+ состояние»: иначе строка разрастается в стену одинаковых слов.
+ * Остальным — просто ярлыки; нет состояний — null.
+ */
+function statusRow(t, edit) {
+  const свои = t.statuses || [];
+  const st = el('div', 'status-row');
+  if (!edit) {
+    if (!свои.length) return null;
+    свои.forEach((n) => st.append(el('span', 'status on', n)));
+    return st;
+  }
+  const кнопка = (name, on) => {
+    const b = el('button', 'status' + (on ? ' on' : ''), name);
+    b.addEventListener('click', () => {
+      const next = on ? свои.filter((x) => x !== name) : [...свои, name];
+      app.store.dispatch({ t: 'token.status', id: t.id, statuses: next });
+    });
+    return b;
+  };
+  свои.forEach((name) => st.append(кнопка(name, true)));
+  const add = el('button', 'status status-add', свои.length ? '+' : '+ состояние');
+  add.title = 'Наложить состояние';
+  add.addEventListener('click', () => {
+    const box = el('div', 'status-row status-pick');
+    STATUSES.filter((n) => !свои.includes(n)).forEach((n) => box.append(кнопка(n, false)));
+    add.replaceWith(box);
+  });
+  st.append(add);
+  return st;
 }
 
 function renderPics(s) {
@@ -731,6 +741,13 @@ function renderHeroes(s) {
     const nums = el('div', 'hero-nums');
     nums.append(lvl, gems);
     row.append(nums);
+    // состояния героя — и в бою, и вне его: фигурка этого игрока на поле
+    const hTok = Object.values(s.tokens).filter((t) => nameKey(t.ownerName) === m.key)
+      .sort((a, b) => (b.locId === s.activeLoc) - (a.locId === s.activeLoc))[0];
+    if (hTok) {
+      const st = statusRow(hTok, app.isDM);
+      if (st) { st.classList.add('hero-status'); row.append(st); }
+    }
     if (app.isDM) heroInventory(s, m, row);
     box.append(row);
   });
@@ -847,6 +864,8 @@ function renderStatusFx(s) {
   const key = list.join('|');
   if (key === fxNow) return;
   fxNow = key;
+  // опьянение качает само поле, а не только пелену поверх него
+  $('#board-wrap').classList.toggle('is-drunk', list.includes('Опьянён'));
 
   layer.innerHTML = '';
   if (!list.length) return;

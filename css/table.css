@@ -387,6 +387,7 @@
   background:linear-gradient(180deg, transparent, var(--gold-dim), transparent);
 }
 .hero-row.is-me{border-color:var(--gold-dim)}
+.hero-row > .hero-status{flex:1 1 100%}
 .hero-row.is-me::before{background:linear-gradient(180deg, transparent, var(--gold), transparent)}
 /* Человек и его персонаж одной строкой: иконка, имя игрока, под ним герой */
 .hero-who{flex:1 1 100%; min-width:0; display:flex; align-items:center; gap:var(--s2)}
@@ -519,6 +520,20 @@
   animation:fx-glow 3s ease-in-out infinite alternate;
 }
 @keyframes fx-glow{0%,100%{opacity:.5} 50%{opacity:1}}
+/* Опьянён — поле плывёт и качается, тёплый хмельной туман, двоится по краям */
+.fx-drunk{background:radial-gradient(circle at 50% 50%, transparent 40%, rgba(150,70,40,.3) 100%);
+  backdrop-filter:saturate(1.35) sepia(.18);
+  animation:fx-in .5s var(--ease) both, fx-glow 5s ease-in-out infinite}
+.fx-drunk::after{content:''; position:absolute; inset:0; backdrop-filter:blur(2px);
+  -webkit-mask:radial-gradient(circle at 50% 50%, transparent 35%, #000 85%);
+  mask:radial-gradient(circle at 50% 50%, transparent 35%, #000 85%)}
+.board-wrap.is-drunk #board{animation:drunk-sway 7s ease-in-out infinite; transform-origin:50% 50%}
+@keyframes drunk-sway{
+  0%,100%{transform:translate(0,0) rotate(0); filter:blur(0)}
+  25%{transform:translate(9px,-4px) rotate(.6deg); filter:blur(.8px)}
+  50%{transform:translate(-3px,6px) rotate(-.3deg); filter:blur(0)}
+  75%{transform:translate(-9px,-3px) rotate(-.6deg); filter:blur(.8px)}
+}
 
 .fx-label{
   position:absolute; left:50%; bottom:var(--s4); transform:translateX(-50%);
@@ -531,6 +546,7 @@
 }
 @media (prefers-reduced-motion:reduce){
   .fx, .fx::after{animation-duration:.01ms !important; animation-iteration-count:1 !important}
+  .board-wrap.is-drunk #board{animation:none}
 }
 
 /* ── Карточка токена ─────────────────────────────────────────────── */
