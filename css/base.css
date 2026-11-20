@@ -41,6 +41,17 @@ h1,h2,h3{font-family:var(--f-head); font-weight:600; margin:0; letter-spacing:.0
 button,input,select{font-family:inherit; font-size:16px; color:inherit}
 em{color:var(--muted); font-style:normal; font-size:14px}
 
+/* ── Полосы прокрутки: тонкие, в тон столу, без серых системных стрелок ── */
+::-webkit-scrollbar{width:8px; height:8px}
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-button{display:none}
+::-webkit-scrollbar-thumb{background:#4a4234; border-radius:999px; border:2px solid transparent; background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:var(--gold-dim); background-clip:padding-box}
+/* Firefox не знает ::-webkit-scrollbar — ему те же цвета стандартным свойством */
+@supports not selector(::-webkit-scrollbar){
+  *{scrollbar-width:thin; scrollbar-color:#4a4234 transparent}
+}
+
 /* ── Общие элементы ──────────────────────────────────────────────── */
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:var(--s2);

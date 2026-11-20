@@ -258,8 +258,8 @@
 .sheet-lite .blk,.sheet-lite .abil,.sheet-lite .fld{min-width:0}
 /* Имя и уровень — одна строка: подпись «Уровень» уходит влево от числа, и
    окошко перестаёт быть башней, из-под которой имя съезжает вниз. */
-.lite-head{display:flex; align-items:center; justify-content:space-between; gap:var(--s3)}
-.sheet-lite .fld-lvl{flex-direction:row; align-items:center; gap:6px; width:auto}
+.lite-head{display:flex; align-items:center; justify-content:space-between; gap:var(--s2)}
+.sheet-lite .fld-lvl{flex-direction:row; align-items:center; gap:var(--s1); width:auto; max-width:none}
 .sheet-lite .fld-lvl .fld-l{white-space:nowrap}
 .sheet-lite .lvl-n{min-width:36px; height:32px; font-size:20px}
 .lite-name{font-family:var(--f-head); font-size:20px; color:var(--gold); margin:0; min-width:0}

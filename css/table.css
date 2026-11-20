@@ -69,7 +69,7 @@
   display:flex; flex-direction:column; min-height:0; padding:var(--s3);
 }
 .panel-right{border-right:0; border-left:1px solid var(--line); width:320px; flex-basis:320px}
-.panel-body{padding-top:var(--s3); overflow:auto; min-height:0}
+.panel-body{padding-top:var(--s3); overflow:hidden auto; min-height:0}
 .panel-flex{display:flex; flex-direction:column; flex:1}
 .panel-body.panel-flex{overflow:hidden}
 
@@ -650,15 +650,16 @@
 .vol-range::-webkit-slider-thumb{
   -webkit-appearance:none; appearance:none; width:16px; height:16px; margin-top:-5px; border-radius:50%;
   background:#f1dfb0; border:2px solid var(--gold); box-shadow:0 1px 4px rgba(0,0,0,.5);
-  transition:transform .18s var(--ease), box-shadow .18s var(--ease);
+  transition:box-shadow .18s var(--ease);
 }
 .vol-range::-moz-range-thumb{
   width:12px; height:12px; border-radius:50%;
   background:#f1dfb0; border:2px solid var(--gold); box-shadow:0 1px 4px rgba(0,0,0,.5);
-  transition:transform .18s var(--ease), box-shadow .18s var(--ease);
+  transition:box-shadow .18s var(--ease);
 }
-.vol-range:hover::-webkit-slider-thumb, .vol-range:focus-visible::-webkit-slider-thumb{transform:scale(1.15); box-shadow:0 0 0 4px rgba(201,164,90,.25)}
-.vol-range:hover::-moz-range-thumb, .vol-range:focus-visible::-moz-range-thumb{transform:scale(1.15); box-shadow:0 0 0 4px rgba(201,164,90,.25)}
+/* подсветка без увеличения: выросший бегунок на краю вылезал из панели вбок */
+.vol-range:hover::-webkit-slider-thumb, .vol-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(201,164,90,.3)}
+.vol-range:hover::-moz-range-thumb, .vol-range:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px rgba(201,164,90,.3)}
 
 .music-bar{
   display:flex; align-items:center; gap:var(--s2); min-height:44px; padding:0 var(--s3);

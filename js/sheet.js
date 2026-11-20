@@ -290,10 +290,11 @@ const el = (tag, cls = '', text = '') => {
  * Уровень только показываем — маленьким окошком, как вдохновение: поднимает
  * его Мастер за столом, во вкладке «Герои».
  */
-function lvlBox(n) {
+function lvlBox(n, short = false) {
   const b = el('div', 'fld fld-lvl');
   b.title = 'Уровень поднимает Мастер за столом.';
-  b.append(el('span', 'fld-l', 'Уровень'), el('span', 'lvl-n', String(n || 1)));
+  // в коротком листе за столом место дорого: «ур.» оставляет имени целую строку
+  b.append(el('span', 'fld-l', short ? 'ур.' : 'Уровень'), el('span', 'lvl-n', String(n || 1)));
   return b;
 }
 
@@ -1078,7 +1079,7 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   };
 
   const head = el('div', 'lite-head');
-  head.append(el('p', 'lite-name', ch.name || 'Персонаж'), lvlBox(ctx.level ?? s.level));
+  head.append(el('p', 'lite-name', ch.name || 'Персонаж'), lvlBox(ctx.level ?? s.level, true));
   root.append(head);
 
   /* ── КД и хиты: щит и полоска вместо трёх одинаковых окошек ──────────
