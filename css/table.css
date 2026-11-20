@@ -632,21 +632,53 @@
 .only-mobile{display:none}
 
 /* ── Телефон ─────────────────────────────────────────────────────── */
-/* ── Музыка: кнопка ♪, своя громкость, пульт Мастера ──────────────── */
-.music-btn{min-width:44px; transition:background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease)}
-.music-btn.is-alert{border-color:var(--gold); color:var(--gold); animation:music-call 1.6s var(--ease) infinite}
-@keyframes music-call{50%{box-shadow:0 0 0 4px rgba(201,164,90,.25)}}
-.music-pop{
-  position:fixed; top:64px; right:var(--s4); z-index:46; width:280px;
-  padding:var(--s4); border:1px solid var(--line); border-radius:var(--r);
-  background:var(--panel); box-shadow:var(--shadow);
+/* ── Музыка: своя громкость вверху, пульт Мастера ──────────────────── */
+/* Ползунок громкости: системный вид снят, дорожка залита золотом до значения.
+   Заливку ведёт переменная --val, её ставит music.js (у WebKit нет своей заливки). */
+.vol-range{
+  --val:50%;
+  -webkit-appearance:none; appearance:none; display:block; width:100%; height:24px; margin:0;
+  background:transparent; cursor:pointer;
 }
-.music-pop-title{margin:0; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.music-pop .hint{margin-bottom:var(--s3)}
+.vol-range:focus{outline:none}
+.vol-range::-webkit-slider-runnable-track{
+  height:6px; border-radius:999px;
+  background:linear-gradient(90deg, var(--gold-dim), var(--gold)) 0 0 / var(--val) 100% no-repeat, var(--line);
+}
+.vol-range::-moz-range-track{height:6px; border-radius:999px; background:var(--line)}
+.vol-range::-moz-range-progress{height:6px; border-radius:999px; background:linear-gradient(90deg, var(--gold-dim), var(--gold))}
+.vol-range::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none; width:16px; height:16px; margin-top:-5px; border-radius:50%;
+  background:#f1dfb0; border:2px solid var(--gold); box-shadow:0 1px 4px rgba(0,0,0,.5);
+  transition:transform .18s var(--ease), box-shadow .18s var(--ease);
+}
+.vol-range::-moz-range-thumb{
+  width:12px; height:12px; border-radius:50%;
+  background:#f1dfb0; border:2px solid var(--gold); box-shadow:0 1px 4px rgba(0,0,0,.5);
+  transition:transform .18s var(--ease), box-shadow .18s var(--ease);
+}
+.vol-range:hover::-webkit-slider-thumb, .vol-range:focus-visible::-webkit-slider-thumb{transform:scale(1.15); box-shadow:0 0 0 4px rgba(201,164,90,.25)}
+.vol-range:hover::-moz-range-thumb, .vol-range:focus-visible::-moz-range-thumb{transform:scale(1.15); box-shadow:0 0 0 4px rgba(201,164,90,.25)}
+
+.music-bar{
+  display:flex; align-items:center; gap:var(--s2); min-height:44px; padding:0 var(--s3);
+  border:1px solid var(--line); border-radius:999px; background:var(--bg-2);
+  transition:border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.music-bar:hover{border-color:var(--gold-dim)}
+.music-bar .vol-range{width:112px}
+.music-ico{width:20px; height:20px; flex:none; fill:none; stroke:var(--gold); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+.music-ico .spk{fill:var(--gold)}
+.music-ico path{transition:opacity .18s var(--ease)}
+.music-ico.is-low .w2, .music-ico.is-off .w1, .music-ico.is-off .w2{opacity:.2}
+.music-pct{min-width:40px; font-size:14px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums}
+/* браузер не дал играть без щелчка — мягко зовём кликнуть */
+.music-bar.is-alert{border-color:var(--gold); animation:music-call 1.6s var(--ease) infinite}
+@keyframes music-call{50%{box-shadow:0 0 0 4px rgba(201,164,90,.25)}}
+
 .music-range{display:flex; flex-direction:column; gap:var(--s1); margin:var(--s3) 0}
 .music-range > span{font-size:14px; color:var(--muted)}
 .music-range b{color:var(--text); font-weight:500}
-.music-range input{width:100%; min-height:32px; accent-color:var(--gold); cursor:pointer}
 .music-list{display:flex; flex-direction:column; gap:var(--s2); margin:var(--s3) 0}
 .music-row{
   display:flex; align-items:center; gap:var(--s2); padding:var(--s2);
@@ -663,7 +695,7 @@
 .music-meta{font-size:14px; color:var(--muted)}
 .music-controls{align-items:center}
 .music-progress{color:var(--gold)}
-@media (prefers-reduced-motion:reduce){ .music-btn.is-alert{animation:none} }
+@media (prefers-reduced-motion:reduce){ .music-bar.is-alert{animation:none} }
 
 @media (max-width:900px){
   .panel{

@@ -9,9 +9,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- стол: основа, поле и панели, лист персонажа в левой панели -->
-<link rel="stylesheet" href="css/base.css?v=61">
-<link rel="stylesheet" href="css/table.css?v=61">
-<link rel="stylesheet" href="css/sheet.css?v=61">
+<link rel="stylesheet" href="css/base.css?v=62">
+<link rel="stylesheet" href="css/table.css?v=62">
+<link rel="stylesheet" href="css/sheet.css?v=62">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -23,31 +23,31 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/app-state.js":       "./js/app-state.js?v=61",
-    "./js/chat.js":            "./js/chat.js?v=61",
-    "./js/zones.js":           "./js/zones.js?v=61",
-    "./js/moves-use.js":        "./js/moves-use.js?v=61",
-    "./js/leash.js":          "./js/leash.js?v=61",
-    "./js/ability-bar.js":    "./js/ability-bar.js?v=61",
-    "./js/music.js":          "./js/music.js?v=61",
-    "./js/ui.js":             "./js/ui.js?v=61",
-    "./js/main.js":           "./js/main.js?v=61",
-    "./js/sync.js":           "./js/sync.js?v=61",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=61",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=61",
-    "./js/store.js":          "./js/store.js?v=61",
-    "./js/history.js":        "./js/history.js?v=61",
-    "./js/board.js":          "./js/board.js?v=61",
-    "./js/dice.js":           "./js/dice.js?v=61",
-    "./js/dice3d.js":         "./js/dice3d.js?v=61",
-    "./js/roomcode.js":       "./js/roomcode.js?v=61",
-    "./js/registry.js":       "./js/registry.js?v=61",
-    "./js/translit.js":       "./js/translit.js?v=61",
-    "./js/sheet.js":          "./js/sheet.js?v=61",
-    "./js/classes.js":        "./js/classes.js?v=61",
-    "./js/charlink.js":       "./js/charlink.js?v=61",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=61",
-    "./js/idb.js":            "./js/idb.js?v=61"
+    "./js/app-state.js":       "./js/app-state.js?v=62",
+    "./js/chat.js":            "./js/chat.js?v=62",
+    "./js/zones.js":           "./js/zones.js?v=62",
+    "./js/moves-use.js":        "./js/moves-use.js?v=62",
+    "./js/leash.js":          "./js/leash.js?v=62",
+    "./js/ability-bar.js":    "./js/ability-bar.js?v=62",
+    "./js/music.js":          "./js/music.js?v=62",
+    "./js/ui.js":             "./js/ui.js?v=62",
+    "./js/main.js":           "./js/main.js?v=62",
+    "./js/sync.js":           "./js/sync.js?v=62",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=62",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=62",
+    "./js/store.js":          "./js/store.js?v=62",
+    "./js/history.js":        "./js/history.js?v=62",
+    "./js/board.js":          "./js/board.js?v=62",
+    "./js/dice.js":           "./js/dice.js?v=62",
+    "./js/dice3d.js":         "./js/dice3d.js?v=62",
+    "./js/roomcode.js":       "./js/roomcode.js?v=62",
+    "./js/registry.js":       "./js/registry.js?v=62",
+    "./js/translit.js":       "./js/translit.js?v=62",
+    "./js/sheet.js":          "./js/sheet.js?v=62",
+    "./js/classes.js":        "./js/classes.js?v=62",
+    "./js/charlink.js":       "./js/charlink.js?v=62",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=62",
+    "./js/idb.js":            "./js/idb.js?v=62"
   }
 }
 </script>
@@ -165,18 +165,16 @@
       <button class="gem-badge" id="gem-badge" hidden title="Ваше вдохновение">
         <span class="gem" aria-hidden="true"><svg class="gem-svg" viewBox="0 0 40 44"><use href="#gem-shape"/></svg></span><span class="gem-count" id="gem-count">0</span>
       </button>
-      <!-- музыка Мастера: кнопка видна, пока выбран трек; громкость у каждого своя -->
-      <button class="btn btn-ghost music-btn" id="btn-music" hidden title="Музыка: своя громкость">♪</button>
-      <div class="music-pop" id="music-pop" hidden>
-        <p class="music-pop-title" id="music-now"></p>
-        <p class="hint" id="music-state"></p>
-        <label class="music-range">
-          <span>Моя громкость <b id="music-my-val"></b></span>
-          <input type="range" id="music-my-vol" min="0" max="100" step="1">
-        </label>
-        <button class="btn btn-soft btn-sm w-full" id="music-mute">Без звука</button>
-        <p class="hint">Слышно только вам. Общую громкость задаёт Мастер.</p>
-      </div>
+      <!-- своя громкость музыки: видна, пока Мастер выбрал трек; слышна только себе -->
+      <label class="music-bar" id="music-bar" hidden>
+        <svg class="music-ico" id="music-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="spk" d="M4 9h4l5-4v14l-5-4H4z"/>
+          <path class="w1" d="M16 9.5a3.5 3.5 0 0 1 0 5"/>
+          <path class="w2" d="M18.5 7a7 7 0 0 1 0 10"/>
+        </svg>
+        <input type="range" class="vol-range" id="music-my-vol" min="0" max="100" step="1" aria-label="Моя громкость музыки">
+        <span class="music-pct" id="music-my-val"></span>
+      </label>
       <button class="btn btn-ghost" id="btn-dice">Кубики</button>
       <button class="btn btn-ghost only-mobile" id="btn-panel">Панели</button>
       <span class="members" id="members"></span>
@@ -296,9 +294,8 @@
         </div>
         <label class="music-range">
           <span>Громкость для всех <b id="music-vol-val"></b></span>
-          <input type="range" id="music-vol" min="0" max="100" step="1">
+          <input type="range" class="vol-range" id="music-vol" min="0" max="100" step="1">
         </label>
-        <p class="hint">У каждого ещё своя громкость — кнопка ♪ вверху экрана.</p>
         <p class="hint" id="music-used"></p>
       </section>
     </aside>
@@ -483,6 +480,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=61"></script>
+<script type="module" src="js/main.js?v=62"></script>
 </body>
 </html>

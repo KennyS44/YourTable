@@ -6,7 +6,7 @@
 // у всех идёт с одного места, и опоздавший слышит его оттуда же.
 //
 // Громкость у каждого своя: итог = общая громкость Мастера × своя громкость.
-// Своя хранится только в этом браузере и никуда не уходит.
+// Своя — ползунок вверху экрана; хранится только в этом браузере и никуда не уходит.
 
 import { app } from './app-state.js';
 import { uid } from './store.js';
@@ -15,7 +15,7 @@ import { $, el, toast } from './ui.js';
 const MAX_BYTES = 20 * 1024 * 1024;
 const FREE_DB = 1024 * 1024 * 1024;       // бесплатный объём Realtime Database
 const DRIFT = 1.5;                        // на сколько секунд можно разойтись с остальными
-const MY_VOL = 'dnd.musicVol', MY_MUTE = 'dnd.musicMute';
+const MY_VOL = 'dnd.musicVol';
 
 const audio = new Audio();
 audio.preload = 'auto';
@@ -30,7 +30,6 @@ const NONE = { tracks: [], now: null, vol: 0.8, loop: true };
 const music = () => app.store.get().music || NONE;
 const serverNow = () => (app.sync.now ? app.sync.now() : Date.now());
 const myVol = () => { const v = parseFloat(localStorage.getItem(MY_VOL)); return Number.isFinite(v) ? v : 1; };
-const isMuted = () => localStorage.getItem(MY_MUTE) === '1';
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const trackOf = (m) => m.now && m.tracks.find((t) => t.id === m.now.id);
 const clock = (sec) => {
@@ -50,7 +49,7 @@ function position(m, track) {
 const ended = (m, track) => !m.loop && track.dur > 0 && position(m, track) >= track.dur;
 
 function setVolume(m) {
-  audio.volume = isMuted() ? 0 : clamp01((m.vol ?? 0.8) * myVol());
+  audio.volume = clamp01((m.vol ?? 0.8) * myVol());
 }
 
 /* ───────────────────────── Плеер ───────────────────────── */
@@ -59,12 +58,12 @@ async function load(track) {
   if (loadingId === track.id) return false;
   loadingId = track.id;
   status = 'Загружается…';
-  renderPop();
+  renderBar();
   const blob = await Promise.resolve()
-    .then(() => app.sync.getAudio(track, (p) => { status = `Загружается ${Math.round(p * 100)}%`; renderPop(); }))
+    .then(() => app.sync.getAudio(track, (p) => { status = `Загружается ${Math.round(p * 100)}%`; renderBar(); }))
     .catch(() => null);
   loadingId = null;
-  if (!blob) { status = 'Файл трека не найден'; renderPop(); return false; }
+  if (!blob) { status = 'Файл трека не найден'; renderBar(); return false; }
   if (objUrl) URL.revokeObjectURL(objUrl);
   objUrl = URL.createObjectURL(blob);
   audio.src = objUrl;
@@ -88,7 +87,7 @@ async function follow() {
   const m = music();
   setVolume(m);
   const track = trackOf(m);
-  if (!track) { unload(); status = ''; renderPop(); return; }
+  if (!track) { unload(); status = ''; renderBar(); return; }
   if (loadedId !== track.id) {
     audio.pause();
     if (!(await load(track))) return;
@@ -99,36 +98,43 @@ async function follow() {
   if (!m.now.playing || ended(m, track)) {
     audio.pause();
     if (!m.now.playing && Math.abs(audio.currentTime - t) > 0.3) audio.currentTime = t;
-    renderPop();
+    renderBar();
     return;
   }
   if (Math.abs(audio.currentTime - t) > DRIFT) audio.currentTime = t;
   if (audio.paused) {
-    audio.play().then(() => { blocked = false; renderPop(); }).catch((e) => {
-      if (e.name === 'NotAllowedError') { blocked = true; renderPop(); }
+    audio.play().then(() => { blocked = false; renderBar(); }).catch((e) => {
+      if (e.name === 'NotAllowedError') { blocked = true; renderBar(); }
     });
   }
-  renderPop();
+  renderBar();
 }
 
 /* ───────────────────────── Своя громкость ───────────────────────── */
 
-function renderPop() {
+/** Заливка ползунка до значения: у WebKit своей нет, рисуем градиентом по --val. */
+function fill(range) { range.style.setProperty('--val', range.value + '%'); }
+
+function renderBar() {
   const m = music();
   const track = trackOf(m);
-  const btn = $('#btn-music');
-  btn.hidden = !track;
-  btn.classList.toggle('is-alert', blocked);
-  btn.textContent = blocked ? '♪ Включить звук' : (isMuted() ? '♪ Без звука' : '♪');
-  if (!track) { $('#music-pop').hidden = true; return; }
-  $('#music-now').textContent = track.name;
-  $('#music-state').textContent = status
-    || (blocked ? 'Браузер ждёт щелчка — нажмите «Включить звук»'
-      : !m.now.playing ? 'Пауза' : ended(m, track) ? 'Трек закончился' : 'Играет');
+  const bar = $('#music-bar');
+  bar.hidden = !track;
+  if (!track) return;
+  bar.classList.toggle('is-alert', blocked);
+  // что играет и в каком состоянии — во всплывающей подсказке, без лишних надписей
+  const state = status
+    || (blocked ? 'щёлкните по странице, чтобы включить звук'
+      : !m.now.playing ? 'пауза' : ended(m, track) ? 'трек закончился' : 'играет');
+  bar.title = `Музыка: ${track.name} — ${state}. Громкость слышна только вам.`;
+  const pct = Math.round(myVol() * 100);
   const r = $('#music-my-vol');
-  if (document.activeElement !== r) r.value = Math.round(myVol() * 100);
-  $('#music-my-val').textContent = Math.round(myVol() * 100) + '%';
-  $('#music-mute').textContent = isMuted() ? 'Включить звук' : 'Без звука';
+  if (document.activeElement !== r) r.value = pct;
+  fill(r);
+  $('#music-my-val').textContent = pct + '%';
+  const ico = $('#music-ico');
+  ico.classList.toggle('is-off', pct === 0);
+  ico.classList.toggle('is-low', pct > 0 && pct < 50);
 }
 
 /* ───────────────────────── Пульт Мастера ───────────────────────── */
@@ -175,6 +181,7 @@ function renderList(s) {
   $('#music-loop').checked = !!m.loop;
   const r = $('#music-vol');
   if (document.activeElement !== r) r.value = Math.round((m.vol ?? 0.8) * 100);
+  fill(r);
   $('#music-vol-val').textContent = Math.round((m.vol ?? 0.8) * 100) + '%';
   // в базе куски лежат в base64 — это на треть больше самого файла
   const used = m.tracks.reduce((a, t) => a + t.size * 4 / 3, 0);
@@ -223,29 +230,14 @@ async function upload(files) {
 export function initMusic() {
   // окно для проверок: что на самом деле играет у этого человека
   window.__music = () => ({ id: loadedId, t: audio.currentTime, vol: audio.volume, paused: audio.paused, blocked });
-  const pop = $('#music-pop');
-  $('#btn-music').addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (blocked) {
-      // щелчок — то самое разрешение браузера: играем прямо из него
-      audio.play().then(() => { blocked = false; renderPop(); }).catch(() => {});
-      return;
-    }
-    pop.hidden = !pop.hidden;
-    renderPop();
-  });
-  document.addEventListener('click', (e) => {
-    if (!pop.hidden && !pop.contains(e.target) && e.target.id !== 'btn-music') pop.hidden = true;
+  // браузер не даёт играть звук до первого щелчка: любой щелчок по странице и есть разрешение
+  document.addEventListener('pointerdown', () => {
+    if (blocked) audio.play().then(() => { blocked = false; renderBar(); }).catch(() => {});
   });
   $('#music-my-vol').addEventListener('input', (e) => {
     localStorage.setItem(MY_VOL, String(e.target.value / 100));
     setVolume(music());
-    renderPop();
-  });
-  $('#music-mute').addEventListener('click', () => {
-    localStorage.setItem(MY_MUTE, isMuted() ? '0' : '1');
-    setVolume(music());
-    renderPop();
+    renderBar();
   });
 
   if (app.isDM) {
@@ -267,6 +259,7 @@ export function initMusic() {
     $('#music-vol').addEventListener('input', (e) => {
       const v = e.target.value / 100;
       $('#music-vol-val').textContent = e.target.value + '%';
+      fill(e.target);
       setVolume({ vol: v });
     });
     $('#music-vol').addEventListener('change', (e) => {
