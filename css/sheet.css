@@ -374,3 +374,61 @@
 }
 .char-del{right:var(--s2); width:28px; justify-content:center}
 .char-del:hover{color:var(--danger)}
+
+/* ── Инвентарь: монеты, предметы с жетоном М/И, строка «вписать» ──────
+   Жетон — маленькая монета, как гербы классов: золотая М — выдал Мастер,
+   серебряная И — вписал сам игрок. */
+.inv{display:flex; flex-direction:column; gap:var(--s3)}
+.inv-coins{display:grid; grid-template-columns:repeat(auto-fit, minmax(112px, 1fr)); gap:var(--s2)}
+.inv-coin{
+  display:flex; align-items:center; gap:var(--s2); min-width:0; padding:0 var(--s2);
+  border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel);
+  transition:border-color .18s var(--ease);
+}
+.inv-coin:focus-within{border-color:var(--gold-dim)}
+.inv-coin input{
+  flex:1; width:100%; min-width:0; min-height:36px; padding:0; border:0; background:transparent;
+  color:var(--text); font-size:16px; text-align:right; font-variant-numeric:tabular-nums;
+  -moz-appearance:textfield; appearance:textfield;
+}
+.inv-coin input::-webkit-outer-spin-button, .inv-coin input::-webkit-inner-spin-button{-webkit-appearance:none; margin:0}
+.inv-coin input:focus{outline:none}
+.inv-coin-l{font-size:14px; color:var(--muted)}
+.inv-coin-tok{width:20px; height:20px; flex:none; border-radius:50%; box-shadow:inset 0 0 0 2px rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.4)}
+.inv-coin-pp{background:radial-gradient(circle at 50% 35%, #f4f6f8, #aab2bc); border:1px solid #7d858f}
+.inv-coin-gp{background:radial-gradient(circle at 50% 35%, #e3c98f, #c9a45a); border:1px solid #8d7440}
+.inv-coin-sp{background:radial-gradient(circle at 50% 35%, #e4e2dd, #9d9a93); border:1px solid #6f6a5e}
+.inv-coin-cp{background:radial-gradient(circle at 50% 35%, #e2a878, #a8653a); border:1px solid #74421f}
+
+.inv-list{display:flex; flex-direction:column}
+.inv-empty{margin:0}
+.inv-row{display:flex; align-items:center; gap:var(--s2); min-height:44px; padding:var(--s1) 0; border-bottom:1px solid var(--line-soft)}
+.inv-row:last-child{border-bottom:0}
+.inv-tok{
+  width:24px; height:24px; flex:none; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+  font-family:var(--f-head); font-size:14px; font-weight:600; line-height:1; color:var(--ink); cursor:default;
+  box-shadow:inset 0 0 0 2px rgba(0,0,0,.14), 0 1px 2px rgba(0,0,0,.4);
+}
+.inv-tok-m{background:radial-gradient(circle at 50% 35%, #e3c98f, #c9a45a); border:1px solid #8d7440}
+.inv-tok-p{background:radial-gradient(circle at 50% 35%, #e4e2dd, #9d9a93); border:1px solid #6f6a5e}
+.inv-name{flex:1; min-width:0; overflow-wrap:anywhere}
+.inv-qty{display:flex; align-items:center; gap:var(--s1)}
+.inv-n{min-width:40px; text-align:center; font-size:14px; color:var(--muted); font-variant-numeric:tabular-nums}
+.inv-step{
+  width:32px; height:32px; flex:none; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid var(--line); border-radius:var(--r-sm); background:var(--panel-2); color:var(--text);
+  font-size:16px; cursor:pointer; transition:background .18s var(--ease), border-color .18s var(--ease), color .18s var(--ease);
+}
+.inv-step:hover{border-color:var(--gold-dim); color:var(--gold)}
+.inv-row > .inv-step{border-color:transparent; background:transparent; color:var(--muted)}
+.inv-row > .inv-step:hover{color:var(--danger)}
+
+.inv-add{display:flex; gap:var(--s2)}
+.inv-add input{
+  min-height:40px; padding:0 var(--s2); border-radius:var(--r-sm); border:1px solid var(--line);
+  background:var(--panel); color:var(--text); font-size:16px;
+}
+.inv-add input:focus{outline:2px solid var(--gold-dim); outline-offset:1px}
+.inv-add-name{flex:1; min-width:0}
+.inv-add-qty{width:56px; text-align:center}
+.inv-add-go{min-width:44px; min-height:40px; padding:0; font-size:20px}

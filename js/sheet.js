@@ -5,6 +5,7 @@
 // спасбросков, бонуса мастерства, предыстории, опыта, инициативы и спасбросков
 // от смерти. Вдохновение и уровень не правятся: их выдаёт Мастер за столом.
 
+import { fixInv, applyOps, invWidget } from './inventory.js';
 import { CLASSES, classById } from './classes.js';
 
 export const ABILITIES = [
@@ -276,7 +277,28 @@ export function fixSheet(raw) {
     m.raw = [a.bonus, a.dmg].filter(Boolean).join(' · ');
   });
   delete s.attacks;
+  // инвентарь — список с жетонами М/И; прежний текст gear остаётся в листе как был
+  s.inv = fixInv(raw && raw.inv, raw && raw.gear);
   return s;
+}
+
+/**
+ * Блок «Инвентарь» листа. Правки игрока применяются к листу сразу; onEdit
+ * получает третьим аргументом саму операцию — стол по ней пишет в ленту.
+ */
+function invBlock(s, onEdit, ro) {
+  const b = el('section', 'blk inv-blk');
+  const w = invWidget(() => s.inv, {
+    role: ro ? 'ro' : 'p',
+    onOp: (op) => {
+      const before = s.inv;
+      s.inv = applyOps(s.inv, [op]);
+      w.redraw();
+      onEdit('inv', s.inv, op, before);
+    },
+  });
+  b.append(el('h3', 'blk-h', 'Инвентарь'), w.node);
+  return { node: b, redraw: w.redraw };
 }
 
 const el = (tag, cls = '', text = '') => {
@@ -1011,7 +1033,7 @@ export function renderSheet(root, ch, onEdit, ctx = {}) {
   // Слева всё, что про тело и снаряжение героя, посередине — что он делает,
   // справа — каким его видят и чем его не взять.
   const cols = [
-    [abilBlk, defenseBlk, hpBlk, rest.gear],
+    [abilBlk, defenseBlk, hpBlk, invBlock(s, onEdit, ro).node],
     [atkBlk, featsBlk, block('Личность', pairGrid(PERSONA))],
     [rest.appearance, rest.langs,
       block('Сопротивления и слабости', guardPicker(s, onEdit, ro), pairGrid(DEFENCE))],
@@ -1195,8 +1217,11 @@ export function renderSheetLite(root, ch, onEdit, ctx = {}) {
   drawFeats();
   root.append(block('Способности', feats));
 
-  root.append(bindArea('gear', 'Инвентарь', 5));
+  const inv = invBlock(s, onEdit, false);
+  root.append(inv.node);
   root.append(block('Сопротивления и слабости', guardPicker(s, onEdit, false)));
   root.append(bindArea('flaws', 'Слабости', 3));
   root.append(bindArea('resist', 'Сопротивления', 3));
+  // стол перерисует инвентарь сам, когда Мастер что-то выдаст
+  return { redrawInv: inv.redraw };
 }

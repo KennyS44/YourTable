@@ -24,6 +24,7 @@ import { useMove, rollAbility, applyToHp } from './moves-use.js';
 import { bindTokens, canUnbind, unbindButton, renderLeashBar } from './leash.js';
 import { openAbilityBar, closeAbilityBar, renderAbilityBar, wireAbilityBar } from './ability-bar.js';
 import { initMusic } from './music.js';
+import { fixInv, applyOps, describeOp, invWidget } from './inventory.js';
 
 const COLORS = ['#c9a45a', '#ece6d9', '#b8604a', '#83a05f', '#7fa8c9', '#a678b8', '#e0a05a', '#6f6a5e'];
 const SHAPES = [
@@ -682,6 +683,7 @@ function whoBox(s, m) {
 function renderHeroes(s) {
   const box = $('#heroes-list');
   if (!box) return;
+  const focused = document.activeElement;
   box.innerHTML = '';
   const people = participants().filter((m) => m.role !== 'dm');
   if (!people.length) {
@@ -708,8 +710,11 @@ function renderHeroes(s) {
     const nums = el('div', 'hero-nums');
     nums.append(lvl, gems);
     row.append(nums);
+    if (app.isDM) heroInventory(s, m, row);
     box.append(row);
   });
+  // список пересобирается на каждое действие — поле, в котором Мастер печатал, возвращаем под курсор
+  if (focused && box.contains(focused.closest('.inv'))) focused.focus();
 
   // свой самоцвет — всегда на виду, у Мастера его нет
   const badge = $('#gem-badge');
@@ -728,6 +733,54 @@ function renderHeroes(s) {
     gemShown = mine;
     sendInspToCabinet(mine);
   }
+}
+
+/* ── Инвентарь героя у Мастера ──────────────────────────────────────
+   Мастер видит копию, которую прислал лист героя, вместе с ещё не забранными
+   выдачами. Его правки — операции в комнате: лист применит их у себя. */
+const invOpen = new Set();          // у каких героев список раскрыт
+const invViews = new Map();         // id персонажа -> {w, sig}: поля ввода живут между перерисовками
+
+function heroInvOf(s, charId) {
+  const mirror = s.inv[charId];
+  return applyOps(fixInv(mirror.inv), Object.values(s.invOps[charId] || {}));
+}
+
+function heroInventory(s, m, row) {
+  // у игрока могли быть разные персонажи — берём того, с кем он заходил последним
+  const mine = Object.entries(s.inv || {}).filter(([, v]) => v && v.owner === m.key)
+    .sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+  if (!mine.length) return;
+  const [charId, mirror] = mine[0];
+  const open = invOpen.has(charId);
+  const pending = Object.keys(s.invOps[charId] || {}).length;
+  const btn = el('button', 'btn btn-soft btn-sm hero-inv-btn' + (open ? ' is-open' : ''),
+    (open ? 'Скрыть инвентарь' : 'Инвентарь') + (pending && !m.online ? ` · ждёт ${pending}` : ''));
+  btn.title = pending && !m.online ? 'Выданное ляжет в лист, когда игрок придёт за стол' : `Инвентарь: ${mirror.name}`;
+  btn.addEventListener('click', () => {
+    if (open) invOpen.delete(charId); else invOpen.add(charId);
+    renderHeroes(app.store.get());
+  });
+  row.append(btn);
+  if (!open) return;
+
+  let view = invViews.get(charId);
+  if (!view) {
+    const w = invWidget(() => heroInvOf(app.store.get(), charId), {
+      role: 'dm',
+      onOp: (op) => {
+        const st = app.store.get();
+        const text = describeOp(heroInvOf(st, charId), op, st.inv[charId].name, true);
+        app.store.dispatch({ t: 'inv.op', charId, op });
+        if (text) say(text, 'system');
+      },
+    });
+    view = { w, sig: '' };
+    invViews.set(charId, view);
+  }
+  const sig = JSON.stringify(heroInvOf(s, charId));
+  if (sig !== view.sig) { view.sig = sig; view.w.redraw(); }
+  row.append(view.w.node);
 }
 
 /**
@@ -1524,14 +1577,38 @@ async function wireHeroSheet() {
     });
   };
 
-  const onEdit = (key) => {
+  /* ── Инвентарь: лист — главный, стол держит копию для Мастера ─────
+     Выдачи Мастера ждут в комнате (invOps), пока лист их не заберёт: так
+     предмет доходит, даже если игрок был не в сети. Забрал — отмечаем. */
+  const charId = ch.id || brought.id;
+  let lite = null;
+  const syncInv = (done = []) => app.store.dispatch({
+    t: 'inv.sync', charId, done,
+    mirror: { name: ch.name, owner: myKey, inv: ch.sheet.inv, at: Date.now() },
+  });
+  const takeOps = (s) => {
+    const ops = Object.values((s.invOps || {})[charId] || {});
+    if (!ops.length) return false;
+    ch.sheet.inv = applyOps(fixInv(ch.sheet.inv, ch.sheet.gear), ops);
+    if (lite && lite.redrawInv) lite.redrawInv();
+    save();
+    syncInv(ops.map((o) => o.id));
+    return true;
+  };
+
+  const onEdit = (key, _value, op, before) => {
+    if (key === 'inv') {
+      syncInv();
+      const text = op && describeOp(before, op, ch.name, false);
+      if (text) say(text, 'system');
+    }
     if (key === 'hpCur' || key === 'hpMax') pushHpToToken();
     // характеристики двигают спасброски, поля стойкости — множители урона
     if (ABILITIES.some((a) => a.id === key) || key === 'dmgResist' || key === 'dmgVuln') pushTraitsToToken();
     save();
   };
 
-  renderSheetLite($('#lite-sheet'), ch, onEdit, {
+  lite = renderSheetLite($('#lite-sheet'), ch, onEdit, {
     level: levelOf(app.store.get(), myKey),
     onRoll: rollAbility,
     onUse: (m, anchor) => useMove(m, ch, anchor),
@@ -1562,9 +1639,10 @@ async function wireHeroSheet() {
   syncHpFromToken(app.store.get());
   pushTraitsToToken();
   showLink(app.store.get());
+  if (!takeOps(app.store.get())) syncInv();
   // фигурку ставит Мастер, и появиться она может позже: следим за столом и
   // дописываем в неё лист, как только она встала
-  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); pushTraitsToToken(); showLink(s); });
+  app.store.subscribe((s) => { showLevel(s); syncHpFromToken(s); pushTraitsToToken(); showLink(s); takeOps(s); });
 }
 
 function wireDM() {

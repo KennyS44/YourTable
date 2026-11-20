@@ -28,6 +28,10 @@ export function emptyState(room) {
     pics: { assets: [], shown: null },
     // музыка Мастера: список треков, что играет сейчас и общая громкость
     music: { tracks: [], now: null, vol: 0.8, loop: true },
+    // Инвентарь живёт в листе героя (в кабинете игрока). Здесь — его копия,
+    // чтобы Мастер видел список, и выдачи Мастера, которые лист ещё не забрал.
+    inv: {},                    // id персонажа -> {name, owner, inv, at}
+    invOps: {},                 // id персонажа -> {id операции -> операция}
     seq: 0,
   };
 }
@@ -69,6 +73,8 @@ export function normalize(raw) {
   s.pics.assets = s.pics.assets || [];
   s.music = { tracks: [], now: null, vol: 0.8, loop: true, ...(s.music || {}) };
   s.music.tracks = s.music.tracks || [];
+  s.inv = s.inv || {};
+  s.invOps = s.invOps || {};
   s.init = { order: [], idx: 0, round: 1, ...(s.init || {}) };
   s.init.order = s.init.order || [];
 
@@ -417,6 +423,19 @@ export function reduce(s, a) {
     // отдельным действием: null в патче база выбросит, и остановка до других не дойдёт
     case 'music.stop':
       s.music = { ...s.music, now: null }; break;
+
+    // Мастер выдал или забрал: операция ждёт, пока её заберёт лист героя
+    case 'inv.op':
+      s.invOps = { ...s.invOps, [a.charId]: { ...(s.invOps[a.charId] || {}), [a.op.id]: a.op } };
+      break;
+    // лист героя прислал свежую копию и отметил, какие выдачи уже забрал
+    case 'inv.sync': {
+      s.inv = { ...s.inv, [a.charId]: a.mirror };
+      const left = { ...(s.invOps[a.charId] || {}) };
+      (a.done || []).forEach((id) => { delete left[id]; });
+      s.invOps = { ...s.invOps, [a.charId]: left };
+      break;
+    }
 
     case 'state.replace':
       return { ...a.state };

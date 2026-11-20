@@ -387,6 +387,10 @@
 }
 .hero-row .off{color:var(--muted); font-size:14px}
 .hero-lvl,.hero-gems{display:flex; align-items:center; gap:var(--s2)}
+/* инвентарь героя у Мастера раскрывается прямо в строке, во всю её ширину */
+.hero-inv-btn{flex:1 1 100%}
+.hero-inv-btn.is-open{border-color:var(--gold-dim); color:var(--gold)}
+.hero-row > .inv{flex:1 1 100%; min-width:0}
 .hero-nums{display:flex; align-items:center; flex-wrap:wrap; gap:var(--s3); margin-left:auto}
 .hero-lvl .lvl-tag{color:var(--muted); font-size:14px}
 .hero-lvl .n{font-family:var(--f-head); font-size:20px; color:var(--gold); min-width:16px; text-align:center}
