@@ -9,9 +9,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- стол: основа, поле и панели, лист персонажа в левой панели -->
-<link rel="stylesheet" href="css/base.css?v=63">
-<link rel="stylesheet" href="css/table.css?v=63">
-<link rel="stylesheet" href="css/sheet.css?v=63">
+<link rel="stylesheet" href="css/base.css?v=64">
+<link rel="stylesheet" href="css/table.css?v=64">
+<link rel="stylesheet" href="css/sheet.css?v=64">
 
 <!--
   Версия сборки. GitHub Pages отдаёт файлы с max-age=600, поэтому после
@@ -23,33 +23,33 @@
 <script type="importmap">
 {
   "imports": {
-    "./js/app-state.js":       "./js/app-state.js?v=63",
-    "./js/chat.js":            "./js/chat.js?v=63",
-    "./js/zones.js":           "./js/zones.js?v=63",
-    "./js/moves-use.js":        "./js/moves-use.js?v=63",
-    "./js/leash.js":          "./js/leash.js?v=63",
-    "./js/ability-bar.js":    "./js/ability-bar.js?v=63",
-    "./js/music.js":          "./js/music.js?v=63",
-    "./js/terrain.js":        "./js/terrain.js?v=63",
-    "./js/ui.js":             "./js/ui.js?v=63",
-    "./js/main.js":           "./js/main.js?v=63",
-    "./js/sync.js":           "./js/sync.js?v=63",
-    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=63",
-    "./js/firebase-config.js":"./js/firebase-config.js?v=63",
-    "./js/store.js":          "./js/store.js?v=63",
-    "./js/history.js":        "./js/history.js?v=63",
-    "./js/board.js":          "./js/board.js?v=63",
-    "./js/dice.js":           "./js/dice.js?v=63",
-    "./js/dice3d.js":         "./js/dice3d.js?v=63",
-    "./js/roomcode.js":       "./js/roomcode.js?v=63",
-    "./js/registry.js":       "./js/registry.js?v=63",
-    "./js/translit.js":       "./js/translit.js?v=63",
-    "./js/sheet.js":          "./js/sheet.js?v=63",
-    "./js/inventory.js":      "./js/inventory.js?v=63",
-    "./js/classes.js":        "./js/classes.js?v=63",
-    "./js/charlink.js":       "./js/charlink.js?v=63",
-    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=63",
-    "./js/idb.js":            "./js/idb.js?v=63"
+    "./js/app-state.js":       "./js/app-state.js?v=64",
+    "./js/chat.js":            "./js/chat.js?v=64",
+    "./js/zones.js":           "./js/zones.js?v=64",
+    "./js/moves-use.js":        "./js/moves-use.js?v=64",
+    "./js/leash.js":          "./js/leash.js?v=64",
+    "./js/ability-bar.js":    "./js/ability-bar.js?v=64",
+    "./js/music.js":          "./js/music.js?v=64",
+    "./js/terrain.js":        "./js/terrain.js?v=64",
+    "./js/ui.js":             "./js/ui.js?v=64",
+    "./js/main.js":           "./js/main.js?v=64",
+    "./js/sync.js":           "./js/sync.js?v=64",
+    "./js/sync-firebase.js":  "./js/sync-firebase.js?v=64",
+    "./js/firebase-config.js":"./js/firebase-config.js?v=64",
+    "./js/store.js":          "./js/store.js?v=64",
+    "./js/history.js":        "./js/history.js?v=64",
+    "./js/board.js":          "./js/board.js?v=64",
+    "./js/dice.js":           "./js/dice.js?v=64",
+    "./js/dice3d.js":         "./js/dice3d.js?v=64",
+    "./js/roomcode.js":       "./js/roomcode.js?v=64",
+    "./js/registry.js":       "./js/registry.js?v=64",
+    "./js/translit.js":       "./js/translit.js?v=64",
+    "./js/sheet.js":          "./js/sheet.js?v=64",
+    "./js/inventory.js":      "./js/inventory.js?v=64",
+    "./js/classes.js":        "./js/classes.js?v=64",
+    "./js/charlink.js":       "./js/charlink.js?v=64",
+    "./js/cabinet-store.js":  "./js/cabinet-store.js?v=64",
+    "./js/idb.js":            "./js/idb.js?v=64"
   }
 }
 </script>
@@ -290,10 +290,7 @@
         <p class="hint">mp3, ogg или m4a, до 20 МБ за трек. ▶ — играть у всех за столом.</p>
         <p class="hint music-progress" id="music-progress" hidden></p>
         <div class="music-list" id="music-list"></div>
-        <div class="row-2 music-controls">
-          <button class="btn btn-soft btn-sm" id="music-stop">■ Стоп</button>
-          <label class="check"><input type="checkbox" id="music-loop"><span>Повтор трека</span></label>
-        </div>
+        <label class="check"><input type="checkbox" id="music-loop"><span>Повтор трека</span></label>
         <label class="music-range">
           <span>Громкость для всех <b id="music-vol-val"></b></span>
           <input type="range" class="vol-range" id="music-vol" min="0" max="100" step="1">
@@ -488,6 +485,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=63"></script>
+<script type="module" src="js/main.js?v=64"></script>
 </body>
 </html>

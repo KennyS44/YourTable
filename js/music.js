@@ -177,7 +177,6 @@ function renderList(s) {
     row.append(play, name, del);
     list.append(row);
   });
-  $('#music-stop').disabled = !m.now;
   $('#music-loop').checked = !!m.loop;
   const r = $('#music-vol');
   if (document.activeElement !== r) r.value = Math.round((m.vol ?? 0.8) * 100);
@@ -246,7 +245,6 @@ export function initMusic() {
       e.target.value = '';
       await upload(files);
     });
-    $('#music-stop').addEventListener('click', () => app.store.dispatch({ t: 'music.stop' }));
     $('#music-loop').addEventListener('change', (e) => {
       const m = music();
       const track = trackOf(m);
